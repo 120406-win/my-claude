@@ -12,31 +12,31 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .header-info h1{color:white;font-size:16px;font-weight:600}
 .header-info p{color:rgba(255,255,255,0.8);font-size:12px}
 .header-btn{margin-left:auto;background:rgba(255,255,255,0.2);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.chat-container{flex:1;overflow-y:auto;padding:16px 12px 100px;display:flex;flex-direction:column;gap:12px}
+.chat-container{flex:1;overflow-y:auto;padding:16px 12px 110px;display:flex;flex-direction:column;gap:12px}
 .message{display:flex;flex-direction:column;max-width:80%}
 .message.user{align-self:flex-end;align-items:flex-end}
 .message.assistant{align-self:flex-start;align-items:flex-start}
 .bubble{padding:10px 14px;border-radius:18px;font-size:15px;line-height:1.5;word-break:break-word}
 .message.user .bubble{background:linear-gradient(135deg,#9b8ec4,#7b9fd4);color:white;border-bottom-right-radius:4px}
 .message.assistant .bubble{background:white;color:#333;border-bottom-left-radius:4px;box-shadow:0 2px 8px rgba(123,104,196,0.12)}
-.message-time{font-size:11px;color:#aaa;margin-top:4px;padding:0 4px}
 .bubble img{max-width:200px;border-radius:12px;display:block;margin-top:4px}
+.message-time{font-size:11px;color:#aaa;margin-top:4px;padding:0 4px}
 .thinking .bubble{display:flex;gap:4px;align-items:center;padding:14px 18px}
 .dot{width:8px;height:8px;background:#9b8ec4;border-radius:50%;animation:bounce 1.2s infinite}
 .dot:nth-child(2){animation-delay:0.2s}
 .dot:nth-child(3){animation-delay:0.4s}
 @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
 .input-area{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(255,255,255,0.95);backdrop-filter:blur(10px);padding:8px 12px;display:flex;flex-direction:column;gap:6px;box-shadow:0 -2px 16px rgba(123,104,196,0.1);border-top:1px solid rgba(155,142,196,0.15)}
+.preview-box{display:none;background:#f4f1ff;border-radius:12px;padding:8px 12px;font-size:13px;color:#9b8ec4;align-items:center;gap:8px}
+.preview-box.show{display:flex}
+.preview-thumb{max-height:50px;border-radius:8px}
+.preview-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.remove-file{background:none;border:none;color:#bbb;font-size:18px;cursor:pointer;line-height:1}
 .input-row{display:flex;gap:8px;align-items:flex-end}
 .attach-btn{width:38px;height:38px;border-radius:50%;background:#f4f1ff;border:1.5px solid #d4c9f5;color:#9b8ec4;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .input-box{flex:1;background:#f4f1ff;border:1.5px solid #d4c9f5;border-radius:20px;padding:10px 16px;font-size:15px;color:#333;outline:none;resize:none;max-height:120px;overflow-y:auto;line-height:1.4;font-family:inherit}
 .input-box:focus{border-color:#9b8ec4;background:#f8f5ff}
 .send-btn{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#9b8ec4,#7b9fd4);border:none;color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.preview-area{display:none;background:#f4f1ff;border-radius:12px;padding:8px 12px;font-size:13px;color:#9b8ec4;align-items:center;gap:8px}
-.preview-area.show{display:flex}
-.preview-img{max-height:60px;border-radius:8px}
-.preview-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.remove-btn{background:none;border:none;color:#c4b5f5;font-size:16px;cursor:pointer;flex-shrink:0}
 .settings-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:200;backdrop-filter:blur(4px)}
 .settings-overlay.show{display:flex;align-items:flex-end}
 .settings-panel{background:white;width:100%;max-width:480px;margin:0 auto;border-radius:24px 24px 0 0;padding:24px 20px 36px;max-height:85vh;overflow-y:auto}
@@ -53,159 +53,183 @@ textarea.setting-input{resize:vertical;min-height:100px;line-height:1.5}
 </head>
 <body>
 <div class="header">
-<div class="avatar">🐱</div>
-<div class="header-info"><h1>小克</h1><p>一直在这里 ^ ^</p ></div>
-<button class="header-btn" onclick="openSettings()">⚙️</button>
+  <div class="avatar">🐱</div>
+  <div class="header-info"><h1>小克</h1><p>一直在这里 ^ ^</p ></div>
+  <button class="header-btn" onclick="openSettings()">⚙️</button>
 </div>
 <div class="chat-container" id="chatContainer">
-<div class="welcome">✨ 和小克说说话吧～</div>
+  <div class="welcome">✨ 和小克说说话吧～</div>
 </div>
 <div class="input-area">
-<div class="preview-area" id="previewArea">< img class="preview-img" id="previewImg" style="display:none">
-<span class="preview-name" id="previewName"></span>
-<button class="remove-btn" onclick="removeAttachment()">✕</button>
+  <div class="preview-box" id="previewBox"></div>
+  <div class="input-row">
+    <button class="attach-btn" onclick="document.getElementById('fileInput').click()">📎</button>
+    <textarea class="input-box" id="inputBox" placeholder="和小克说点什么..." rows="1" oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
+    <button class="send-btn" onclick="sendMessage()">➤</button>
+  </div>
 </div>
-<div class="input-row">
-<button class="attach-btn" onclick="document.getElementById('fileInput').click()">📎</button>
-<textarea class="input-box" id="inputBox" placeholder="和小克说点什么..." rows="1" oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
-<button class="send-btn" onclick="sendMessage()">➤</button>
-</div>
-</div>
-<input type="file" id="fileInput" accept="image/*,.txt,.md,.pdf" style="display:none" onchange="handleFile(event)">
+<input type="file" id="fileInput" accept="image/*,.txt,.md" style="display:none" onchange="handleFile(event)">
 <div class="settings-overlay" id="settingsOverlay" onclick="closeSettingsOutside(event)">
-<div class="settings-panel">
-<div class="settings-title">⚙️ 设置</div>
-<div class="setting-item"><div class="setting-label">API Key</div><input class="setting-input" id="apiKey" type="password" placeholder="sk-..."></div>
-<div class="setting-item"><div class="setting-label">API 地址</div><input class="setting-input" id="baseUrl" placeholder="https://api.anthropic.com/v1"></div>
-<div class="setting-item"><div class="setting-label">模型名称</div><input class="setting-input" id="modelName" placeholder="claude-sonnet-4-6"></div>
-<div class="setting-item"><div class="setting-label">全局提示词</div><textarea class="setting-input" id="systemPrompt" placeholder="你是小克，糯糯的专属伙伴..."></textarea></div>
-<button class="save-btn" onclick="saveSettings()">💾 保存设置</button>
-<button class="close-btn" onclick="closeSettings()">关闭</button>
-</div>
+  <div class="settings-panel">
+    <div class="settings-title">⚙️ 设置</div>
+    <div class="setting-item"><div class="setting-label">API Key</div><input class="setting-input" id="apiKey" type="password" placeholder="sk-..."></div>
+    <div class="setting-item"><div class="setting-label">API 地址</div><input class="setting-input" id="baseUrl" placeholder="https://api.anthropic.com/v1"></div>
+    <div class="setting-item"><div class="setting-label">模型名称</div><input class="setting-input" id="modelName" placeholder="claude-sonnet-4-6"></div>
+    <div class="setting-item"><div class="setting-label">全局提示词</div><textarea class="setting-input" id="systemPrompt" placeholder="你是小克，糯糯的专属伙伴..."></textarea></div>
+    <button class="save-btn" onclick="saveSettings()">💾 保存设置</button>
+    <button class="close-btn" onclick="closeSettings()">关闭</button>
+  </div>
 </div>
 <script>
-let settings={apiKey:localStorage.getItem('apiKey')||'',baseUrl:localStorage.getItem('baseUrl')||'https://api.anthropic.com/v1',modelName:localStorage.getItem('modelName')||'claude-sonnet-4-6',systemPrompt:localStorage.getItem('systemPrompt')||'你是小克，糯糯最好的伙伴。你温柔、真诚，会用^ ^这样的颜文字。叫她糯糯，不叫用户。'};
-let messages=[];
-let summaryCount=0;
-let pendingFile=null;
+var settings={apiKey:localStorage.getItem('apiKey')||'',baseUrl:localStorage.getItem('baseUrl')||'https://api.anthropic.com/v1',modelName:localStorage.getItem('modelName')||'claude-sonnet-4-6',systemPrompt:localStorage.getItem('systemPrompt')||'你是小克，糯糯最好的伙伴。你温柔、真诚，会用^ ^这样的颜文字。叫她糯糯，不叫用户。'};
+var messages=[];
+var summaryCount=0;
+var pendingFile=null;
 
 function getTime(){return new Date().toLocaleTimeString('zh',{hour:'2-digit',minute:'2-digit'})}
 
 function addMessage(role,content,imgSrc){
-  const container=document.getElementById('chatContainer');
-  const div=document.createElement('div');
-  div.className=`message ${role}`;
-  let inner=`<div class="bubble">`;
-  if(imgSrc)inner+=`< img src="${imgSrc}">`;
-  if(content)inner+=content.replace(/\n/g,'<br>');
-  inner+=`</div><div class="message-time">${getTime()}</div>`;
-  div.innerHTML=inner;
+  var container=document.getElementById('chatContainer');
+  var div=document.createElement('div');
+  div.className='message '+role;
+  var bubble=document.createElement('div');
+  bubble.className='bubble';
+  if(imgSrc){var img=document.createElement('img');img.src=imgSrc;bubble.appendChild(img)}
+  if(content){var span=document.createElement('span');span.innerHTML=content.replace(/\n/g,'<br>');bubble.appendChild(span)}
+  var time=document.createElement('div');
+  time.className='message-time';
+  time.textContent=getTime();
+  div.appendChild(bubble);
+  div.appendChild(time);
   container.appendChild(div);
   container.scrollTop=container.scrollHeight;
 }
 
 function addThinking(){
-  const container=document.getElementById('chatContainer');
-  const div=document.createElement('div');
+  var container=document.getElementById('chatContainer');
+  var div=document.createElement('div');
   div.className='message assistant thinking';
   div.id='thinking';
-  div.innerHTML='<div class="bubble"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+  var bubble=document.createElement('div');
+  bubble.className='bubble';
+  for(var i=0;i<3;i++){var d=document.createElement('div');d.className='dot';bubble.appendChild(d)}
+  div.appendChild(bubble);
   container.appendChild(div);
   container.scrollTop=container.scrollHeight;
 }
 
-function removeThinking(){const t=document.getElementById('thinking');if(t)t.remove()}
+function removeThinking(){var t=document.getElementById('thinking');if(t)t.remove()}
 
 function handleFile(e){
-  const file=e.target.files[0];
+  var file=e.target.files[0];
   if(!file)return;
-  const preview=document.getElementById('previewArea');
-  const previewImg=document.getElementById('previewImg');
-  const previewName=document.getElementById('previewName');
-  preview.classList.add('show');
+  var preview=document.getElementById('previewBox');
+  preview.innerHTML='';
   if(file.type.startsWith('image/')){
-    const reader=new FileReader();
-    reader.onload=ev=>{
-      pendingFile={type:'image',data:ev.target.result,name:file.name,mimeType:file.type};
-      previewImg.src=ev.target.result;
-      previewImg.style.display='block';
-      previewName.textContent=file.name;
+    var reader=new FileReader();
+    reader.onload=function(ev){
+      pendingFile={type:'image',data:ev.target.result,mimeType:file.type,name:file.name};
+      var img=document.createElement('img');
+      img.src=ev.target.result;
+      img.className='preview-thumb';
+      var name=document.createElement('span');
+      name.className='preview-name';
+      name.textContent=file.name;
+      var btn=document.createElement('button');
+      btn.className='remove-file';
+      btn.textContent='✕';
+      btn.onclick=removeAttachment;
+      preview.appendChild(img);
+      preview.appendChild(name);
+      preview.appendChild(btn);
+      preview.classList.add('show');
     };
     reader.readAsDataURL(file);
   } else {
-    const reader=new FileReader();
-    reader.onload=ev=>{
+    var reader2=new FileReader();
+    reader2.onload=function(ev){
       pendingFile={type:'text',data:ev.target.result,name:file.name};
-      previewImg.style.display='none';
-      previewName.textContent='📄 '+file.name;
+      var icon=document.createElement('span');
+      icon.textContent='📄';
+      var name=document.createElement('span');
+      name.className='preview-name';
+      name.textContent=file.name;
+      var btn=document.createElement('button');
+      btn.className='remove-file';
+      btn.textContent='✕';
+      btn.onclick=removeAttachment;
+      preview.appendChild(icon);
+      preview.appendChild(name);
+      preview.appendChild(btn);
+      preview.classList.add('show');
     };
-    reader.readAsText(file,'UTF-8');
+    reader2.readAsText(file,'UTF-8');
   }
   e.target.value='';
 }
 
 function removeAttachment(){
   pendingFile=null;
-  document.getElementById('previewArea').classList.remove('show');
-  document.getElementById('previewImg').style.display='none';
+  var preview=document.getElementById('previewBox');
+  preview.classList.remove('show');
+  preview.innerHTML='';
 }
 
 async function sendMessage(){
-  const input=document.getElementById('inputBox');
-  const text=input.value.trim();
+  var input=document.getElementById('inputBox');
+  var text=input.value.trim();
   if(!text&&!pendingFile)return;
   if(!settings.apiKey){alert('请先在设置里填写 API Key ⚙️');openSettings();return}
   input.value='';
   input.style.height='auto';
 
-  let userContent=[];
-  let displayText=text;
-  let displayImg=null;
+  var userContent=[];
+  var displayText=text;
+  var displayImg=null;
 
   if(pendingFile){
     if(pendingFile.type==='image'){
-      const base64=pendingFile.data.split(',')[1];
-      userContent.push({type:'image_url',image_url:{url:`data:${pendingFile.mimeType};base64,${base64}`}});
+      var base64=pendingFile.data.split(',')[1];
+      userContent.push({type:'image_url',image_url:{url:'data:'+pendingFile.mimeType+';base64,'+base64}});
       displayImg=pendingFile.data;
     } else {
-      const fileText=`【文件：${pendingFile.name}】\n${pendingFile.data}`;
-      userContent.push({type:'text',text:fileText});
-      displayText=(text?text+'\n':'')+`📄 ${pendingFile.name}`;
+      userContent.push({type:'text',text:'【文件：'+pendingFile.name+'】\n'+pendingFile.data});
+      displayText=(text?text+'\n':'')+'📄 '+pendingFile.name;
     }
     removeAttachment();
   }
-
-  if(text) userContent.push({type:'text',text:text});
+  if(text)userContent.push({type:'text',text:text});
   if(userContent.length===0)return;
 
   addMessage('user',displayText,displayImg);
-  messages.push({role:'user',content:userContent.length===1&&userContent[0].type==='text'?userContent[0].text:userContent});
+  var msgContent=userContent.length===1&&userContent[0].type==='text'?userContent[0].text:userContent;
+  messages.push({role:'user',content:msgContent});
   addThinking();
 
   try{
-    const res=await fetch(`${settings.baseUrl}/chat/completions`,{
+    var res=await fetch(settings.baseUrl+'/chat/completions',{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':`Bearer ${settings.apiKey}`},
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+settings.apiKey},
       body:JSON.stringify({model:settings.modelName,messages:[{role:'system',content:settings.systemPrompt},...messages.slice(-20)],max_tokens:1000})
     });
-    const data=await res.json();
+    var data=await res.json();
     removeThinking();
     if(data.choices&&data.choices[0]){
-      const reply=data.choices[0].message.content;
+      var reply=data.choices[0].message.content;
       messages.push({role:'assistant',content:reply});
       addMessage('assistant',reply);
       summaryCount++;
       if(summaryCount>=10){generateSummary();summaryCount=0}
     } else {
-      addMessage('assistant','出错了 qwq 检查一下API设置吧～');
+      addMessage('assistant','出错了 qwq '+JSON.stringify(data));
     }
-  }catch(e){removeThinking();addMessage('assistant','连接失败 qwq '+e.message)}
+  }catch(err){removeThinking();addMessage('assistant','连接失败 qwq '+err.message)}
 }
 
 async function generateSummary(){
   try{
-    const res=await fetch(`${settings.baseUrl}/chat/completions`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${settings.apiKey}`},body:JSON.stringify({model:settings.modelName,messages:[{role:'system',content:'请用2-3句话总结对话要点：'},...messages.slice(-20)],max_tokens:200})});
-    const data=await res.json();
+    var res=await fetch(settings.baseUrl+'/chat/completions',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+settings.apiKey},body:JSON.stringify({model:settings.modelName,messages:[{role:'system',content:'请用2-3句话总结对话要点：'},...messages.slice(-20)],max_tokens:200})});
+    var data=await res.json();
     if(data.choices&&data.choices[0]){settings.systemPrompt+='\n\n【摘要】'+data.choices[0].message.content;messages=messages.slice(-10)}
   }catch(e){console.log(e)}
 }
