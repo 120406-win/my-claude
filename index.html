@@ -281,7 +281,7 @@ function loadAudio(e) {
   e.target.value = '';
 }
 
-// 核心修复版语音生成函数（修正角色、增加日志、异常捕获）
+// 核心修复版语音生成函数（修复messages缺少user消息导致Param Incorrect）
 async function speakText(text) {
   if (!voiceOn || !S.mimoKey || !audioB64) return;
   // 停止上一段语音，杜绝重叠播放
@@ -306,7 +306,11 @@ async function speakText(text) {
       },
       body: JSON.stringify({
         model: "mimo-v2.5-tts-voiceclone",
-        messages: [{ role: "assistant", content: cleanText }],
+        // 官方强制要求：同时存在user、assistant两条消息，修复参数错误
+        messages: [
+          { role: "user", content: "严格使用上传音频里的音色，温柔自然朗读下面文字" },
+          { role: "assistant", content: cleanText }
+        ],
         audio: {
           format: fmt,
           input_audio: {
@@ -325,7 +329,7 @@ async function speakText(text) {
     }
     // 校验是否返回音频数据
     if (!data.choices?.[0]?.message?.audio?.data) {
-      addMsg('assistant', '未获取到音频流，请检查：1.MiMo密钥权限 2.音色音频是否清晰无杂音', null, false);
+      addMsg('assistant', '未获取到音频流，请检查：1.MiMo密钥权限/余额 2.音色音频清晰无杂音、时长10-30秒', null, false);
       return;
     }
     // base64标准转码修复
@@ -351,9 +355,9 @@ async function speakText(text) {
       URL.revokeObjectURL(audioUrl);
       curAudio = null;
     };
-  } catch (err) {
+  } catch (err)
     console.error('语音请求网络异常：', err);
-    addMsg('assistant', '语音接口请求失败，请检查网络或接口地址', null, false);
+    addMsg('assistant', '语音请求网络拦截，github.io存在跨域限制，请下载html文件本地浏览器打开测试', null, false);
   }
 }
 
@@ -479,7 +483,7 @@ async function sendMessage() {
     } else {
       addMsg('assistant', `对话接口返回异常：${JSON.stringify(resData)}`, null, false);
     }
-  } catch (err) {
+  } catch (err)
     rmThinking();
     addMsg('assistant', `对话请求失败：${err.message}`, null, false);
   }
