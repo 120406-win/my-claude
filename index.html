@@ -130,68 +130,70 @@ var pendingFile=null;
 var voiceEnabled=false;
 var audioBase64=localStorage.getItem('audioBase64')||'';
 var audioMime=localStorage.getItem('audioMime')||'audio/mpeg';
+var currentAudio=null;
+var audioCtx=null;
 
-function getTime(){return new Date().toLocaleTimeString('zh',{hour:'2-digit',minute:'2-digit'})}
-
-function toggleVoice(){
-  if(!settings.mimoKey){alert('请先在设置里填写 MiMo API Key！');openSettings();return}
-  if(!audioBase64){alert('请先在设置里上传声音文件！');openSettings();return}
-  voiceEnabled=!voiceEnabled;
-  var btn=document.getElementById('voiceToggle');
-  var status=document.getElementById('voiceStatus');
-  btn.textContent=voiceEnabled?'🔊':'🔇';
-  btn.classList.toggle('on',voiceEnabled);
-  status.textContent=voiceEnabled?'语音已开启':'语音未开启';
+function unlockAudio(){
+  if(audioCtx)return;
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+  var buf=audioCtx.createBuffer(1,1,22050);
+  var src=audioCtx.createBufferSource();
+  src.buffer=buf;
+  src.connect(audioCtx.destination);
+  src.start(0);
 }
 
-function loadAudio(e){
-  var file=e.target.files[0];
-  if(!file)return;
-  var reader=new FileReader();
-  reader.onload=function(ev){
-    var dataUrl=ev.target.result;
-    var base64=dataUrl.split(',')[1];
-    audioBase64=base64;
-    audioMime=file.type||'audio/mpeg';
-    localStorage.setItem('audioBase64',base64);
-    localStorage.setItem('audioMime',audioMime);
-    document.getElementById('audioBtn').textContent='✅ '+file.name+'（已保存）';
-  };
-  reader.readAsDataURL(file);
-  e.target.value='';
-}
+document.addEventListener('click',unlockAudio,{once:true});
 
 async function speakText(text){
   if(!voiceEnabled||!settings.mimoKey||!audioBase64)return;
   try{
+    if(currentAudio){currentAudio.pause();currentAudio=null}
     var clean=text.replace(/[*_~`#>]/g,'').replace(/\n/g,' ').slice(0,300);
+    var mimeFormat=audioMime.includes('wav')?'wav':audioMime.includes('m4a')?'m4a':'mp3';
     var res=await fetch('https://api.xiaomimimo.com/v1/chat/completions',{
       method:'POST',
       headers:{'Content-Type':'application/json','api-key':settings.mimoKey},
       body:JSON.stringify({
         model:'mimo-v2.5-tts-voiceclone',
-        messages:[
-          {role:'user',content:[
-            {type:'input_audio',input_audio:{data:'data:'+audioMime+';base64,'+audioBase64,format:audioMime.includes('wav')?'wav':'mp3'}},
-            {type:'text',text:clean}
-          ]}
-        ],
+        messages:[{role:'user',content:[
+          {type:'input_audio',input_audio:{data:'data:'+audioMime+';base64,'+audioBase64,format:mimeFormat}},
+          {type:'text',text:clean}
+        ]}],
         stream:false
       })
     });
     var data=await res.json();
     if(data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.audio){
       var audioData=data.choices[0].message.audio.data;
-      var audioBlob=b64ToBlob(audioData,'audio/mp3');
-      var url=URL.createObjectURL(audioBlob);
+      var fixed=audioData.replace(/-/g,'+').replace(/_/g,'/');
+      var blob=b64ToBlob(fixed,'audio/mpeg');
+      var url=URL.createObjectURL(blob);
       var audio=new Audio(url);
-      audio.play();
-      audio.onended=function(){URL.revokeObjectURL(url)};
+      currentAudio=audio;
+      var playPromise=audio.play();
+      if(playPromise){
+        playPromise.catch(function(e){
+          console.log('播放失败:',e);
+          addMessage('assistant','🔊 语音生成成功但无法自动播放，请点击页面后重试',null,false);
+        });
+      }
+      audio.onended=function(){URL.revokeObjectURL(url);currentAudio=null};
+    } else {
+      console.log('MiMo返回：',JSON.stringify(data));
     }
   }catch(e){console.log('MiMo语音失败',e)}
 }
 
 function b64ToBlob(b64,mime){
+  try{
+    var bytes=atob(b64);
+    var arr=new Uint8Array(bytes.length);
+    for(var i=0;i<bytes.length;i++)arr[i]=bytes.charCodeAt(i);
+    return new Blob([arr],{type:mime});
+  }catch(e){console.log('Base64解码失败',e);return new Blob([],{type:mime})}
+}
+
   var bytes=atob(b64);
   var arr=new Uint8Array(bytes.length);
   for(var i=0;i<bytes.length;i++)arr[i]=bytes.charCodeAt(i);
