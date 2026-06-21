@@ -107,7 +107,7 @@ textarea.setting-input{resize:vertical;min-height:80px;line-height:1.5}
 <div class="setting-item"><div class="setting-label">模型名称</div><input class="setting-input" id="modelName" placeholder="claude-sonnet-4-6"></div>
 <div class="setting-item"><div class="setting-label">全局系统提示词</div><textarea class="setting-input" id="systemPrompt"></textarea></div>
 <div class="setting-item"><div class="setting-label">MiMo语音API Key（单独密钥）</div><input class="setting-input" id="mimoKey" type="password" placeholder="sk-..."></div>
-<div class="setting-item"><div class="setting-label">音色参考音频（mp3/wav/m4a，10-30秒，≤3MB）</div><button class="upload-btn" id="audioBtn" onclick="document.getElementById('audioInput').click()">📂 点击上传音色文件</button></div>
+<div class="setting-item"><div class="setting-label">音色参考音频（mp3/wav/m4a，10-30秒，≤3MB，中英音频均可）</div><button class="upload-btn" id="audioBtn" onclick="document.getElementById('audioInput').click()">📂 点击上传音色文件</button></div>
 <button class="save-btn" onclick="saveSettings()">💾 保存全部设置</button>
 <button class="clear-btn" onclick="clearChat()">🗑️ 清空聊天记录</button>
 <button class="close-btn" onclick="closeSettings()">关闭设置面板</button>
@@ -258,7 +258,7 @@ function toggleVoice() {
   }
 }
 
-// 上传音色音频并转存本地
+// 上传音色音频，无语种限制
 function loadAudio(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -281,7 +281,7 @@ function loadAudio(e) {
   e.target.value = '';
 }
 
-// 核心修复版语音生成函数（修复messages缺少user消息导致Param Incorrect）
+// 语音生成，适配中英双语音频，无强制中文要求
 async function speakText(text) {
   if (!voiceOn || !S.mimoKey || !audioB64) return;
   // 停止上一段语音，杜绝重叠播放
@@ -306,9 +306,8 @@ async function speakText(text) {
       },
       body: JSON.stringify({
         model: "mimo-v2.5-tts-voiceclone",
-        // 官方强制要求：同时存在user、assistant两条消息，修复参数错误
         messages: [
-          { role: "user", content: "严格使用上传音频里的音色，温柔自然朗读下面文字" },
+          { role: "user", content: "使用参考音频的原生音色朗读后文，支持英文、中文各类语种" },
           { role: "assistant", content: cleanText }
         ],
         audio: {
@@ -322,42 +321,36 @@ async function speakText(text) {
     });
     const data = await res.json();
     console.log('MiMo TTS接口完整返回数据：', data);
-    // 接口返回错误信息直接展示
     if (data.error) {
       addMsg('assistant', `语音失败：${data.error.message}`, null, false);
       return;
     }
-    // 校验是否返回音频数据
     if (!data.choices?.[0]?.message?.audio?.data) {
-      addMsg('assistant', '未获取到音频流，请检查：1.MiMo密钥权限/余额 2.音色音频清晰无杂音、时长10-30秒', null, false);
+      addMsg('assistant', '未获取到音频流，请检查密钥、音频时长/音质', null, false);
       return;
     }
-    // base64标准转码修复
     let audioBase64 = data.choices[0].message.audio.data;
     audioBase64 = audioBase64.replace(/-/g, '+').replace(/_/g, '/');
     while (audioBase64.length % 4) audioBase64 += '=';
-    // 二进制解码
     const byteStr = atob(audioBase64);
     const byteArr = new Uint8Array(byteStr.length);
     for (let i = 0; i < byteStr.length; i++) byteArr[i] = byteStr.charCodeAt(i);
     const audioBlob = new Blob([byteArr], { type: 'audio/mpeg' });
     const audioUrl = URL.createObjectURL(audioBlob);
     curAudio = new Audio(audioUrl);
-    // 播放音频
     const playPromise = curAudio.play();
     if (playPromise) {
       playPromise.catch(() => {
         addMsg('assistant', '🔊 请点击页面任意位置解锁音频播放权限', null, false);
       });
     }
-    // 音频结束释放资源
     curAudio.onended = function () {
       URL.revokeObjectURL(audioUrl);
       curAudio = null;
     };
-  } catch (err)
+  } catch (err) {
     console.error('语音请求网络异常：', err);
-    addMsg('assistant', '语音请求网络拦截，github.io存在跨域限制，请下载html文件本地浏览器打开测试', null, false);
+    addMsg('assistant', '语音接口请求失败，本地打开html可规避跨域问题', null, false);
   }
 }
 
@@ -368,19 +361,17 @@ function handleFile(e) {
   const previewBox = document.getElementById('previewBox');
   previewBox.innerHTML = '';
   const maxImgSize = 2 * 1024 * 1024;
-  const maxTxtSize = 1 * 1024 * 1024;
-  // 文件大小拦截
+  const maxTxtSize = 1 * 1024;
   if (file.type.startsWith('image/') && file.size > maxImgSize) {
-    alert('图片文件不能超过2MB，请压缩后上传');
+    alert('图片不能超过2MB');
     e.target.value = '';
     return;
   }
   if (!file.type.startsWith('image/') && file.size > maxTxtSize) {
-    alert('文本文件不能超过1MB');
+    alert('文本不能超过1MB');
     e.target.value = '';
     return;
   }
-  // 图片附件
   if (file.type.startsWith('image/')) {
     const reader = new FileReader();
     reader.onload = function (ev) {
@@ -400,7 +391,6 @@ function handleFile(e) {
     };
     reader.readAsDataURL(file);
   } else {
-    // 文本附件
     const reader = new FileReader();
     reader.onload = function (ev) {
       pendingFile = { type: 'text', data: ev.target.result, name: file.name };
@@ -435,7 +425,7 @@ async function sendMessage() {
   const text = inputDom.value.trim();
   if (!text && !pendingFile) return;
   if (!S.apiKey) {
-    alert('请先在设置面板填写对话API Key');
+    alert('请先在设置填写对话API Key');
     openSettings();
     return;
   }
@@ -444,7 +434,6 @@ async function sendMessage() {
   let userSendText = text;
   let userSendImg = null;
   let messageArr = [];
-  // 处理附件
   if (pendingFile) {
     if (pendingFile.type === 'image') {
       messageArr.push({ type: 'image_url', image_url: { url: pendingFile.data } });
@@ -457,7 +446,6 @@ async function sendMessage() {
   }
   if (text) messageArr.push({ type: 'text', text: text });
   addMsg('user', userSendText, userSendImg);
-  // 拼接历史上下文（仅保留最近19条控制token）
   const historyCtx = msgs.slice(-19).map(item => ({ role: item.role, content: item.content }));
   historyCtx.push({ role: 'user', content: messageArr.length === 1 ? messageArr[0].text : messageArr });
   addThinking();
@@ -483,7 +471,7 @@ async function sendMessage() {
     } else {
       addMsg('assistant', `对话接口返回异常：${JSON.stringify(resData)}`, null, false);
     }
-  } catch (err)
+  } catch (err) {
     rmThinking();
     addMsg('assistant', `对话请求失败：${err.message}`, null, false);
   }
