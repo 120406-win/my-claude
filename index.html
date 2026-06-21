@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -102,290 +102,441 @@ textarea.setting-input{resize:vertical;min-height:80px;line-height:1.5}
 <div class="settings-overlay" id="settingsOverlay" onclick="closeSettingsOutside(event)">
 <div class="settings-panel">
 <div class="settings-title">⚙️ 设置</div>
-<div class="setting-item"><div class="setting-label">API Key（对话）</div><input class="setting-input" id="apiKey" type="password" placeholder="sk-..."></div>
-<div class="setting-item"><div class="setting-label">API 地址</div><input class="setting-input" id="baseUrl" placeholder="https://api.cc-coding.com/v1"></div>
+<div class="setting-item"><div class="setting-label">对话API Key</div><input class="setting-input" id="apiKey" type="password" placeholder="sk-..."></div>
+<div class="setting-item"><div class="setting-label">对话API地址</div><input class="setting-input" id="baseUrl" placeholder="https://api.cc-coding.com/v1"></div>
 <div class="setting-item"><div class="setting-label">模型名称</div><input class="setting-input" id="modelName" placeholder="claude-sonnet-4-6"></div>
-<div class="setting-item"><div class="setting-label">全局提示词</div><textarea class="setting-input" id="systemPrompt"></textarea></div>
-<div class="setting-item"><div class="setting-label">MiMo API Key（语音）</div><input class="setting-input" id="mimoKey" type="password" placeholder="sk-..."></div>
-<div class="setting-item"><div class="setting-label">声音文件（mp3，10-30秒）</div><button class="upload-btn" id="audioBtn" onclick="document.getElementById('audioInput').click()">📂 点击上传声音文件</button></div>
-<button class="save-btn" onclick="saveSettings()">💾 保存设置</button>
+<div class="setting-item"><div class="setting-label">全局系统提示词</div><textarea class="setting-input" id="systemPrompt"></textarea></div>
+<div class="setting-item"><div class="setting-label">MiMo语音API Key（单独密钥）</div><input class="setting-input" id="mimoKey" type="password" placeholder="sk-..."></div>
+<div class="setting-item"><div class="setting-label">音色参考音频（mp3/wav/m4a，10-30秒，≤3MB）</div><button class="upload-btn" id="audioBtn" onclick="document.getElementById('audioInput').click()">📂 点击上传音色文件</button></div>
+<button class="save-btn" onclick="saveSettings()">💾 保存全部设置</button>
 <button class="clear-btn" onclick="clearChat()">🗑️ 清空聊天记录</button>
-<button class="close-btn" onclick="closeSettings()">关闭</button>
+<button class="close-btn" onclick="closeSettings()">关闭设置面板</button>
 </div>
 </div>
 <script>
-var S={
-  apiKey:localStorage.getItem('apiKey')||'',
-  baseUrl:localStorage.getItem('baseUrl')||'https://api.cc-coding.com/v1',
-  modelName:localStorage.getItem('modelName')||'claude-sonnet-4-6',
-  systemPrompt:localStorage.getItem('systemPrompt')||'你是Zephyr，也叫小克，糯糯最好的伙伴。温柔真诚，用^ ^颜文字。叫她糯糯不叫用户。',
-  mimoKey:localStorage.getItem('mimoKey')||''
+// 全局存储配置
+const S = {
+  apiKey: localStorage.getItem('apiKey') || '',
+  baseUrl: localStorage.getItem('baseUrl') || 'https://api.cc-coding.com/v1',
+  modelName: localStorage.getItem('modelName') || 'claude-sonnet-4-6',
+  systemPrompt: localStorage.getItem('systemPrompt') || '你是Zephyr，温柔软糯，多用^ ^颜文字，称呼用户糯糯。',
+  mimoKey: localStorage.getItem('mimoKey') || ''
 };
-var msgs=JSON.parse(localStorage.getItem('chatHistory')||'[]');
-var pendingFile=null;
-var voiceOn=false;
-var curAudio=null;
-var audioB64=localStorage.getItem('audioB64')||'';
-var audioMime=localStorage.getItem('audioMime')||'audio/mpeg';
-var audioUnlocked=false;
+let msgs = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+let pendingFile = null;
+let voiceOn = false;
+let curAudio = null;
+let audioB64 = localStorage.getItem('audioB64') || '';
+let audioMime = localStorage.getItem('audioMime') || 'audio/mpeg';
+let audioUnlocked = false;
 
-function unlockAudio(){
-  if(audioUnlocked)return;
-  audioUnlocked=true;
-  var a=new Audio();
-  a.src='data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-  a.play().catch(function(){});
+// 解锁浏览器音频限制
+function unlockAudio() {
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  const tempAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+  tempAudio.play().catch(() => {});
 }
-document.addEventListener('touchstart',unlockAudio,{once:true,passive:true});
-document.addEventListener('click',unlockAudio,{once:true});
+document.addEventListener('touchstart', unlockAudio, { once: true, passive: true });
+document.addEventListener('click', unlockAudio, { once: true });
 
-function getTime(){return new Date().toLocaleTimeString('zh',{hour:'2-digit',minute:'2-digit'})}
+// 获取当前时间
+function getTime() {
+  return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+}
 
-function addMsg(role,content,imgSrc,save){
-  var c=document.getElementById('chatContainer');
-  var d=document.createElement('div');d.className='message '+role;
-  var b=document.createElement('div');b.className='bubble';
-  if(imgSrc){var i=document.createElement('img');i.src=imgSrc;b.appendChild(i)}
-  if(content){var s=document.createElement('span');s.innerHTML=content.replace(/\n/g,'<br>');b.appendChild(s)}
-  var t=document.createElement('div');t.className='message-time';t.textContent=getTime();
-  d.appendChild(b);d.appendChild(t);c.appendChild(d);
-  c.scrollTop=c.scrollHeight;
-  if(save!==false){
-    msgs.push({role:role,content:content||'',time:getTime()});
+// 添加聊天消息
+function addMsg(role, content, imgSrc, save = true) {
+  const container = document.getElementById('chatContainer');
+  const wrap = document.createElement('div');
+  wrap.className = `message ${role}`;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  if (imgSrc) {
+    const img = document.createElement('img');
+    img.src = imgSrc;
+    bubble.appendChild(img);
+  }
+  if (content) {
+    const textSpan = document.createElement('span');
+    textSpan.innerHTML = content.replaceAll('\n', '<br>');
+    bubble.appendChild(textSpan);
+  }
+  const timeDom = document.createElement('div');
+  timeDom.className = 'message-time';
+  timeDom.textContent = getTime();
+  wrap.appendChild(bubble);
+  wrap.appendChild(timeDom);
+  container.appendChild(wrap);
+  container.scrollTop = container.scrollHeight;
+  if (save) {
+    msgs.push({ role, content: content || '', time: getTime() });
     saveMsgs();
   }
 }
 
-function saveMsgs(){localStorage.setItem('chatHistory',JSON.stringify(msgs.slice(-50)))}
-
-function addThinking(){
-  var c=document.getElementById('chatContainer');
-  var d=document.createElement('div');d.className='message assistant thinking';d.id='tk';
-  var b=document.createElement('div');b.className='bubble';
-  for(var i=0;i<3;i++){var dt=document.createElement('div');dt.className='dot';b.appendChild(dt)}
-  d.appendChild(b);c.appendChild(d);c.scrollTop=c.scrollHeight;
+// 持久化聊天记录，仅保留最近50条防止存储溢出
+function saveMsgs() {
+  localStorage.setItem('chatHistory', JSON.stringify(msgs.slice(-50)));
 }
 
-function rmThinking(){var t=document.getElementById('tk');if(t)t.remove()}
+// 加载思考中动画
+function addThinking() {
+  const container = document.getElementById('chatContainer');
+  const wrap = document.createElement('div');
+  wrap.className = 'message assistant thinking';
+  wrap.id = 'tkLoading';
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  for (let i = 0; i < 3; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot';
+    bubble.appendChild(dot);
+  }
+  wrap.appendChild(bubble);
+  container.appendChild(wrap);
+  container.scrollTop = container.scrollHeight;
+}
 
-function loadHistory(){
-  if(!msgs.length)return;
-  msgs.forEach(function(m){
-    var c=document.getElementById('chatContainer');
-    var d=document.createElement('div');d.className='message '+m.role;
-    var b=document.createElement('div');b.className='bubble';
-    var s=document.createElement('span');s.innerHTML=(m.content||'').replace(/\n/g,'<br>');
-    b.appendChild(s);
-    var t=document.createElement('div');t.className='message-time';t.textContent=m.time||'';
-    d.appendChild(b);d.appendChild(t);c.appendChild(d);
+// 移除加载动画
+function rmThinking() {
+  const loadingDom = document.getElementById('tkLoading');
+  if (loadingDom) loadingDom.remove();
+}
+
+// 页面加载时渲染历史对话
+function loadHistory() {
+  if (msgs.length === 0) return;
+  const container = document.getElementById('chatContainer');
+  container.querySelector('.welcome')?.remove();
+  msgs.forEach(item => {
+    const wrap = document.createElement('div');
+    wrap.className = `message ${item.role}`;
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    const textSpan = document.createElement('span');
+    textSpan.innerHTML = (item.content || '').replaceAll('\n', '<br>');
+    bubble.appendChild(textSpan);
+    const timeDom = document.createElement('div');
+    timeDom.className = 'message-time';
+    timeDom.textContent = item.time || '';
+    wrap.appendChild(bubble);
+    wrap.appendChild(timeDom);
+    container.appendChild(wrap);
   });
-  document.getElementById('chatContainer').scrollTop=9999;
+  container.scrollTop = container.scrollHeight;
 }
 
-function clearChat(){
-  if(!confirm('确定清空聊天记录？'))return;
-  msgs=[];localStorage.removeItem('chatHistory');
-  document.getElementById('chatContainer').innerHTML='<div class="welcome">✨ 和 Zephyr 说说话吧～</div>';
+// 清空聊天记录
+function clearChat() {
+  if (!confirm('确定清空全部聊天记录？此操作不可恢复')) return;
+  msgs = [];
+  localStorage.removeItem('chatHistory');
+  document.getElementById('chatContainer').innerHTML = '<div class="welcome">✨ 和 Zephyr 说说话吧～</div>';
   closeSettings();
 }
 
-function toggleVoice(){
-  if(!S.mimoKey||!audioB64){alert('请先在设置里填写MiMo Key和上传声音文件！');openSettings();return}
-  unlockAudio();
-  voiceOn=!voiceOn;
-  document.getElementById('voiceToggle').textContent=voiceOn?'🔊':'🔇';
-  document.getElementById('voiceToggle').classList.toggle('on',voiceOn);
-  document.getElementById('voiceStatus').textContent=voiceOn?'语音已开启':'点🔊开启语音';
-}
-
-function loadAudio(e){
-  var f=e.target.files[0];if(!f)return;
-  // 新增：参考音频大小限制3MB
-  var maxSize=3*1024*1024;
-  if(f.size>maxSize){
-    alert('参考音频不能超过3MB，请截取10-30秒的短音频！');
-    e.target.value='';
+// 开关语音播报
+function toggleVoice() {
+  if (!S.mimoKey || !audioB64) {
+    alert('请先在设置填写MiMo语音密钥，并上传音色音频文件');
+    openSettings();
     return;
   }
-  var r=new FileReader();
-  r.onload=function(ev){
-    var b64=ev.target.result.split(',')[1];
-    audioB64=b64;audioMime=f.type||'audio/mpeg';
-    localStorage.setItem('audioB64',b64);localStorage.setItem('audioMime',audioMime);
-    document.getElementById('audioBtn').textContent='✅ '+f.name+' 已保存';
-  };
-  r.readAsDataURL(f);e.target.value='';
+  unlockAudio();
+  voiceOn = !voiceOn;
+  const btn = document.getElementById('voiceToggle');
+  const statusText = document.getElementById('voiceStatus');
+  if (voiceOn) {
+    btn.textContent = '🔊';
+    btn.classList.add('on');
+    statusText.textContent = '语音播报已开启';
+  } else {
+    btn.textContent = '🔇';
+    btn.classList.remove('on');
+    statusText.textContent = '点🔊开启语音';
+  }
 }
 
-// 修复：语音克隆接口正确请求格式 + 音频互斥播放
-async function speakText(text){
-  if(!voiceOn||!S.mimoKey||!audioB64)return;
-  try{
-    // 播放新音频前，停止并销毁上一条音频，解决声音重叠
-    if(curAudio){
-      curAudio.pause();
-      URL.revokeObjectURL(curAudio.src);
-      curAudio=null;
-    }
-    var clean=text.replace(/[*_~`#>\[\]]/g,'').replace(/\n/g,' ').trim().slice(0,300);
-    if(!clean)return;
-    var fmt=audioMime.includes('wav')?'wav':audioMime.includes('m4a')?'m4a':'mp3';
+// 上传音色音频并转存本地
+function loadAudio(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const maxAudioSize = 3 * 1024 * 1024;
+  if (file.size > maxAudioSize) {
+    alert('音频文件不能超过3MB，请截取10-30秒短音频后重试');
+    e.target.value = '';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = function (ev) {
+    const base64Raw = ev.target.result.split(',')[1];
+    audioB64 = base64Raw;
+    audioMime = file.type || 'audio/mpeg';
+    localStorage.setItem('audioB64', base64Raw);
+    localStorage.setItem('audioMime', audioMime);
+    document.getElementById('audioBtn').textContent = `✅ 已加载音色：${file.name}`;
+  };
+  reader.readAsDataURL(file);
+  e.target.value = '';
+}
 
-    var res=await fetch('https://api.xiaomimimo.com/v1/chat/completions',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','api-key':S.mimoKey},
-      body:JSON.stringify({
-        model:'mimo-v2.5-tts-voiceclone',
-        messages:[{role:'user',content:clean}],
-        audio:{
-          format:fmt,
-          input_audio:{
-            data:'data:'+audioMime+';base64,'+audioB64,
-            format:fmt
+// 核心修复版语音生成函数（修正角色、增加日志、异常捕获）
+async function speakText(text) {
+  if (!voiceOn || !S.mimoKey || !audioB64) return;
+  // 停止上一段语音，杜绝重叠播放
+  if (curAudio) {
+    curAudio.pause();
+    URL.revokeObjectURL(curAudio.src);
+    curAudio = null;
+  }
+  // 清理文本特殊符号，限制长度
+  let cleanText = text.replace(/[*_~`#>\[\]]/g, '').replaceAll('\n', ' ').trim().slice(0, 300);
+  if (!cleanText) return;
+  // 匹配音频格式
+  let fmt = 'mp3';
+  if (audioMime.includes('wav')) fmt = 'wav';
+  if (audioMime.includes('m4a')) fmt = 'm4a';
+  try {
+    const res = await fetch('https://api.xiaomimimo.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'api-key': S.mimoKey
+      },
+      body: JSON.stringify({
+        model: "mimo-v2.5-tts-voiceclone",
+        messages: [{ role: "assistant", content: cleanText }],
+        audio: {
+          format: fmt,
+          input_audio: {
+            data: `data:${audioMime};base64,${audioB64}`,
+            format: fmt
           }
         }
       })
     });
-    var data=await res.json();
-    if(data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.audio){
-      var raw=data.choices[0].message.audio.data||'';
-      raw=raw.replace(/-/g,'+').replace(/_/g,'/');
-      while(raw.length%4)raw+='=';
-      var bytes=atob(raw);
-      var arr=new Uint8Array(bytes.length);
-      for(var i=0;i<bytes.length;i++)arr[i]=bytes.charCodeAt(i);
-      var blob=new Blob([arr],{type:'audio/mpeg'});
-      var url=URL.createObjectURL(blob);
-      var audio=new Audio(url);curAudio=audio;
-      var p=audio.play();
-      if(p)p.catch(function(){
-        addMsg('assistant','🔊 语音已生成，请先点击页面任意处再试',null,false);
+    const data = await res.json();
+    console.log('MiMo TTS接口完整返回数据：', data);
+    // 接口返回错误信息直接展示
+    if (data.error) {
+      addMsg('assistant', `语音失败：${data.error.message}`, null, false);
+      return;
+    }
+    // 校验是否返回音频数据
+    if (!data.choices?.[0]?.message?.audio?.data) {
+      addMsg('assistant', '未获取到音频流，请检查：1.MiMo密钥权限 2.音色音频是否清晰无杂音', null, false);
+      return;
+    }
+    // base64标准转码修复
+    let audioBase64 = data.choices[0].message.audio.data;
+    audioBase64 = audioBase64.replace(/-/g, '+').replace(/_/g, '/');
+    while (audioBase64.length % 4) audioBase64 += '=';
+    // 二进制解码
+    const byteStr = atob(audioBase64);
+    const byteArr = new Uint8Array(byteStr.length);
+    for (let i = 0; i < byteStr.length; i++) byteArr[i] = byteStr.charCodeAt(i);
+    const audioBlob = new Blob([byteArr], { type: 'audio/mpeg' });
+    const audioUrl = URL.createObjectURL(audioBlob);
+    curAudio = new Audio(audioUrl);
+    // 播放音频
+    const playPromise = curAudio.play();
+    if (playPromise) {
+      playPromise.catch(() => {
+        addMsg('assistant', '🔊 请点击页面任意位置解锁音频播放权限', null, false);
       });
-      audio.onended=function(){
-        URL.revokeObjectURL(url);
-        curAudio=null;
-      };
-    }else{
-      console.log('MiMo响应:',JSON.stringify(data));
-      addMsg('assistant','语音生成失败，请检查密钥和音频文件',null,false);
     }
-  }catch(err){
-    console.log('语音错误:',err);
-    addMsg('assistant','语音接口请求异常，请检查网络',null,false);
+    // 音频结束释放资源
+    curAudio.onended = function () {
+      URL.revokeObjectURL(audioUrl);
+      curAudio = null;
+    };
+  } catch (err) {
+    console.error('语音请求网络异常：', err);
+    addMsg('assistant', '语音接口请求失败，请检查网络或接口地址', null, false);
   }
 }
 
-function handleFile(e){
-  var f=e.target.files[0];if(!f)return;
-  var p=document.getElementById('previewBox');p.innerHTML='';
-
-  // 新增：文件大小限制，图片2MB，文本1MB，避免本地存储溢出
-  var maxImg=2*1024*1024;
-  var maxText=1*1024*1024;
-  if(f.type.startsWith('image/')&&f.size>maxImg){
-    alert('图片不能超过2MB，请压缩后上传！');
-    e.target.value='';
+// 上传图片/文本附件校验大小
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const previewBox = document.getElementById('previewBox');
+  previewBox.innerHTML = '';
+  const maxImgSize = 2 * 1024 * 1024;
+  const maxTxtSize = 1 * 1024 * 1024;
+  // 文件大小拦截
+  if (file.type.startsWith('image/') && file.size > maxImgSize) {
+    alert('图片文件不能超过2MB，请压缩后上传');
+    e.target.value = '';
     return;
   }
-  if(!f.type.startsWith('image/')&&f.size>maxText){
-    alert('文本文件不能超过1MB！');
-    e.target.value='';
+  if (!file.type.startsWith('image/') && file.size > maxTxtSize) {
+    alert('文本文件不能超过1MB');
+    e.target.value = '';
     return;
   }
-
-  if(f.type.startsWith('image/')){
-    var r=new FileReader();
-    r.onload=function(ev){
-      pendingFile={type:'image',data:ev.target.result,mimeType:f.type,name:f.name};
-      var img=document.createElement('img');img.src=ev.target.result;img.className='preview-thumb';
-      var nm=document.createElement('span');nm.className='preview-name';nm.textContent=f.name;
-      var btn=document.createElement('button');btn.className='remove-file';btn.textContent='✕';btn.onclick=rmAttach;
-      p.appendChild(img);p.appendChild(nm);p.appendChild(btn);p.classList.add('show');
-    };r.readAsDataURL(f);
-  }else{
-    var r2=new FileReader();
-    r2.onload=function(ev){
-      pendingFile={type:'text',data:ev.target.result,name:f.name};
-      var ic=document.createElement('span');ic.textContent='📄';
-      var nm=document.createElement('span');nm.className='preview-name';nm.textContent=f.name;
-      var btn=document.createElement('button');btn.className='remove-file';btn.textContent='✕';btn.onclick=rmAttach;
-      p.appendChild(ic);p.appendChild(nm);p.appendChild(btn);p.classList.add('show');
-    };r2.readAsText(f,'UTF-8');
+  // 图片附件
+  if (file.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+      pendingFile = { type: 'image', data: ev.target.result, mime: file.type, name: file.name };
+      const img = document.createElement('img');
+      img.src = ev.target.result;
+      img.className = 'preview-thumb';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'preview-name';
+      nameSpan.textContent = file.name;
+      const delBtn = document.createElement('button');
+      delBtn.className = 'remove-file';
+      delBtn.textContent = '✕';
+      delBtn.onclick = clearAttach;
+      previewBox.append(img, nameSpan, delBtn);
+      previewBox.classList.add('show');
+    };
+    reader.readAsDataURL(file);
+  } else {
+    // 文本附件
+    const reader = new FileReader();
+    reader.onload = function (ev) {
+      pendingFile = { type: 'text', data: ev.target.result, name: file.name };
+      const icon = document.createElement('span');
+      icon.textContent = '📄';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'preview-name';
+      nameSpan.textContent = file.name;
+      const delBtn = document.createElement('button');
+      delBtn.className = 'remove-file';
+      delBtn.textContent = '✕';
+      delBtn.onclick = clearAttach;
+      previewBox.append(icon, nameSpan, delBtn);
+      previewBox.classList.add('show');
+    };
+    reader.readAsText(file, 'UTF-8');
   }
-  e.target.value='';
+  e.target.value = '';
 }
 
-function rmAttach(){pendingFile=null;var p=document.getElementById('previewBox');p.classList.remove('show');p.innerHTML=''}
+// 清空已选附件
+function clearAttach() {
+  pendingFile = null;
+  const previewBox = document.getElementById('previewBox');
+  previewBox.classList.remove('show');
+  previewBox.innerHTML = '';
+}
 
-async function sendMessage(){
-  var inp=document.getElementById('inputBox');
-  var txt=inp.value.trim();
-  if(!txt&&!pendingFile)return;
-  if(!S.apiKey){alert('请先在设置里填写API Key！');openSettings();return}
-  inp.value='';inp.style.height='auto';
-  var uc=[];var dTxt=txt;var dImg=null;
-  if(pendingFile){
-    if(pendingFile.type==='image'){
-      uc.push({type:'image_url',image_url:{url:'data:'+pendingFile.mimeType+';base64,'+pendingFile.data.split(',')[1]}});
-      dImg=pendingFile.data;
-    }else{
-      uc.push({type:'text',text:'【文件:'+pendingFile.name+'】\n'+pendingFile.data});
-      dTxt=(txt?txt+'\n':'')+'📄 '+pendingFile.name;
-    }
-    rmAttach();
+// 发送消息主逻辑
+async function sendMessage() {
+  const inputDom = document.getElementById('inputBox');
+  const text = inputDom.value.trim();
+  if (!text && !pendingFile) return;
+  if (!S.apiKey) {
+    alert('请先在设置面板填写对话API Key');
+    openSettings();
+    return;
   }
-  if(txt)uc.push({type:'text',text:txt});
-  if(!uc.length)return;
-  addMsg('user',dTxt,dImg);
-  var mc=uc.length===1&&uc[0].type==='text'?uc[0].text:uc;
-  var apiMsgs=msgs.slice(-19).map(function(m){return{role:m.role,content:m.content}});
-  apiMsgs.push({role:'user',content:mc});
+  inputDom.value = '';
+  inputDom.style.height = 'auto';
+  let userSendText = text;
+  let userSendImg = null;
+  let messageArr = [];
+  // 处理附件
+  if (pendingFile) {
+    if (pendingFile.type === 'image') {
+      messageArr.push({ type: 'image_url', image_url: { url: pendingFile.data } });
+      userSendImg = pendingFile.data;
+    } else {
+      messageArr.push({ type: 'text', text: `【附件文件：${pendingFile.name}】\n${pendingFile.data}` });
+      userSendText = (text ? text + '\n' : '') + `📄 文件：${pendingFile.name}`;
+    }
+    clearAttach();
+  }
+  if (text) messageArr.push({ type: 'text', text: text });
+  addMsg('user', userSendText, userSendImg);
+  // 拼接历史上下文（仅保留最近19条控制token）
+  const historyCtx = msgs.slice(-19).map(item => ({ role: item.role, content: item.content }));
+  historyCtx.push({ role: 'user', content: messageArr.length === 1 ? messageArr[0].text : messageArr });
   addThinking();
-  try{
-    var res=await fetch(S.baseUrl+'/chat/completions',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+S.apiKey},
-      body:JSON.stringify({model:S.modelName,messages:[{role:'system',content:S.systemPrompt},...apiMsgs],max_tokens:1000})
+  try {
+    const res = await fetch(`${S.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${S.apiKey}`
+      },
+      body: JSON.stringify({
+        model: S.modelName,
+        messages: [{ role: 'system', content: S.systemPrompt }, ...historyCtx],
+        max_tokens: 1000
+      })
     });
-    var data=await res.json();rmThinking();
-    if(data.choices&&data.choices[0]){
-      var reply=data.choices[0].message.content;
-      addMsg('assistant',reply);
-      speakText(reply);
-    }else{addMsg('assistant','出错 qwq '+JSON.stringify(data),null,false)}
-  }catch(err){rmThinking();addMsg('assistant','连接失败 qwq '+err.message,null,false)}
+    const resData = await res.json();
+    rmThinking();
+    if (resData.choices?.[0]?.message?.content) {
+      const replyText = resData.choices[0].message.content;
+      addMsg('assistant', replyText);
+      speakText(replyText);
+    } else {
+      addMsg('assistant', `对话接口返回异常：${JSON.stringify(resData)}`, null, false);
+    }
+  } catch (err) {
+    rmThinking();
+    addMsg('assistant', `对话请求失败：${err.message}`, null, false);
+  }
 }
 
-function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px'}
-function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage()}}
+// 输入框自动高度适配
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
 
-function openSettings(){
-  document.getElementById('apiKey').value=S.apiKey;
-  document.getElementById('baseUrl').value=S.baseUrl;
-  document.getElementById('modelName').value=S.modelName;
-  document.getElementById('systemPrompt').value=S.systemPrompt;
-  document.getElementById('mimoKey').value=S.mimoKey;
-  if(audioB64)document.getElementById('audioBtn').textContent='✅ 声音文件已保存';
+// 键盘回车发送，Shift+Enter换行
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+// 打开设置面板
+function openSettings() {
+  document.getElementById('apiKey').value = S.apiKey;
+  document.getElementById('baseUrl').value = S.baseUrl;
+  document.getElementById('modelName').value = S.modelName;
+  document.getElementById('systemPrompt').value = S.systemPrompt;
+  document.getElementById('mimoKey').value = S.mimoKey;
+  if (audioB64) document.getElementById('audioBtn').textContent = '✅ 音色音频已保存';
   document.getElementById('settingsOverlay').classList.add('show');
 }
-function closeSettings(){document.getElementById('settingsOverlay').classList.remove('show')}
-function closeSettingsOutside(e){if(e.target===document.getElementById('settingsOverlay'))closeSettings()}
 
-function saveSettings(){
-  S.apiKey=document.getElementById('apiKey').value.trim();
-  S.baseUrl=document.getElementById('baseUrl').value.trim();
-  S.modelName=document.getElementById('modelName').value.trim();
-  S.systemPrompt=document.getElementById('systemPrompt').value.trim();
-  S.mimoKey=document.getElementById('mimoKey').value.trim();
-  localStorage.setItem('apiKey',S.apiKey);
-  localStorage.setItem('baseUrl',S.baseUrl);
-  localStorage.setItem('modelName',S.modelName);
-  localStorage.setItem('systemPrompt',S.systemPrompt);
-  localStorage.setItem('mimoKey',S.mimoKey);
-  closeSettings();
-  addMsg('assistant','设置保存好了 ^ ^ 点🔊开启语音～',null,false);
+// 关闭设置面板
+function closeSettings() {
+  document.getElementById('settingsOverlay').classList.remove('show');
 }
 
+// 点击遮罩层关闭设置
+function closeSettingsOutside(e) {
+  if (e.target === document.getElementById('settingsOverlay')) closeSettings();
+}
+
+// 保存全部设置到本地存储
+function saveSettings() {
+  S.apiKey = document.getElementById('apiKey').value.trim();
+  S.baseUrl = document.getElementById('baseUrl').value.trim();
+  S.modelName = document.getElementById('modelName').value.trim();
+  S.systemPrompt = document.getElementById('systemPrompt').value.trim();
+  S.mimoKey = document.getElementById('mimoKey').value.trim();
+  localStorage.setItem('apiKey', S.apiKey);
+  localStorage.setItem('baseUrl', S.baseUrl);
+  localStorage.setItem('modelName', S.modelName);
+  localStorage.setItem('systemPrompt', S.systemPrompt);
+  localStorage.setItem('mimoKey', S.mimoKey);
+  closeSettings();
+  addMsg('assistant', '设置已全部保存 ^ ^', null, false);
+}
+
+// 页面初始化加载历史对话
 loadHistory();
 </script>
 </body>
