@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Zephyr · iOS 专用版</title>
+<title>Zephyr · 最终稳定版</title>
 <style>
-/* ===== 保留原版全部样式，与之前完全一致 ===== */
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1a1535;min-height:100vh;display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative;overflow-x:hidden}
 .bg-deco{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
@@ -38,57 +37,55 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .message.assistant .bubble{background:rgba(255,255,255,0.12);color:rgba(240,235,255,0.95);border-bottom-left-radius:4px;backdrop-filter:blur(8px);border:1px solid rgba(150,130,220,0.2)}
 .bubble img{max-width:200px;border-radius:12px;display:block;margin-top:4px}
 .message-time{font-size:11px;color:rgba(180,170,220,0.5);margin-top:4px;padding:0 4px}
-.thinking .bubble{display:flex;gap:4px;align-items:center;padding:14px 18px}
+.thinking .bubble{display:flex;gap:4;align-items:center;padding:14px 18px}
 .dot{width:7px;height:7px;background:rgba(150,130,220,0.8);border-radius:50%;animation:bounce 1.2s infinite}
 .dot:nth-child(2){animation-delay:0.2s}
 .dot:nth-child(3){animation-delay:0.4s}
 @keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
-.input-area{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(20,15,45,0.95);backdrop-filter:blur(16px);padding:8px 12px;display:flex;flex-direction:column;gap:6px;box-shadow:0 -2px 20px rgba(0,0,0,0.4);border-top:1px solid rgba(100,80,200,0.3);z-index:100}
+.input-area{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(20,15,45,0.95);backdrop-filter:16px;padding:8px 12px;display:flex;flex-direction:column;gap:6px;box-shadow:0 -2px 20px rgba(0,0,0.4);border-top:1px solid rgba(100,80,200,0.3);z-index:100}
 .preview-box{display:none;background:rgba(80,60,160,0.3);border-radius:12px;padding:8px 12px;font-size:13px;color:rgba(200,190,255,0.9);align-items:center;gap:8px}
 .preview-box.show{display:flex}
 .preview-thumb{max-height:50px;border-radius:8px}
 .preview-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .remove-file{background:none;border:none;color:rgba(180,160,255,0.6);font-size:18px;cursor:pointer}
 .input-row{display:flex;gap:8px;align-items:flex-end}
-.attach-btn{width:38px;height:38px;border-radius:50%;background:rgba(80,60,160,0.4);border:1px solid rgba(120,100,200,0.4);color:rgba(200,190,255,0.9);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.input-box{flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(120,100,200,0.4);border-radius:20px;padding:10px 16px;font-size:15px;color:rgba(240,235,255,0.95);outline:none;resize:none;max-height:120px;overflow-y:auto;line-height:1.4;font-family:inherit}
-.input-box::placeholder{color:rgba(180,170,220,0.5)}
+.attach-btn{width:38px;height:38px;border-radius:50%;background:rgba(80,60,160,0.4);border:1px solid rgba(120,100,200,0.4);color:rgba(200,190,255,0.9);font-size:16px;cursor:pointer;display:flex;align-items:center;flex-shrink:0}
+.input-box{flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(120,100,0.4);border-radius:20px;padding:10px 16px;font-size:15px;color:rgba(240,235,255,0.95);outline:none;resize:none;max-height:120px;overflow-y:auto;line-height:1.4;font-family:inherit}
+.input-box::placeholder{color:rgba(180,170,255,0.5)}
 .input-box:focus{border-color:rgba(140,120,220,0.8)}
 .send-btn{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#6040c0,#4060d0);border:none;color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.settings-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;backdrop-filter:blur(4px)}
+.settings-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0.6);z-index:200;backdrop-filter:4px}
 .settings-overlay.show{display:flex;align-items:flex-end}
-.settings-panel{background:#1e1840;width:100%;max-width:480px;margin:0 auto;border-radius:24px 24px 0 0;padding:24px 20px 36px;max-height:85vh;overflow-y:auto;border-top:1px solid rgba(120,100,200,0.3)}
+.settings-panel{background:#1e1840;width:100%;max-width:480px;margin:0 auto;border-radius:24px 24px 0 0;padding:24px 20px 36px;max-height:85vh;overflow-y:auto;border-top:1px solid rgba(120,100,0.3)}
 .settings-title{font-size:18px;font-weight:700;color:rgba(200,190,255,0.95);margin-bottom:20px;text-align:center}
 .setting-item{margin-bottom:16px}
 .setting-label{font-size:13px;color:rgba(180,170,220,0.7);margin-bottom:6px;font-weight:500}
-.setting-input{width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(120,100,200,0.4);border-radius:12px;padding:10px 14px;font-size:14px;color:rgba(240,235,255,0.95);outline:none;font-family:inherit}
-.setting-input::placeholder{color:rgba(180,170,220,0.4)}
+.setting-input{width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(120,100,0.4);border-radius:12px;padding:10px 14px;font-size:14px;color:rgba(240,235,255,0.95);outline:none;font-family:inherit}
+.setting-input::placeholder{color:rgba(180,170,0.4)}
 .setting-input:focus{border-color:rgba(140,120,220,0.8)}
 textarea.setting-input{resize:vertical;min-height:80px;line-height:1.5}
 .save-btn{width:100%;background:linear-gradient(135deg,#6040c0,#4060d0);color:white;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px}
-.clear-btn{width:100%;background:rgba(180,40,40,0.3);color:rgba(255,150,150,0.9);border:1px solid rgba(180,40,40,0.4);border-radius:14px;padding:12px;font-size:15px;cursor:pointer;margin-top:8px}
+.test-btn{width:100%;background:rgba(80,160,120,0.3);color:#a8e9d0;border:1px solid rgba(80,160,120,0.4);border-radius:14px;padding:10px;font-size:14px;cursor:pointer;margin-top:6px}
+.clear-a-btn{width:100%;background:rgba(160,120,60,0.3);color:#ffe2b0;border:1px solid rgba(160,120,0.4);border-radius:14px;padding:10px;font-size:14px;cursor:pointer;margin-top:6px}
+.clear-all-btn{width:100%;background:rgba(120,60,160,0.3);color:#e0c8ff;border:1px solid rgba(120,60,160,0.4);border-radius:14px;padding:10px;font-size:14px;cursor:pointer;margin-top:6px}
+.clear-btn{width:100%;background:rgba(180,40,0.3);color:rgba(255,150,150,0.9);border:1px solid rgba(180,40,0.4);border-radius:14px;padding:12px;font-size:15px;cursor:pointer;margin-top:8px}
 .close-btn{width:100%;background:rgba(255,255,255,0.08);color:rgba(200,190,255,0.8);border:none;border-radius:14px;padding:12px;font-size:15px;cursor:pointer;margin-top:8px}
-.upload-btn{width:100%;background:rgba(80,60,160,0.4);color:rgba(200,190,255,0.9);border:1px solid rgba(120,100,200,0.4);border-radius:12px;padding:10px 14px;font-size:14px;cursor:pointer;text-align:left}
-.welcome{text-align:center;color:rgba(180,170,220,0.5);font-size:13px;padding:20px 0 8px}
-.check-row{display:flex;align-items:center;gap:10px;margin-top:4px}
-.check-row input[type="checkbox"]{width:18px;height:18px;accent-color:#6040c0}
+.upload-btn{width:100%;background:rgba(80,60,160,0.4);color:rgba(200,190,255,0.9);border:1px solid rgba(120,100,0.4);border-radius:12px;padding:10px 14px;font-size:14px;cursor:pointer;text-align:left}
+.welcome{text-align:center;color:rgba(180,170,255,0.5);font-size:13px;padding:20px 0 8px}
+.help-text{color:rgba(180,170,255,0.4);font-size:11px;margin-top:4px}
 </style>
 </head>
 <body>
-
-<!-- 装饰背景 -->
 <div class="bg-deco">
   <div class="deco">🐱</div><div class="deco">⭐</div><div class="deco">🐹</div>
   <div class="deco">☁️</div><div class="deco">🐱</div><div class="deco">✨</div>
   <div class="deco">⭐</div><div class="deco">🐹</div><div class="deco">☁️</div>
   <div class="deco">🌙</div>
 </div>
-
-<!-- 顶部栏 -->
 <div class="header">
   <div class="avatar">🌙</div>
   <div class="header-info">
-    <h1>Zephyr</h1>
+    <h1>Zephyr · 最终稳定版</h1>
     <p id="voiceStatus">点🔊开启语音</p>
   </div>
   <div class="header-right">
@@ -96,13 +93,9 @@ textarea.setting-input{resize:vertical;min-height:80px;line-height:1.5}
     <button class="header-btn" onclick="openSettings()">⚙️</button>
   </div>
 </div>
-
-<!-- 聊天区域 -->
 <div class="chat-container" id="chatContainer">
   <div class="welcome">✨ 和 Zephyr 说说话吧～</div>
 </div>
-
-<!-- 输入区域 -->
 <div class="input-area">
   <div class="preview-box" id="previewBox"></div>
   <div class="input-row">
@@ -111,12 +104,8 @@ textarea.setting-input{resize:vertical;min-height:80px;line-height:1.5}
     <button class="send-btn" onclick="sendMessage()">➤</button>
   </div>
 </div>
-
-<!-- 隐藏文件输入 -->
 <input type="file" id="fileInput" accept="image/*,.txt,.md" style="display:none" onchange="handleFile(event)">
 <input type="file" id="audioInput" accept=".mp3,.wav,.m4a" style="display:none" onchange="loadAudio(event)">
-
-<!-- 设置面板 -->
 <div class="settings-overlay" id="settingsOverlay" onclick="closeSettingsOutside(event)">
   <div class="settings-panel">
     <div class="settings-title">⚙️ 设置</div>
@@ -136,119 +125,220 @@ textarea.setting-input{resize:vertical;min-height:80px;line-height:1.5}
       <div class="setting-label">全局系统提示词</div>
       <textarea class="setting-input" id="systemPrompt"></textarea>
     </div>
-    <!-- ===== 语音相关设置 ===== -->
-    <div class="setting-item" style="border-top:1px solid rgba(120,100,200,0.2);padding-top:12px;margin-top:4px;">
+    <div class="setting-item" style="border-top:1px solid rgba(120,100,0.2);padding-top:12px;margin-top:4px;">
       <div class="setting-label" style="color:rgba(200,190,255,0.9);font-weight:600;">🎤 语音设置</div>
     </div>
     <div class="setting-item">
       <div class="setting-label">语音模式</div>
       <select class="setting-input" id="voiceMode" style="appearance:auto;">
-        <option value="browser">iOS 系统语音（推荐，免密钥）</option>
-        <option value="mimo">MiMo 克隆音色（需密钥+代理）</option>
+        <option value="browser">iOS 系统语音（推荐，免密钥/无后端）</option>
+        <option value="mimo">MiMo 克隆音色（需Railway/本地后端）</option>
       </select>
     </div>
-    <div class="setting-item" id="mimoSettings">
-      <div class="setting-label">MiMo 语音 API Key</div>
-      <input class="setting-input" id="mimoKey" type="password" placeholder="sk-...">
+    <div class="setting-item" id="proxyWrap">
+      <div class="setting-label">后端代理地址（Railway公网/电脑局域网IP）</div>
+      <input class="setting-input" id="proxyUrl" placeholder="https://xxx.railway.app/api/tts">
+      <button class="test-btn" onclick="testProxy()">🔍 测试代理连通性</button>
+      <div class="help-text">克隆音色模式填写后端公网地址，系统语音无需填写</div>
     </div>
-    <div class="setting-item" id="audioSettings">
+    <div class="setting-item" id="audioWrap">
       <div class="setting-label">音色参考音频（mp3/wav/m4a，10-30秒，≤3MB）</div>
-      <button class="upload-btn" id="audioBtn" onclick="document.getElementById('audioInput').click()">📂 点击上传音色文件</button>
-    </div>
-    <div class="setting-item" id="proxySettings">
-      <div class="setting-label">使用后端代理（解决跨域，必选）</div>
-      <div class="check-row">
-        <input type="checkbox" id="useProxy">
-        <span style="color:rgba(200,190,255,0.8);font-size:14px;">开启后请求发往代理地址</span>
-      </div>
-      <input class="setting-input" id="proxyUrl" placeholder="http://你的电脑IP:3000/api/tts" style="margin-top:6px;">
-      <div style="color:rgba(180,170,220,0.5);font-size:12px;margin-top:4px;">💡 手机和电脑需在同一 WiFi，电脑运行代理后端</div>
+      <button class="upload-btn" id="audioBtn" onclick="document.getElementById('audioInput').click()">📂 上传音色文件</button>
+      <div class="help-text" id="audioStatus">未上传</div>
+      <button class="clear-a-btn" onclick="clearAudio()">🗑️ 清空本地音色缓存</button>
+      <button class="clear-all-btn" onclick="clearAllStorage()">🧹 清空全部本地缓存</button>
     </div>
     <button class="save-btn" onclick="saveSettings()">💾 保存全部设置</button>
     <button class="clear-btn" onclick="clearChat()">🗑️ 清空聊天记录</button>
-    <button class="close-btn" onclick="closeSettings()">关闭设置面板</button>
+    <button class="close-btn" onclick="closeSettings()">关闭</button>
   </div>
 </div>
-
 <script>
-// ============================================================
-//  iOS + Git 静态托管专用 · 语音增强版
-//  默认使用 iOS 系统语音（Web Speech API），零配置、零跨域
-//  如需 MiMo 克隆音色，必须配置后端代理（见下方说明）
-// ============================================================
+// 线上调试：URL拼接 ?debug=1 自动开启日志
+const urlParams = new URLSearchParams(window.location.search);
+const IS_DEBUG_URL = urlParams.get('debug') === '1';
 
-// ======================== 全局配置 ========================
-const CONFIG = {
-  apiKey:      localStorage.getItem('apiKey') || '',
-  baseUrl:     localStorage.getItem('baseUrl') || 'https://api.cc-coding.com/v1',
-  modelName:   localStorage.getItem('modelName') || 'claude-sonnet-4-6',
-  systemPrompt:localStorage.getItem('systemPrompt') || '你是Zephyr，温柔软糯，多用^ ^颜文字，称呼用户糯糯。',
-  voiceMode:   localStorage.getItem('voiceMode') || 'browser', // 'browser' 或 'mimo'
-  mimoKey:     localStorage.getItem('mimoKey') || '',
-  useProxy:    localStorage.getItem('useProxy') === 'true',
-  proxyUrl:    localStorage.getItem('proxyUrl') || 'http://localhost:3000/api/tts',
+// ======================== 全局统一常量 ========================
+const CONST = {
+  DEBUG_LOG: IS_DEBUG_URL || false,
+  MAX_AUDIO_SIZE: 3 * 1024 * 1024,
+  SAFE_LOCAL_AUDIO_MAX: 1.5 * 1024 * 1024,
+  DIALOG_TIMEOUT: 15000,
+  TTS_TIMEOUT: 30000,
+  MAX_HISTORY: 50,
+  MAX_IMG_SIZE: 2 * 1024 * 1024,
+  MAX_TXT_FILE: 1 * 1024,
+  TEXT_TRUNCATE_LEN: 500,
+  TTS_MODEL: "mimo-v2.5-tts-voiceclone",
+  DEFAULT_PROXY: "https://xxx.railway.app/api/tts",
+  MIN_AUDIO_SEC: 10,
+  MAX_AUDIO_SEC: 30,
+  TEXT_LIMIT: 300,
+  LS_TOTAL_LIMIT: 5 * 1024 * 1024,
+  IDLE_RELEASE_DELAY: 30000,
+  FETCH_RETRY_COUNT: 1
 };
-let msgs = JSON.parse(localStorage.getItem('chatHistory') || '[]');
-let pendingFile = null;
-let voiceOn = false;
-let curAudio = null;
-let audioB64 = localStorage.getItem('audioB64') || '';
-let audioMime = localStorage.getItem('audioMime') || 'audio/mpeg';
-let audioUnlocked = false;
 
-// ======================== 辅助函数 ========================
+// ======================== 通用工具 ========================
+function log(...args) {
+  if (CONST.DEBUG_LOG) console.log(...args);
+}
+
+// 仅外部不可控内容转义（文件名、接口报错），聊天内容不转义保留颜文字
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// 纯文本渲染，天然防注入，不二次转义聊天内容
+function safeText(rawText) {
+  const wrapper = document.createElement('span');
+  const lines = rawText.split('\n');
+  lines.forEach((line, idx) => {
+    wrapper.appendChild(document.createTextNode(line));
+    if (idx < lines.length - 1) wrapper.appendChild(document.createElement('br'));
+  });
+  return wrapper;
+}
+
+function getLocalStorageUsed() {
+  let total = 0;
+  for (let k in localStorage) {
+    if (localStorage.hasOwnProperty(k)) total += (localStorage[k].length + k.length) * 2;
+  }
+  return total;
+}
+
+// 空间不足自动裁剪+友好提示
+function checkStorageSpace(fileByte = 0) {
+  const used = getLocalStorageUsed();
+  const remain = CONST.LS_TOTAL_LIMIT - used;
+  if (remain < fileByte + 512 * 1024) {
+    const historyRaw = JSON.parse(localStorage.getItem('chatHistory') || '[]');
+    const halfLen = Math.floor(historyRaw.length / 2);
+    localStorage.setItem('chatHistory', JSON.stringify(historyRaw.slice(0, halfLen)));
+    alert(`本地存储空间不足，自动删减一半聊天记录，仅保留最近${halfLen}条，请重新上传音频`);
+    return false;
+  }
+  return true;
+}
+
 function getTime() {
   return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
 }
 
+// ======================== 全局状态 ========================
+let state = {
+  msgs: JSON.parse(localStorage.getItem('chatHistory') || '[]'),
+  pendingFile: null,
+  voiceOn: localStorage.getItem('voiceSwitch') === 'true',
+  curAudio: null,
+  audioB64: localStorage.getItem('audioB64') || '',
+  audioMime: localStorage.getItem('audioMime') || 'audio/mpeg',
+  audioUnlocked: false,
+  isSpeaking: false,
+  audioUrl: null,
+  idleTimer: null,
+  isAudioPersisted: !!localStorage.getItem('audioB64')
+};
+
+// DOM缓存
+const $ = {
+  chat: document.getElementById('chatContainer'),
+  input: document.getElementById('inputBox'),
+  voiceToggle: document.getElementById('voiceToggle'),
+  voiceStatus: document.getElementById('voiceStatus'),
+  overlay: document.getElementById('settingsOverlay'),
+  proxyUrl: document.getElementById('proxyUrl'),
+  voiceMode: document.getElementById('voiceMode'),
+  audioBtn: document.getElementById('audioBtn'),
+  audioStatus: document.getElementById('audioStatus'),
+  audioWrap: document.getElementById('audioWrap'),
+  proxyWrap: document.getElementById('proxyWrap'),
+  preview: document.getElementById('previewBox')
+};
+
+// 配置读取（修复缺失.value bug）
+let config = {
+  apiKey: localStorage.getItem('apiKey') || '',
+  baseUrl: localStorage.getItem('baseUrl') || 'https://api.cc-coding.com/v1',
+  modelName: localStorage.getItem('modelName') || 'claude-sonnet-4-6',
+  systemPrompt: localStorage.getItem('systemPrompt') || '你是Zephyr，温柔软糯，多用^ ^颜文字，称呼用户糯糯。',
+  voiceMode: localStorage.getItem('voiceMode') || 'browser',
+  proxyUrl: localStorage.getItem('proxyUrl') || CONST.DEFAULT_PROXY
+};
+
+// ======================== 音频资源管理 ========================
+function disposeAudio() {
+  if (state.curAudio) { state.curAudio.pause(); state.curAudio = null; }
+  if (state.audioUrl) { URL.revokeObjectURL(state.audioUrl); state.audioUrl = null; }
+}
+
+function scheduleIdleRelease() {
+  clearTimeout(state.idleTimer);
+  state.idleTimer = setTimeout(() => {
+    if (!state.curAudio) {
+      state.audioB64 = '';
+      state.audioMime = '';
+    }
+  }, CONST.IDLE_RELEASE_DELAY);
+}
+
+// 页面切回前台自动重载本地音色
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    if (!state.audioB64 && localStorage.getItem('audioB64')) {
+      state.audioB64 = localStorage.getItem('audioB64');
+      state.audioMime = localStorage.getItem('audioMime');
+      state.isAudioPersisted = true;
+    }
+  } else {
+    disposeAudio();
+    clearTimeout(state.idleTimer);
+  }
+});
+
+// ======================== 聊天DOM操作 ========================
 function addMsg(role, content, imgSrc, save = true) {
-  const container = document.getElementById('chatContainer');
   const wrap = document.createElement('div');
   wrap.className = `message ${role}`;
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
   if (imgSrc) {
     const img = document.createElement('img');
-    img.src = imgSrc;
+    img.src = img;
     bubble.appendChild(img);
   }
-  if (content) {
-    const span = document.createElement('span');
-    span.innerHTML = content.replace(/\n/g, '<br>');
-    bubble.appendChild(span);
-  }
+  if (content) bubble.appendChild(safeText(content));
   const time = document.createElement('div');
   time.className = 'message-time';
   time.textContent = getTime();
   wrap.appendChild(bubble);
   wrap.appendChild(time);
-  container.appendChild(wrap);
-  container.scrollTop = container.scrollHeight;
+  $.chat.appendChild(wrap);
+  $.chat.scrollTop = $.chat.scrollHeight;
   if (save) {
-    msgs.push({ role, content: content || '', time: getTime() });
+    state.msgs.push({ role, content, time: getTime() });
     saveMsgs();
   }
-}
-
-function saveMsgs() {
-  localStorage.setItem('chatHistory', JSON.stringify(msgs.slice(-50)));
+  scheduleIdleRelease();
 }
 
 function addThinking() {
-  const container = document.getElementById('chatContainer');
   const wrap = document.createElement('div');
   wrap.className = 'message assistant thinking';
   wrap.id = 'tkLoading';
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
-  for (let i = 0; i < 3; i++) {
-    const dot = document.createElement('div');
-    dot.className = 'dot';
-    bubble.appendChild(dot);
-  }
+  for (let i = 0; i < 3; i++) bubble.appendChild(document.createElement('div').className = 'dot');
   wrap.appendChild(bubble);
-  container.appendChild(wrap);
-  container.scrollTop = container.scrollHeight;
+  $.chat.appendChild(wrap);
+  $.chat.scrollTop = $.chat.scrollHeight;
 }
 
 function rmThinking() {
@@ -257,32 +347,34 @@ function rmThinking() {
 }
 
 function loadHistory() {
-  if (!msgs.length) return;
-  const container = document.getElementById('chatContainer');
-  container.querySelector('.welcome')?.remove();
-  msgs.forEach(item => {
+  if (!state.msgs.length) return;
+  $.chat.querySelector('.welcome')?.remove();
+  state.msgs.forEach(item => {
     const wrap = document.createElement('div');
     wrap.className = `message ${item.role}`;
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
-    const span = document.createElement('span');
-    span.innerHTML = (item.content || '').replace(/\n/g, '<br>');
-    bubble.appendChild(span);
+    bubble.appendChild(safeText(item.content));
     const time = document.createElement('div');
     time.className = 'message-time';
-    time.textContent = item.time || '';
+    time.textContent = item.time;
     wrap.appendChild(bubble);
     wrap.appendChild(time);
-    container.appendChild(wrap);
+    $.chat.appendChild(wrap);
   });
-  container.scrollTop = container.scrollHeight;
+  $.chat.scrollTop = $.chat.scrollHeight;
+}
+
+function saveMsgs() {
+  const arr = state.msgs.slice(-CONST.MAX_HISTORY);
+  localStorage.setItem('chatHistory', JSON.stringify(arr));
 }
 
 function clearChat() {
-  if (!confirm('确定清空全部聊天记录？此操作不可恢复')) return;
-  msgs = [];
+  if (!confirm('确定清空全部聊天记录？不可恢复')) return;
+  state.msgs = [];
   localStorage.removeItem('chatHistory');
-  document.getElementById('chatContainer').innerHTML = '<div class="welcome">✨ 和 Zephyr 说说话吧～</div>';
+  $.chat.innerHTML = '<div class="welcome">✨ 和 Zephyr 说说话吧～</div>';
   closeSettings();
 }
 
@@ -292,388 +384,441 @@ function autoResize(el) {
 }
 
 function handleKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
-  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 }
 
-// iOS 音频解锁（必须由用户点击触发）
+// ======================== iOS 音频解锁 ========================
 function unlockAudio() {
-  if (audioUnlocked) return;
-  audioUnlocked = true;
-  // 创建无声短音频解锁 iOS 播放
-  const a = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
-  a.play().catch(() => {});
-  // 同时解锁 Web Speech
+  if (state.audioUnlocked) return;
+  state.audioUnlocked = true;
+  const tempAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
+  temp.play().catch(() => {});
   if (window.speechSynthesis) {
-    const temp = new SpeechSynthesisUtterance(' ');
-    temp.lang = 'zh-CN';
-    window.speechSynthesis.speak(temp);
+    const utt = new SpeechSynthesisUtterance(' ');
+    utt.lang = 'zh-CN';
+    window.speechSynthesis.speak(utt);
     window.speechSynthesis.cancel();
   }
 }
-// 全局点击/触摸时解锁（iOS 需要）
 document.addEventListener('touchstart', unlockAudio, { passive: true });
 document.addEventListener('click', unlockAudio, { passive: true });
 
-// ======================== 语音合成核心 ========================
-async function speakText(text) {
-  if (!voiceOn) return;
-  let clean = text.replace(/[*_~`#>\[\]]/g, '').replace(/\n/g, ' ').trim().slice(0, 300);
-  if (!clean) return;
-
-  // ----- 模式1：iOS 系统语音（默认，免密钥，免代理） -----
-  if (CONFIG.voiceMode === 'browser') {
-    fallbackSpeech(clean);
-    return;
-  }
-
-  // ----- 模式2：MiMo 克隆音色（必须配置代理） -----
-  if (CONFIG.voiceMode === 'mimo') {
-    // 检查必要条件
-    if (!CONFIG.mimoKey || !audioB64) {
-      addMsg('assistant', '⚠️ 缺少 MiMo 密钥或音频样本，已切换至系统语音。', null, false);
-      fallbackSpeech(clean);
-      return;
-    }
-    if (!CONFIG.useProxy || !CONFIG.proxyUrl) {
-      addMsg('assistant', '⚠️ MiMo 模式必须启用代理并填写代理地址（同一WiFi下）。已切换至系统语音。', null, false);
-      fallbackSpeech(clean);
-      return;
-    }
-
-    // 停止当前播放
-    if (curAudio) { curAudio.pause(); curAudio = null; }
-
-    let fmt = 'mp3';
-    if (audioMime.includes('wav')) fmt = 'wav';
-    else if (audioMime.includes('m4a')) fmt = 'm4a';
-
-    const payload = {
-      model: 'mimo-v2.5-tts-voiceclone',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: '请用上传音频的音色朗读以下文字：' },
-            { type: 'input_audio', input_audio: { data: `data:${audioMime};base64,${audioB64}`, format: fmt } }
-          ]
-        },
-        { role: 'assistant', content: clean }
-      ],
-      audio: { format: fmt },
-      stream: false
-    };
-
-    try {
-      console.log('🔊 语音请求体:', JSON.stringify(payload, null, 2));
-      const res = await fetch(CONFIG.proxyUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      console.log('📦 语音响应:', data);
-
-      if (data.error) {
-        addMsg('assistant', `⚠️ 代理/语音错误：${data.error.message || '未知'}，切到系统语音`, null, false);
-        fallbackSpeech(clean);
-        return;
-      }
-
-      let audioBase64 = data?.choices?.[0]?.message?.audio?.data;
-      if (!audioBase64) {
-        addMsg('assistant', '⚠️ 未获取到音频，切到系统语音', null, false);
-        fallbackSpeech(clean);
-        return;
-      }
-
-      audioBase64 = audioBase64.replace(/-/g, '+').replace(/_/g, '/');
-      while (audioBase64.length % 4) audioBase64 += '=';
-
-      const byteStr = atob(audioBase64);
-      const byteArr = new Uint8Array(byteStr.length);
-      for (let i = 0; i < byteStr.length; i++) byteArr[i] = byteStr.charCodeAt(i);
-      const blob = new Blob([byteArr], { type: 'audio/mpeg' });
-      const audioUrl = URL.createObjectURL(blob);
-      curAudio = new Audio(audioUrl);
-      curAudio.play().catch(() => {
-        addMsg('assistant', '🔊 请点击屏幕解锁音频', null, false);
-      });
-      curAudio.onended = () => {
-        URL.revokeObjectURL(audioUrl);
-        curAudio = null;
-      };
-    } catch (err) {
-      console.error('❌ MiMo 请求异常:', err);
-      addMsg('assistant', `⚠️ 语音请求失败：${err.message}，已切到系统语音`, null, false);
-      fallbackSpeech(clean);
-    }
-  }
-}
-
-// ======================== 系统语音（iOS 自带） ========================
+// ======================== 系统语音（异步加载兜底） ========================
 function fallbackSpeech(text) {
   if (!window.speechSynthesis) return;
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = 'zh-CN';
-  utterance.rate = 0.9;
-  utterance.pitch = 1.0;
-  // iOS 上异步加载语音列表
+  const runSpeak = () => {
+    const voices = window.speechSynthesis.getVoices();
+    const zh = voices.find(v => v.lang.startsWith('zh'));
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'zh-CN';
+    utt.rate = 0.9;
+    utt.pitch = 1.0;
+    if (zh) utt.voice = zh;
+    window.speechSynthesis.speak(utt);
+  };
   const voices = window.speechSynthesis.getVoices();
-  const zhVoice = voices.find(v => v.lang.startsWith('zh'));
-  if (zhVoice) utterance.voice = zhVoice;
-  window.speechSynthesis.speak(utterance);
+  if (voices.length > 0) runSpeak();
+  else window.speechSynthesis.onvoiceschanged = runSpeak;
 }
-// 预加载语音（iOS 需要）
-if (window.speechSynthesis) {
-  window.speechSynthesis.getVoices();
-  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+
+// ======================== 带重试请求封装 ========================
+async function fetchWithRetry(reqOpt, retry = 0) {
+  try {
+    const res = await fetch(reqOpt);
+    return res;
+  } catch (err)
+    if (retry < CONST.FETCH_RETRY_COUNT) return fetchWithRetry(reqOpt, retry + 1);
+    throw err;
+  }
+}
+
+// ======================== TTS 请求 ========================
+async function requestTTS(text, audioB64, audioMime) {
+  const payload = {
+    model: CONST.TTS_MODEL,
+    messages: [{ role: "user", content: "请用上传音频的音色温柔朗读以下文字" }, { role: "assistant", content: text }],
+    audio: { format: "mp3" }
+  };
+  if (audioB64) payload.audio.voice = `data:${audioMime};base64,${audioB64}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CONST.TTS_TIMEOUT);
+  try {
+    const res = await fetchWithRetry({
+      url: config.proxyUrl,
+      method: 'POST',
+      mode: 'cors',
+      signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    clearTimeout(timer);
+    const data = await res.json();
+    if (!res.ok) {
+      if (res.status === 401) return { ok: false, err: 'MiMo密钥无效，请重新填写' };
+      if (res.status === 400) return { ok: false, err: '音频时长/格式不符合要求' };
+      if (res.status >= 500) return { ok: false, err: 'MiMo服务器异常' };
+      return { ok: false, err: `HTTP状态码${res.status}` };
+    }
+    if (data.error) return { ok: false, err: `接口错误：${escapeHtml(data.error.message || data.error)}` };
+    if (!data.choices) return { ok: false, err: '接口无返回音频' };
+    return { ok: true, data };
+  } catch (e) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') return { ok: false, err: '请求超时，检查网络/后端' };
+    if (e.name === 'TypeError') return { ok: false, err: '跨域拦截/后端未启动' };
+    return { ok: false, err: `网络异常：${escapeHtml(e.message)}` };
+  }
+}
+
+// ======================== 朗读入口 ========================
+async function speakText(text) {
+  if (!state.voiceOn || state.isSpeaking) return;
+  let clean = text.replace(/[*_~`#>\[\]]/g, ' ').trim().slice(0, CONST.TEXT_LIMIT);
+  if (!clean) return;
+  if (config.voiceMode === 'browser') {
+    fallbackSpeech(clean);
+    return;
+  }
+  // 内存丢失自动从本地重载音色
+  if (!state.audioB64 && localStorage.getItem('audioB64')) {
+    state.audioB64 = localStorage.getItem('audioB64');
+    state.audioMime = localStorage.getItem('audioMime');
+    state.isAudioPersisted = true;
+  }
+  if (!state.audioB64) {
+    addMsg('assistant', '未上传音色，自动切换系统语音', null, false);
+    fallbackSpeech(clean);
+    return;
+  }
+  if (!config.proxyUrl.trim()) {
+    addMsg('assistant', '代理地址为空，请填写Railway/电脑IP', null, false);
+    fallbackSpeech(clean);
+    return;
+  }
+  disposeAudio();
+  state.isSpeaking = true;
+  const ret = await requestTTS(clean, state.audioB64, state.audioMime);
+  state.isSpeaking = false;
+  if (!ret.ok) {
+    addMsg('assistant', `TTS失败：${ret.err}，切换系统语音`, null, false);
+    fallbackSpeech(clean);
+    return;
+  }
+  const audioRaw = ret.data.choices[0].message?.audio?.data;
+  if (!audioRaw) {
+    addMsg('assistant', '未返回音频流，请更换10-30秒音色', null, false);
+    fallbackSpeech(clean);
+    return;
+  }
+  let b64Fix = audioRaw.replace(/-/g, '+').replace(/_/g, '/');
+  while (b64Fix.length % 4) b64Fix += '=';
+  try {
+    const buf = atob(b64Fix);
+    const arr = Uint8Array.from([...buf].map(c => c.charCodeAt(0)));
+    const blob = new Blob([arr], { type: 'audio/mpeg' });
+    state.audioUrl = URL.createObjectURL(blob);
+    state.curAudio = new Audio(state.audioUrl);
+    state.curAudio.play().catch(() => addMsg('assistant', '点击屏幕解锁音频', null, false));
+    state.curAudio.onended = () => {
+      disposeAudio();
+      scheduleIdleRelease();
+    };
+  } catch (e) {
+    addMsg('assistant', '音频解码失败，更换音色', null, false);
+    fallbackSpeech(clean);
+  }
 }
 
 // ======================== 语音开关 ========================
 function toggleVoice() {
-  // 先解锁
   unlockAudio();
-  voiceOn = !voiceOn;
-  const btn = document.getElementById('voiceToggle');
-  const status = document.getElementById('voiceStatus');
-  btn.textContent = voiceOn ? '🔊' : '🔇';
-  btn.classList.toggle('on', voiceOn);
-  if (CONFIG.voiceMode === 'browser') {
-    status.textContent = voiceOn ? '系统语音' : '点🔊开启语音';
-  } else {
-    status.textContent = voiceOn ? '克隆语音' : '点🔊开启语音';
-  }
-  // 如果开启，测试一下语音是否工作
-  if (voiceOn && CONFIG.voiceMode === 'browser') {
-    fallbackSpeech('语音已开启');
-  }
+  state.voiceOn = !state.voiceOn;
+  localStorage.setItem('voiceSwitch', state.voiceOn);
+  $.voiceToggle.textContent = state.voiceOn ? '🔊' : '🔇';
+  $.voiceToggle.classList.toggle('on', state.voiceOn);
+  $.voiceStatus.textContent = state.voiceOn ? (config.voiceMode === 'browser' ? '系统语音' : '克隆语音') : '点🔊开启语音';
+  if (state.voiceOn && config.voiceMode === 'browser') fallbackSpeech('语音已开启');
 }
 
-// ======================== 上传音频样本 ========================
+// ======================== 音色上传 ========================
 function loadAudio(e) {
   const file = e.target.files[0];
+  e.target.value = '';
   if (!file) return;
-  if (file.size > 3 * 1024 * 1024) {
-    alert('音频文件不能超过3MB，请截取10-30秒片段');
-    e.target.value = '';
+  if (file.size > CONST.MAX_AUDIO_SIZE) {
+    alert(`音频不能超过${CONST.MAX_AUDIO_SIZE / 1024 / 1024}MB`);
+    return;
+  }
+  const allow = ['audio/mpeg','audio/wav','audio/x-wav','audio/m4a','audio/mp4'];
+  if (!allow.includes(file.type)) {
+    alert('仅支持mp3/wav/m4a');
+    return;
+  }
+  const temp = new Audio(URL.createObjectURL(file));
+  temp.onloadedmetadata = () => {
+    const dur = temp.duration;
+    URL.revokeObjectURL(temp.src);
+    if (dur < CONST.MIN_AUDIO_SEC || dur > CONST.MAX_AUDIO_SEC) {
+      alert(`音频时长${CONST.MIN_AUDIO_SEC}-${CONST.MAX_AUDIO_SEC}秒`);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const full = ev.target.result;
+      const b64 = full.split(',')[1];
+      if (file.size > CONST.SAFE_LOCAL_AUDIO_MAX) {
+        state.audioB64 = b64;
+        state.audioMime = file.type;
+        state.isAudioPersisted = false;
+        $.audioBtn.textContent = `临时加载：${escapeHtml(file.name)}`;
+        $.audioStatus.textContent = '超大音频，刷新丢失';
+        alert('音频超过1.5MB，不会本地保存');
+      } else {
+        if (!checkStorage(file.size)) return;
+        state.audioB64 = b64;
+        state.audioMime = file.type;
+        state.isAudioPersisted = true;
+        localStorage.setItem('audioB64', b64);
+        localStorage.setItem('audioMime', file.type);
+        $.audioBtn.textContent = `已保存：${escapeHtml(file.name)}`;
+        $.audioStatus.textContent = `时长${dur.toFixed(1)}秒，刷新不丢失`;
+      }
+      scheduleIdleRelease();
+    };
+    reader.readAsDataURL(file);
+  };
+}
+
+function clearAudio() {
+  state.audioB64 = '';
+  state.audioMime = '';
+  state.isAudioPersisted = false;
+  localStorage.removeItem('audioB64');
+  localStorage.removeItem('audioMime');
+  disposeAudio();
+  $.audioBtn.textContent = '📂 上传音色文件';
+  $.audioStatus.textContent = '未上传';
+  alert('音色缓存已清空');
+}
+
+// ======================== 附件处理（文件名转义+文本截断） ========================
+function handleFile(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  $.preview.innerHTML = '';
+  $.preview.classList.remove('show');
+  if (file.type.startsWith('image') && file.size > CONST.MAX_IMG_SIZE) {
+    alert('图片最大2MB');
+    return;
+  }
+  if (!file.type.startsWith('image') && file.size > CONST.MAX_TXT_FILE * 1024) {
+    alert('文本最大1MB');
     return;
   }
   const reader = new FileReader();
-  reader.onload = function(ev) {
-    const b64 = ev.target.result.split(',')[1];
-    audioB64 = b64;
-    audioMime = file.type || 'audio/mpeg';
-    localStorage.setItem('audioB64', b64);
-    localStorage.setItem('audioMime', audioMime);
-    document.getElementById('audioBtn').textContent = `✅ 已加载：${file.name}`;
-  };
-  reader.readAsDataURL(file);
-  e.target.value = '';
-}
-
-// ======================== 附件处理 ========================
-function handleFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const previewBox = document.getElementById('previewBox');
-  previewBox.innerHTML = '';
-  const maxImg = 2 * 1024 * 1024;
-  const maxTxt = 1 * 1024 * 1024;
-  if (file.type.startsWith('image/') && file.size > maxImg) {
-    alert('图片不能超过2MB');
-    e.target.value = '';
-    return;
-  }
-  if (!file.type.startsWith('image/') && file.size > maxTxt) {
-    alert('文本文件不能超过1MB');
-    e.target.value = '';
-    return;
-  }
-  if (file.type.startsWith('image/')) {
-    const reader = new FileReader();
-    reader.onload = function(ev) {
-      pendingFile = { type: 'image', data: ev.target.result, mime: file.type, name: file.name };
+  reader.onload = ev => {
+    if (file.type.startsWith('image')) {
+      state.pendingFile = { type:'image', data:ev.target.result, name:escapeHtml(file.name) };
       const img = document.createElement('img');
       img.src = ev.target.result;
       img.className = 'preview-thumb';
       const nameSpan = document.createElement('span');
-      nameSpan.className = 'preview-name';
-      nameSpan.textContent = file.name;
+      nameSpan.textContent = escapeHtml(file.name);
       const del = document.createElement('button');
       del.className = 'remove-file';
       del.textContent = '✕';
       del.onclick = clearAttach;
-      previewBox.append(img, nameSpan, del);
-      previewBox.classList.add('show');
-    };
-    reader.readAsDataURL(file);
-  } else {
-    const reader = new FileReader();
-    reader.onload = function(ev) {
-      pendingFile = { type: 'text', data: ev.target.result, name: file.name };
+      $.preview.append(img, nameSpan, del);
+    } else {
+      let rawText = ev.target.result;
+      if (rawText.length > CONST.TEXT_TRUNCATE_LEN) rawText = rawText.slice(0, CONST.TEXT_TRUNCATE_LEN) + '...';
+      state.pendingFile = { type:'text', data:rawText, name:escapeHtml(file.name) };
       const icon = document.createElement('span');
       icon.textContent = '📄';
       const nameSpan = document.createElement('span');
-      nameSpan.className = 'preview-name';
-      nameSpan.textContent = file.name;
+      nameSpan.textContent = escapeHtml(file.name);
       const del = document.createElement('button');
       del.className = 'remove-file';
       del.textContent = '✕';
       del.onclick = clearAttach;
-      previewBox.append(icon, nameSpan, del);
-      previewBox.classList.add('show');
-    };
-    reader.readAsText(file, 'UTF-8');
-  }
-  e.target.value = '';
+      $.preview.append(icon, nameSpan, del);
+    }
+    $.preview.classList.add('show');
+  };
+  if (file.type.startsWith('image')) reader.readAsDataURL(file);
+  else reader.readAsText(file, 'UTF-8');
 }
 
 function clearAttach() {
-  pendingFile = null;
-  const previewBox = document.getElementById('previewBox');
-  previewBox.classList.remove('show');
-  previewBox.innerHTML = '';
+  state.pendingFile = null;
+  $.preview.classList.remove('show');
+  $.preview.innerHTML = '';
 }
 
 // ======================== 发送消息 ========================
 async function sendMessage() {
-  const inputDom = document.getElementById('inputBox');
-  const text = inputDom.value.trim();
-  if (!text && !pendingFile) return;
-  if (!CONFIG.apiKey) {
-    alert('请先在设置面板填写对话 API Key');
+  const text = $.input.value.trim();
+  if (!text && !state.pendingFile) return;
+  if (!config.apiKey) {
+    alert('请填写对话API Key');
     openSettings();
     return;
   }
-  inputDom.value = '';
-  inputDom.style.height = 'auto';
-
-  let userSendText = text;
-  let userSendImg = null;
-  let messageArr = [];
-
-  if (pendingFile) {
-    if (pendingFile.type === 'image') {
-      messageArr.push({ type: 'image_url', image_url: { url: pendingFile.data } });
-      userSendImg = pendingFile.data;
+  $.input.value = '';
+  $.input.style.height = 'auto';
+  let userShow = text;
+  let userImg = null;
+  let blocks = [];
+  if (state.pendingFile) {
+    if (state.pendingFile.type === 'image') {
+      blocks.push({ type:'image_url', image_url:{url:state.pendingFile.data} });
+      userImg = state.pendingFile.data;
+      userShow = `${text}\n[图片：${state.pendingFile.name}]`;
     } else {
-      messageArr.push({ type: 'text', text: `【附件文件：${pendingFile.name}】\n${pendingFile.data}` });
-      userSendText = (text ? text + '\n' : '') + `📄 文件：${pendingFile.name}`;
+      blocks.push({ type:'text', text:`【文件${state.pendingFile.name}】\n${state.pendingFile.data}` });
+      userShow = `${text}\n📄 ${state.pendingFile.name}`;
     }
     clearAttach();
   }
-  if (text) messageArr.push({ type: 'text', text: text });
-
-  addMsg('user', userSendText, userSendImg);
-
-  const historyCtx = msgs.slice(-19).map(item => ({ role: item.role, content: item.content }));
-  const userContent = messageArr.length === 1 ? messageArr[0].text : messageArr;
-  historyCtx.push({ role: 'user', content: userContent });
-
+  if (text) blocks.push({ type:'text', text:text });
+  addMsg('user', userShow, userImg);
+  const history = state.msgs.slice(-19).map(i => ({ role:i.role, content:i.content }));
+  history.push({ role:'user', content: blocks.length === 1 ? blocks[0].text : blocks });
   addThinking();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), CONST.DIALOG_TIMEOUT);
   try {
-    const res = await fetch(`${CONFIG.baseUrl}/chat/completions`, {
+    const res = await fetchWithRetry({
+      url: `${config.baseUrl}/chat/completions`,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${CONFIG.apiKey}`
-      },
-      body: JSON.stringify({
-        model: CONFIG.modelName,
-        messages: [{ role: 'system', content: CONFIG.systemPrompt }, ...historyCtx],
-        max_tokens: 1000
-      })
+      mode: 'cors',
+      signal: controller.signal,
+      headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${config.apiKey}` },
+      body: JSON.stringify({ model:config.modelName, messages:[{role:'system',content:config.systemPrompt},...history], max_tokens:1000 })
     });
+    clearTimeout(timer);
     const data = await res.json();
     rmThinking();
     if (data.choices?.[0]?.message?.content) {
-      const reply = data.choices[0].message.content;
-      addMsg('assistant', reply);
-      speakText(reply);
+      addMsg('assistant', data.choices[0].message.content);
+      speakText(data.choices[0].message.content);
     } else {
-      addMsg('assistant', `对话接口返回异常：${JSON.stringify(data)}`, null, false);
+      addMsg('assistant', `接口返回异常：${escapeHtml(JSON.stringify(data))}`, null, false);
     }
-  } catch (err) {
-    rmThinking();
-    addMsg('assistant', `对话请求失败：${err.message}`, null, false);
+  } catch (err)
+    clearTimeout(timer);
+    const tip = err.name === 'AbortError' ? '对话超时' : escapeHtml(err.message);
+    addMsg('assistant', `对话请求失败：${tip}`, null, false);
+  }
+}
+
+// ======================== 代理测试 OPTIONS优先+空POST无计费 ========================
+async function testProxy() {
+  const url = $.proxyUrl.value.trim();
+  if (!url) {
+    alert('请填写代理地址');
+    return;
+  }
+  try {
+    await fetch(url, { method:'OPTIONS', mode:'cors', signal:AbortSignal.timeout(5000) });
+    alert('✅ OPTIONS预检通过，不消耗API额度');
+    return;
+  } catch (optErr) {
+    try {
+      const res = await fetch(url, {
+        method:'POST',
+        mode:'cors',
+        signal:AbortSignal.timeout(5000),
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ ping:"test" })
+      });
+      if (res.status < 500) alert(`✅ POST兼容检测正常`);
+      else alert(`⚠️ 后端异常码${res.status}`);
+    } catch (postErr) {
+      alert(`❌ 连接失败：${escapeHtml(postErr.message)}`);
+    }
   }
 }
 
 // ======================== 设置面板 ========================
 function openSettings() {
-  document.getElementById('apiKey').value = CONFIG.apiKey;
-  document.getElementById('baseUrl').value = CONFIG.baseUrl;
-  document.getElementById('modelName').value = CONFIG.modelName;
-  document.getElementById('systemPrompt').value = CONFIG.systemPrompt;
-  document.getElementById('voiceMode').value = CONFIG.voiceMode;
-  document.getElementById('mimoKey').value = CONFIG.mimoKey;
-  document.getElementById('useProxy').checked = CONFIG.useProxy;
-  document.getElementById('proxyUrl').value = CONFIG.proxyUrl;
-  if (audioB64) document.getElementById('audioBtn').textContent = '✅ 音色音频已保存';
-  // 切换显示 MiMo 相关设置
-  toggleMimoFields(CONFIG.voiceMode === 'mimo');
-  document.getElementById('settingsOverlay').classList.add('show');
+  document.getElementById('apiKey').value = config.apiKey;
+  document.getElementById('baseUrl').value = config.baseUrl;
+  document.getElementById('modelName').value = config.modelName;
+  document.getElementById('systemPrompt').value = config.systemPrompt;
+  $.voiceMode.value = config.voiceMode;
+  $.proxyUrl.value = config.proxyUrl;
+  if (state.audioB64 && state.isAudioPersisted) {
+    $.audioBtn.textContent = '✅ 音色已保存';
+    $.audioStatus.textContent = '刷新不丢失';
+  } else if (state.audioB64) {
+    $.audioBtn.textContent = '📌 临时音色';
+    $.audioStatus.textContent = '刷新丢失';
+  } else {
+    $.audioStatus.textContent = '未上传';
+  }
+  toggleMimoFields(config.voiceMode === 'mimo');
+  $.overlay.classList.add('show');
 }
-
-function closeSettings() {
-  document.getElementById('settingsOverlay').classList.remove('show');
-}
-
-function closeSettingsOutside(e) {
-  if (e.target === document.getElementById('settingsOverlay')) closeSettings();
-}
-
-// 切换 MiMo 设置项显示
+function closeSettings() { $.overlay.classList.remove('show'); }
+function closeSettingsOutside(e) { if (e.target === $.overlay) closeSettings(); }
 function toggleMimoFields(show) {
-  document.getElementById('mimoSettings').style.display = show ? 'block' : 'none';
-  document.getElementById('audioSettings').style.display = show ? 'block' : 'none';
-  document.getElementById('proxySettings').style.display = show ? 'block' : 'none';
+  document.getElementById('proxyWrap').style.display = show ? 'block' : 'none';
+  document.getElementById('audioWrap').style.display = show ? 'block' : 'none';
 }
-// 监听语音模式切换
-document.addEventListener('DOMContentLoaded', function() {
-  const modeSelect = document.getElementById('voiceMode');
-  if (modeSelect) {
-    modeSelect.addEventListener('change', function() {
-      toggleMimoFields(this.value === 'mimo');
-    });
-  }
-});
-
+// 修复bug：补充所有input.value
 function saveSettings() {
-  CONFIG.apiKey = document.getElementById('apiKey').value.trim();
-  CONFIG.baseUrl = document.getElementById('baseUrl').value.trim();
-  CONFIG.modelName = document.getElementById('modelName').value.trim();
-  CONFIG.systemPrompt = document.getElementById('systemPrompt').value.trim();
-  CONFIG.voiceMode = document.getElementById('voiceMode').value;
-  CONFIG.mimoKey = document.getElementById('mimoKey').value.trim();
-  CONFIG.useProxy = document.getElementById('useProxy').checked;
-  CONFIG.proxyUrl = document.getElementById('proxyUrl').value.trim();
-  localStorage.setItem('apiKey', CONFIG.apiKey);
-  localStorage.setItem('baseUrl', CONFIG.baseUrl);
-  localStorage.setItem('modelName', CONFIG.modelName);
-  localStorage.setItem('systemPrompt', CONFIG.systemPrompt);
-  localStorage.setItem('voiceMode', CONFIG.voiceMode);
-  localStorage.setItem('mimoKey', CONFIG.mimoKey);
-  localStorage.setItem('useProxy', CONFIG.useProxy);
-  localStorage.setItem('proxyUrl', CONFIG.proxyUrl);
+  config.apiKey = document.getElementById('apiKey').value.trim();
+  config.baseUrl = document.getElementById('baseUrl').value.trim();
+  config.modelName = document.getElementById('modelName').value.trim();
+  config.systemPrompt = document.getElementById('systemPrompt').value.trim();
+  config.voiceMode = $.voiceMode.value;
+  config.proxyUrl = $.proxyUrl.value.trim();
+  localStorage.setItem('apiKey', config.apiKey);
+  localStorage.setItem('baseUrl', config.baseUrl);
+  localStorage.setItem('modelName', config.modelName);
+  localStorage.setItem('systemPrompt', config.systemPrompt);
+  localStorage.setItem('voiceMode', config.voiceMode);
+  localStorage.setItem('proxyUrl', config.proxyUrl);
   closeSettings();
-  addMsg('assistant', `✅ 设置已保存，当前语音模式：${CONFIG.voiceMode === 'browser' ? '系统语音' : '克隆语音'}`, null, false);
-  // 更新状态栏
-  if (voiceOn) {
-    document.getElementById('voiceStatus').textContent = CONFIG.voiceMode === 'browser' ? '系统语音' : '克隆语音';
-  }
+  addMsg('assistant', `✅ 设置保存，语音：${config.voiceMode === 'browser' ? '系统语音' : '克隆语音'}`, null, false);
+  if (state.voiceOn) $.voiceStatus.textContent = config.voiceMode === 'browser' ? '系统语音' : '克隆语音';
 }
 
-// ======================== 初始化 ========================
-loadHistory();
-// 根据保存的模式显示设置项
-setTimeout(() => {
-  toggleMimoFields(CONFIG.voiceMode === 'mimo');
-}, 100);
+// 清空全部缓存（判断输入框）
+function clearAllStorage() {
+  const inputText = $.input.value.trim();
+  let tip = '全部缓存（密钥/聊天/音色）删除，不可恢复';
+  if (inputText) tip += '\n⚠️ 当前输入未发送文字会丢失！';
+  if (!confirm(tip)) return;
+  localStorage.clear();
+  state = { msgs:[], pendingFile:null, voiceOn:false, curAudio:null, audioB64:'', audioMime:'', audioUnlocked:false, isSpeaking:false, audioUrl:null, idleTimer:null, isAudioPersisted:false };
+  disposeAudio();
+  $.chat.innerHTML = '<div class="welcome">✨ 和 Zephyr 说说话吧～</div>';
+  alert('缓存清空，点击确定刷新页面');
+  location.reload();
+}
+
+// 页面初始化
+window.addEventListener('DOMContentLoaded', () => {
+  if (localStorage.getItem('audioB64')) {
+    state.audioB64 = localStorage.getItem('audioB64');
+    state.audioMime = localStorage.getItem('audioMime');
+    state.isAudioPersisted = true;
+  }
+  loadHistory();
+  $.voiceToggle.textContent = state.voiceOn ? '🔊' : '🔇';
+  $.voiceToggle.classList.toggle('on', state.voiceOn);
+  $.voiceStatus.textContent = state.voiceOn ? (config.voiceMode === 'browser' ? '系统语音' : '克隆语音') : '点🔊开启语音';
+  $.voiceMode.addEventListener('change', () => toggleMimoFields($.voiceMode.value === 'mimo'));
+  toggleMimoFields(config.voiceMode === 'mimo');
+  window.addEventListener('beforeunload', () => {
+    disposeAudio();
+    clearTimeout(state.idleTimer);
+  });
+});
 </script>
 </body>
 </html>
