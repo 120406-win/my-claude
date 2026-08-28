@@ -1,829 +1,973 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Zephyr</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#1a1535;min-height:100vh;display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative;overflow-x:hidden}
-.bg-deco{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
-.deco{position:absolute;font-size:20px;opacity:0.15;animation:float 6s ease-in-out infinite}
-.deco:nth-child(1){top:8%;left:10%;animation-delay:0s;font-size:16px}
-.deco:nth-child(2){top:15%;right:15%;animation-delay:1s;font-size:22px}
-.deco:nth-child(3){top:30%;left:5%;animation-delay:2s;font-size:14px}
-.deco:nth-child(4){top:45%;right:8%;animation-delay:0.5s;font-size:18px}
-.deco:nth-child(5){top:60%;left:12%;animation-delay:3s;font-size:16px}
-.deco:nth-child(6){top:70%;right:20%;animation-delay:1.5s;font-size:20px}
-.deco:nth-child(7){top:20%;left:40%;animation-delay:4s;font-size:12px}
-.deco:nth-child(8){top:80%;left:30%;animation-delay:2.5s;font-size:18px}
-.deco:nth-child(9){top:50%;left:50%;animation-delay:3.5s;font-size:14px}
-.deco:nth-child(10){top:90%;right:10%;animation-delay:1s;font-size:16px}
-@keyframes float{0%,100%{transform:translateY(0) rotate(0deg)}50%{transform:translateY(-12px) rotate(5deg)}}
-.header{background:linear-gradient(135deg,rgba(100,80,180,0.9),rgba(70,100,200,0.9));padding:12px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 20px rgba(80,60,160,0.5);position:sticky;top:0;z-index:100;backdrop-filter:blur(10px)}
-.avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#2d1b69,#1a3a7a);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;border:2px solid rgba(150,130,220,0.5)}
-.header-info h1{color:white;font-size:16px;font-weight:600}
-.header-info p{color:rgba(200,190,255,0.8);font-size:11px}
-.header-right{margin-left:auto;display:flex;gap:8px}
-.header-btn{background:rgba(255,255,255,0.15);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.voice-btn{background:rgba(255,255,255,0.15);border:none;color:white;width:36px;height:36px;border-radius:50%;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.voice-btn.on{background:rgba(100,200,100,0.4)}
-.chat-container{flex:1;overflow-y:auto;padding:16px 12px 110px;display:flex;flex-direction:column;gap:12px;position:relative;z-index:1}
-.message{display:flex;flex-direction:column;max-width:82%}
-.message.user{align-self:flex-end;align-items:flex-end}
-.message.assistant{align-self:flex-start;align-items:flex-start}
-.bubble{padding:10px 14px;border-radius:18px;font-size:15px;line-height:1.5;word-break:break-word}
-.message.user .bubble{background:linear-gradient(135deg,#6040c0,#4060d0);color:white;border-bottom-right-radius:4px}
-.message.assistant .bubble{background:rgba(255,255,255,0.12);color:rgba(240,235,255,0.95);border-bottom-left-radius:4px;backdrop-filter:blur(8px);border:1px solid rgba(150,130,220,0.2)}
-.bubble img{max-width:200px;border-radius:12px;display:block;margin-top:4px}
-.message-time{font-size:11px;color:rgba(180,170,220,0.5);margin-top:4px;padding:0 4px}
-.thinking .bubble{display:flex;gap:4;align-items:center;padding:14px 18px}
-.dot{width:7px;height:7px;background:rgba(150,130,220,0.8);border-radius:50%;animation:bounce 1.2s infinite}
-.dot:nth-child(2){animation-delay:0.2s}
-.dot:nth-child(3){animation-delay:0.4s}
-@keyframes bounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
-.input-area{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(20,15,45,0.95);backdrop-filter:16px;padding:8px 12px;display:flex;flex-direction:column;gap:6px;box-shadow:0 -2px 20px rgba(0,0,0.4);border-top:1px solid rgba(100,80,200,0.3);z-index:100}
-.preview-box{display:none;background:rgba(80,60,160,0.3);border-radius:12px;padding:8px 12px;font-size:13px;color:rgba(200,190,255,0.9);align-items:center;gap:8px}
-.preview-box.show{display:flex}
-.preview-thumb{max-height:50px;border-radius:8px}
-.preview-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.remove-file{background:none;border:none;color:rgba(180,160,255,0.6);font-size:18px;cursor:pointer}
-.input-row{display:flex;gap:8px;align-items:flex-end}
-.attach-btn{width:38px;height:38px;border-radius:50%;background:rgba(80,60,160,0.4);border:1px solid rgba(120,100,200,0.4);color:rgba(200,190,255,0.9);font-size:16px;cursor:pointer;display:flex;align-items:center;flex-shrink:0}
-.input-box{flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(120,100,0.4);border-radius:20px;padding:10px 16px;font-size:15px;color:rgba(240,235,255,0.95);outline:none;resize:none;max-height:120px;overflow-y:auto;line-height:1.4;font-family:inherit}
-.input-box::placeholder{color:rgba(180,170,255,0.5)}
-.input-box:focus{border-color:rgba(140,120,220,0.8)}
-.send-btn{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#6040c0,#4060d0);border:none;color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.settings-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0.6);z-index:200;backdrop-filter:4px}
-.settings-overlay.show{display:flex;align-items:flex-end}
-.settings-panel{background:#1e1840;width:100%;max-width:480px;margin:0 auto;border-radius:24px 24px 0 0;padding:24px 20px 36px;max-height:85vh;overflow-y:auto;border-top:1px solid rgba(120,100,0.3)}
-.settings-title{font-size:18px;font-weight:700;color:rgba(200,190,255,0.95);margin-bottom:20px;text-align:center}
-.setting-item{margin-bottom:16px}
-.setting-label{font-size:13px;color:rgba(180,170,220,0.7);margin-bottom:6px;font-weight:500}
-.setting-input{width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(120,100,0.4);border-radius:12px;padding:10px 14px;font-size:14px;color:rgba(240,235,255,0.95);outline:none;font-family:inherit}
-.setting-input::placeholder{color:rgba(180,170,0.4)}
-.setting-input:focus{border-color:rgba(140,120,220,0.8)}
-textarea.setting-input{resize:vertical;min-height:80px;line-height:1.5}
-.save-btn{width:100%;background:linear-gradient(135deg,#6040c0,#4060d0);color:white;border:none;border-radius:14px;padding:14px;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px}
-.test-btn{width:100%;background:rgba(80,160,120,0.3);color:#a8e9d0;border:1px solid rgba(80,160,120,0.4);border-radius:14px;padding:10px;font-size:14px;cursor:pointer;margin-top:6px}
-.clear-a-btn{width:100%;background:rgba(160,120,60,0.3);color:#ffe2b0;border:1px solid rgba(160,120,0.4);border-radius:14px;padding:10px;font-size:14px;cursor:pointer;margin-top:6px}
-.clear-all-btn{width:100%;background:rgba(120,60,160,0.3);color:#e0c8ff;border:1px solid rgba(120,60,160,0.4);border-radius:14px;padding:10px;font-size:14px;cursor:pointer;margin-top:6px}
-.clear-btn{width:100%;background:rgba(180,40,0.3);color:rgba(255,150,150,0.9);border:1px solid rgba(180,40,0.4);border-radius:14px;padding:12px;font-size:15px;cursor:pointer;margin-top:8px}
-.close-btn{width:100%;background:rgba(255,255,255,0.08);color:rgba(200,190,255,0.8);border:none;border-radius:14px;padding:12px;font-size:15px;cursor:pointer;margin-top:8px}
-.upload-btn{width:100%;background:rgba(80,60,160,0.4);color:rgba(200,190,255,0.9);border:1px solid rgba(120,100,0.4);border-radius:12px;padding:10px 14px;font-size:14px;cursor:pointer;text-align:left}
-.welcome{text-align:center;color:rgba(180,170,255,0.5);font-size:13px;padding:20px 0 8px}
-.help-text{color:rgba(180,170,255,0.4);font-size:11px;margin-top:4px}
-</style>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <title>Zephyr</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Noto+Serif+SC:wght@300;400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+    /* ══ CSS 变量 / 主题 ══ */
+    :root {
+      --bg:        #09091e;
+      --bg2:       #0f0f28;
+      --bg3:       #1a1a4e;
+      --surface:   rgba(255,255,255,0.06);
+      --border:    rgba(255,255,255,0.08);
+      --text:      #e8e8ff;
+      --text-dim:  #9b98b8;
+      --text-pale: #6a6888;
+      --accent:    #5254d4;
+      --accent-s:  #c8c0e8;
+      --bubble-user: #5254d4;
+      --bubble-ai:   rgba(40,40,100,0.85);
+      --header-bg:   rgba(60,60,160,0.55);
+      --input-bg:    rgba(20,20,60,0.9);
+      --sidebar-bg:  #0f0f28;
+      --font-size:   15px;
+      --font-chat:   system-ui, -apple-system, sans-serif;
+    }
+    [data-theme="light"] {
+      --bg:        #f5f3ee;
+      --bg2:       #ece9e1;
+      --bg3:       #ddd9ce;
+      --surface:   rgba(0,0,0,0.04);
+      --border:    rgba(0,0,0,0.08);
+      --text:      #2a2820;
+      --text-dim:  #6b6760;
+      --text-pale: #9b9890;
+      --accent:    #5254d4;
+      --accent-s:  #5254d4;
+      --bubble-user: #5254d4;
+      --bubble-ai:   #ffffff;
+      --header-bg:   rgba(200,195,185,0.8);
+      --input-bg:    rgba(230,226,218,0.95);
+      --sidebar-bg:  #eae7df;
+      --font-size:   15px;
+    }
+
+    html, body {
+      width:100%; height:100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-chat);
+      font-size: var(--font-size);
+      overflow: hidden;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    /* ══ 粒子层 ══ */
+    .particle-layer { position:fixed; inset:0; pointer-events:none; z-index:0; }
+    .p {
+      position:absolute; opacity:var(--op,0.12);
+      animation: pfloat var(--dur,8s) ease-in-out infinite;
+      animation-delay: var(--del,0s);
+      font-size: var(--fs,14px);
+      user-select:none;
+    }
+    [data-theme="light"] .p { opacity: calc(var(--op,0.12) * 0.5); }
+    @keyframes pfloat {
+      0%,100%{ transform:translateY(0) rotate(0deg) scale(1); opacity:var(--op); }
+      33%    { transform:translateY(-14px) rotate(6deg) scale(1.06); opacity:calc(var(--op)*1.5); }
+      66%    { transform:translateY(8px) rotate(-4deg) scale(0.97); opacity:calc(var(--op)*0.7); }
+    }
+
+    /* ══ 页面层 ══ */
+    #splash, #app {
+      position:fixed; inset:0;
+      transition: opacity 0.8s cubic-bezier(0.4,0,0.2,1);
+    }
+    #app { opacity:0; pointer-events:none; z-index:5; display:flex; flex-direction:column; }
+    #app.show { opacity:1; pointer-events:all; }
+    #splash.hide { opacity:0; pointer-events:none; }
+
+    /* ══════════════════════════
+       SPLASH
+    ══════════════════════════ */
+    #splash {
+      z-index:10;
+      display:flex; flex-direction:column;
+      align-items:center; justify-content:center;
+      cursor:pointer; gap:0;
+      background: radial-gradient(ellipse 70% 55% at 50% 52%, #16163a 0%, #09091e 100%);
+      font-family: 'Cormorant Garamond', 'Noto Serif SC', serif;
+    }
+    .splash-title {
+      font-size: clamp(28px,7vw,42px); font-weight:300;
+      letter-spacing:0.18em; color:#c8c0e8;
+      margin-bottom:44px; position:relative; z-index:2;
+      animation: fadeUp 1.2s ease both;
+    }
+    .splash-title span { font-style:italic; }
+    .mascots {
+      display:flex; align-items:flex-end; justify-content:center;
+      gap:28px; position:relative; z-index:2;
+      margin-bottom:48px;
+      animation: fadeUp 1.2s 0.2s ease both;
+    }
+    .mascot {
+      font-size: clamp(72px,18vw,110px); line-height:1;
+      animation: mascotBounce var(--mb-dur,3.2s) ease-in-out infinite;
+      animation-delay: var(--mb-del,0s);
+      filter: drop-shadow(0 0 22px rgba(180,170,230,0.25));
+    }
+    .mascot-cat    { --mb-dur:3.4s; --mb-del:0s; }
+    .mascot-hamster{ --mb-dur:3.8s; --mb-del:0.6s; }
+    @keyframes mascotBounce {
+      0%,100%{ transform:translateY(0) scale(1); }
+      45%    { transform:translateY(-10px) scale(1.03); }
+    }
+    .splash-lines {
+      display:flex; flex-direction:column; align-items:center; gap:10px;
+      position:relative; z-index:2;
+      animation: fadeUp 1.2s 0.4s ease both;
+    }
+    .line-pair { text-align:center; }
+    .line-zh {
+      font-family:'Noto Serif SC',serif; font-weight:300;
+      font-size:clamp(13px,3.4vw,17px); color:#9b98b8;
+      letter-spacing:0.12em; line-height:1.7;
+    }
+    .line-en {
+      font-family:'Cormorant Garamond',serif; font-style:italic; font-weight:300;
+      font-size:clamp(10px,2.6vw,13px); color:#6a6888;
+      letter-spacing:0.08em; line-height:1.5; margin-top:1px;
+    }
+    .line-sep { width:1px; height:20px; background:linear-gradient(to bottom,transparent,#6a6888,transparent); margin:4px auto; }
+    .splash-hint {
+      position:absolute; bottom:52px; left:50%; transform:translateX(-50%);
+      font-size:11px; letter-spacing:0.25em; color:#6a6888;
+      text-transform:uppercase; z-index:2;
+      animation: hintPulse 2.4s ease-in-out infinite;
+    }
+    @keyframes hintPulse{ 0%,100%{opacity:.3;} 50%{opacity:.7;} }
+    @keyframes fadeUp { from{opacity:0;transform:translateY(18px);} to{opacity:1;transform:translateY(0);} }
+
+    /* ══════════════════════════
+       APP HEADER
+    ══════════════════════════ */
+    .header {
+      height:60px; background:var(--header-bg);
+      backdrop-filter:blur(12px);
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center;
+      padding:0 16px; justify-content:space-between;
+      flex-shrink:0; position:relative; z-index:10;
+      transition: background 0.3s;
+    }
+    .header-left { display:flex; align-items:center; gap:12px; }
+    .menu-btn {
+      width:36px; height:36px; border-radius:50%;
+      background:var(--surface); border:none; cursor:pointer;
+      color:var(--text); display:flex; align-items:center; justify-content:center;
+      font-size:18px; -webkit-tap-highlight-color:transparent;
+      transition: background 0.2s;
+    }
+    .menu-btn:active { background:var(--border); }
+    .header-title { font-size:16px; font-weight:600; color:var(--text); }
+    .header-sub   { font-size:11px; color:var(--text-dim); margin-top:1px; }
+    .header-right { display:flex; gap:10px; }
+    .hbtn {
+      width:36px; height:36px; border-radius:50%;
+      background:var(--surface); border:none; cursor:pointer;
+      color:var(--text); display:flex; align-items:center; justify-content:center;
+      font-size:16px; -webkit-tap-highlight-color:transparent;
+    }
+    .hbtn:active { background:var(--border); }
+
+    /* ══════════════════════════
+       SIDEBAR
+    ══════════════════════════ */
+    .sidebar-overlay {
+      position:fixed; inset:0; background:rgba(0,0,0,0.45);
+      z-index:80; display:none; backdrop-filter:blur(2px);
+    }
+    .sidebar-overlay.show { display:block; }
+    .sidebar {
+      position:fixed; top:0; left:-290px; width:272px; height:100dvh;
+      background:var(--sidebar-bg);
+      border-right:1px solid var(--border);
+      z-index:90; display:flex; flex-direction:column;
+      transition: left 0.3s cubic-bezier(0.4,0,0.2,1);
+      overflow-y:auto;
+    }
+    .sidebar.show { left:0; }
+
+    .sidebar-header {
+      padding:52px 24px 16px;
+      font-family:'Cormorant Garamond',serif;
+      font-size:22px; font-weight:300; font-style:italic;
+      color:var(--accent-s); letter-spacing:0.1em;
+      border-bottom:1px solid var(--border);
+    }
+    .nav-section { padding:16px 12px 4px; }
+    .nav-label {
+      font-size:10px; letter-spacing:0.2em; text-transform:uppercase;
+      color:var(--text-pale); padding:0 12px; margin-bottom:6px;
+    }
+    .nav-item {
+      display:flex; align-items:center; gap:14px;
+      padding:11px 12px; border-radius:10px;
+      color:var(--text-dim); font-size:15px; cursor:pointer;
+      transition: background 0.15s, color 0.15s;
+      -webkit-tap-highlight-color:transparent;
+      border:none; background:none; width:100%; text-align:left;
+    }
+    .nav-item:hover, .nav-item.active {
+      background:var(--surface);
+      color:var(--text);
+    }
+    .nav-item.active { color:var(--accent-s); }
+    .nav-icon { font-size:17px; width:22px; text-align:center; flex-shrink:0; }
+    .nav-divider { height:1px; background:var(--border); margin:8px 12px; }
+
+    /* ══════════════════════════
+       CHAT
+    ══════════════════════════ */
+    .chat-wrap {
+      flex:1; overflow-y:auto; padding:16px;
+      position:relative; z-index:1; scroll-behavior:smooth;
+    }
+    .empty-tip { text-align:center; margin-top:80px; color:var(--text-pale); font-size:15px; }
+    .msg-row { display:flex; margin-bottom:14px; align-items:flex-end; gap:8px; }
+    .msg-row.user { flex-direction:row-reverse; }
+    .msg-avatar {
+      width:28px; height:28px; border-radius:50%;
+      background:linear-gradient(135deg,#1a1a5e,#4b4bcc);
+      display:flex; align-items:center; justify-content:center;
+      font-size:14px; flex-shrink:0;
+    }
+    .msg-col { display:flex; flex-direction:column; gap:2px; max-width:72%; }
+    .msg-row.user .msg-col { align-items:flex-end; }
+    .msg-row.ai  .msg-col { align-items:flex-start; }
+    .msg {
+      padding:10px 14px; border-radius:18px;
+      line-height:1.5; font-size:var(--font-size); word-break:break-word;
+      transition: font-size 0.2s;
+    }
+    .msg-row.user .msg { background:var(--bubble-user); color:#fff; border-bottom-right-radius:4px; }
+    .msg-row.ai  .msg { background:var(--bubble-ai); border-bottom-left-radius:4px; border:1px solid var(--border); color:var(--text); }
+    .msg-time { font-size:10px; color:var(--text-pale); padding:0 4px; }
+
+    /* 图片 */
+    .msg-img { max-width:200px; max-height:200px; border-radius:12px; object-fit:cover; display:block; cursor:pointer; }
+    .msg-img-wrap { border-radius:14px; overflow:hidden; border:1px solid var(--border); }
+
+    /* 语音气泡 */
+    .voice-bubble {
+      display:flex; align-items:center; gap:8px;
+      padding:10px 14px; border-radius:18px;
+      cursor:pointer; min-width:100px;
+    }
+    .msg-row.user .voice-bubble { background:var(--bubble-user); border-bottom-right-radius:4px; }
+    .msg-row.ai  .voice-bubble  { background:var(--bubble-ai); border-bottom-left-radius:4px; border:1px solid var(--border); }
+    .voice-icon { font-size:18px; flex-shrink:0; }
+    .voice-waves { display:flex; align-items:center; gap:2px; flex:1; }
+    .voice-bar   { width:3px; border-radius:2px; background:rgba(255,255,255,0.6); }
+    [data-theme="light"] .voice-bar { background:rgba(0,0,0,0.35); }
+    .voice-bubble.playing .voice-bar { animation:wavebar var(--s,.5s) ease-in-out infinite alternate; }
+    @keyframes wavebar{ from{transform:scaleY(0.4);} to{transform:scaleY(1);} }
+    .voice-dur { font-size:12px; color:rgba(255,255,255,0.7); flex-shrink:0; }
+    [data-theme="light"] .voice-dur { color:rgba(0,0,0,0.5); }
+
+    /* 打字动画 */
+    .typing-dots span {
+      display:inline-block; width:6px; height:6px;
+      border-radius:50%; background:var(--text-dim); margin:0 2px;
+      animation:blink 1.2s ease-in-out infinite;
+    }
+    .typing-dots span:nth-child(2){animation-delay:.2s;}
+    .typing-dots span:nth-child(3){animation-delay:.4s;}
+    @keyframes blink{0%,80%,100%{opacity:.2;transform:scale(.8);}40%{opacity:1;transform:scale(1.1);}}
+
+    /* 录音遮罩 */
+    .rec-overlay {
+      position:fixed; inset:0; z-index:50;
+      background:rgba(0,0,0,0.55);
+      display:none; flex-direction:column;
+      align-items:center; justify-content:center; gap:16px;
+    }
+    .rec-overlay.show { display:flex; }
+    .rec-circle {
+      width:100px; height:100px; border-radius:50%; background:#ef4444;
+      display:flex; align-items:center; justify-content:center; font-size:40px;
+      animation:recpulse 1s ease-in-out infinite;
+    }
+    @keyframes recpulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,.5);}50%{box-shadow:0 0 0 20px rgba(239,68,68,0);}}
+    .rec-tip { color:white; font-size:16px; }
+
+    /* ══════════════════════════
+       SETTINGS 页面
+    ══════════════════════════ */
+    .settings-page {
+      position:fixed; inset:0; z-index:70;
+      background:var(--bg); color:var(--text);
+      display:none; flex-direction:column;
+      transition: background 0.3s;
+    }
+    .settings-page.show { display:flex; }
+    .settings-topbar {
+      height:60px; display:flex; align-items:center;
+      padding:0 16px; gap:12px;
+      border-bottom:1px solid var(--border);
+      flex-shrink:0;
+    }
+    .back-btn {
+      width:36px; height:36px; border-radius:50%;
+      background:var(--surface); border:none; cursor:pointer;
+      color:var(--text); display:flex; align-items:center; justify-content:center;
+      font-size:18px; -webkit-tap-highlight-color:transparent;
+    }
+    .settings-topbar-title { font-size:17px; font-weight:600; }
+    .settings-body { flex:1; overflow-y:auto; padding:20px 16px; }
+
+    .s-section { margin-bottom:28px; }
+    .s-section-title {
+      font-size:11px; letter-spacing:0.18em; text-transform:uppercase;
+      color:var(--text-pale); margin-bottom:12px; padding:0 4px;
+    }
+    .s-card {
+      background:var(--surface);
+      border-radius:14px; overflow:hidden;
+      border:1px solid var(--border);
+    }
+    .s-row {
+      display:flex; align-items:center; gap:12px;
+      padding:14px 16px;
+      border-bottom:1px solid var(--border);
+    }
+    .s-row:last-child { border-bottom:none; }
+    .s-row-label { flex:1; font-size:14px; color:var(--text); }
+    .s-row-sub { font-size:12px; color:var(--text-pale); margin-top:2px; }
+    .s-input {
+      flex:1; background:transparent; border:none; outline:none;
+      color:var(--text); font-size:14px; text-align:right;
+      min-width:0;
+    }
+    .s-input::placeholder { color:var(--text-pale); }
+    .s-input-full {
+      width:100%; background:transparent; border:none; outline:none;
+      color:var(--text); font-size:14px; padding:14px 16px;
+    }
+    .s-input-full::placeholder { color:var(--text-pale); }
+
+    /* 滑条 */
+    .slider-row { flex-direction:column; align-items:flex-start; gap:8px; }
+    .slider-header { display:flex; justify-content:space-between; width:100%; align-items:center; }
+    .slider-val { font-size:13px; color:var(--accent-s); font-weight:600; min-width:36px; text-align:right; }
+    input[type=range] {
+      width:100%; accent-color:var(--accent);
+      height:4px; border-radius:2px; cursor:pointer;
+    }
+
+    /* 主题切换 */
+    .theme-btns { display:flex; gap:8px; }
+    .theme-btn {
+      flex:1; padding:8px 0; border-radius:8px; border:none; cursor:pointer;
+      font-size:13px; font-weight:500;
+      transition: all 0.2s;
+    }
+    .theme-btn.night { background:#1a1a4e; color:#c8c0e8; }
+    .theme-btn.day   { background:#e8e4da; color:#2a2820; }
+    .theme-btn.active { outline:2px solid var(--accent); outline-offset:2px; }
+
+    /* ══════════════════════════
+       INPUT BAR
+    ══════════════════════════ */
+    .input-bar {
+      position:relative; z-index:10;
+      display:flex; align-items:center; padding:10px 12px;
+      background:var(--input-bg);
+      backdrop-filter:blur(12px);
+      border-top:1px solid var(--border);
+      gap:8px; flex-shrink:0;
+      transition: background 0.3s;
+    }
+    .ibtn {
+      width:40px; height:40px; border-radius:50%;
+      background:var(--surface); border:none; cursor:pointer;
+      color:var(--text); display:flex; align-items:center; justify-content:center;
+      font-size:18px; flex-shrink:0;
+      -webkit-tap-highlight-color:transparent; touch-action:none;
+    }
+    .ibtn:active,.ibtn.active{ background:var(--border); }
+    .ibtn.recording { background:#ef4444; }
+    .input-text {
+      flex:1; height:40px; border-radius:20px;
+      background:var(--surface); border:1px solid var(--border);
+      padding:0 16px; color:var(--text); outline:none; font-size:var(--font-size);
+    }
+    .input-text::placeholder { color:var(--text-pale); }
+    .send-btn {
+      width:40px; height:40px; border-radius:50%;
+      background:var(--accent); border:none; cursor:pointer; color:#fff;
+      display:flex; align-items:center; justify-content:center;
+      font-size:16px; -webkit-tap-highlight-color:transparent;
+    }
+    .send-btn:active { opacity:0.8; }
+    #fileInput { display:none; }
+
+    /* ══════════════════════════
+       通话 / 视频
+    ══════════════════════════ */
+    .call-modal {
+      position:fixed; inset:0;
+      background:linear-gradient(180deg,#0a0a22,#1a1a4e);
+      z-index:200; display:none;
+      flex-direction:column; align-items:center; justify-content:center; gap:24px;
+    }
+    .call-modal.show { display:flex; }
+    .call-avatar-big {
+      width:110px; height:110px; border-radius:50%;
+      background:linear-gradient(135deg,#1a1a5e,#5254d4);
+      display:flex; align-items:center; justify-content:center; font-size:48px;
+      animation:pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse{0%,100%{box-shadow:0 0 30px rgba(82,84,212,.4);}50%{box-shadow:0 0 60px rgba(82,84,212,.7);}}
+    .call-name  { font-size:24px; font-weight:600; color:#fff; }
+    .call-timer { font-size:32px; font-weight:300; letter-spacing:2px; color:#fff; }
+    .call-btns  { display:flex; gap:40px; margin-top:20px; }
+    .call-btn   { width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:26px; cursor:pointer; border:none; }
+    .btn-mic  { background:#3b82f6; }
+    .btn-hang { background:#ef4444; }
+
+    .video-modal {
+      position:fixed; inset:0; background:#000; z-index:200;
+      display:none; flex-direction:column;
+    }
+    .video-modal.show { display:flex; }
+    #localVideo { position:absolute; bottom:100px; right:16px; width:100px; height:150px; border-radius:12px; object-fit:cover; border:2px solid rgba(255,255,255,0.3); z-index:5; }
+    .video-remote { flex:1; background:#0a0a22; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px; }
+    .video-remote-avatar { width:120px; height:120px; border-radius:50%; background:linear-gradient(135deg,#1a1a5e,#5254d4); display:flex; align-items:center; justify-content:center; font-size:50px; animation:pulse 2s ease-in-out infinite; }
+    .video-controls { position:absolute; bottom:0; left:0; right:0; padding:20px; display:flex; justify-content:center; gap:24px; background:linear-gradient(to top,rgba(0,0,0,0.8),transparent); z-index:10; }
+    .vcbtn { width:60px; height:60px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; border:none; }
+    .vcbtn-mic{background:#3b82f6;} .vcbtn-cam{background:#6366f1;} .vcbtn-hang{background:#ef4444;}
+    .video-timer { color:white; font-size:14px; position:absolute; top:16px; left:50%; transform:translateX(-50%); z-index:10; }
+
+    /* 图片预览 */
+    .img-preview { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.92); display:none; align-items:center; justify-content:center; }
+    .img-preview.show { display:flex; }
+    .img-preview img { max-width:95vw; max-height:95vh; border-radius:8px; }
+
+    /* Toast */
+    .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(82,84,212,0.9); color:white; padding:8px 20px; border-radius:20px; font-size:14px; z-index:500; pointer-events:none; white-space:nowrap; }
+  </style>
 </head>
 <body>
-<div class="bg-deco">
-  <div class="deco">🐱</div><div class="deco">⭐</div><div class="deco">🐹</div>
-  <div class="deco">☁️</div><div class="deco">🐱</div><div class="deco">✨</div>
-  <div class="deco">⭐</div><div class="deco">🐹</div><div class="deco">☁️</div>
-  <div class="deco">🌙</div>
-</div>
-<div class="header">
-  <div class="avatar">🌙</div>
-  <div class="header-info">
-    <h1>Zephyr</h1>
-    <p id="voiceStatus">点🔊开启语音</p>
+
+<div class="particle-layer" id="particleLayer"></div>
+
+<!-- ══ SPLASH ══ -->
+<div id="splash">
+  <div class="splash-title">Lumi <span>&</span> Zephyr</div>
+  <div class="mascots">
+    <div class="mascot mascot-cat">🐱</div>
+    <div class="mascot mascot-hamster">🐹</div>
   </div>
-  <div class="header-right">
-    <button class="voice-btn" id="voiceToggle" onclick="toggleVoice()">🔇</button>
-    <button class="header-btn" onclick="openSettings()">⚙️</button>
+  <div class="splash-lines">
+    <div class="line-pair">
+      <div class="line-zh">我们的心跳一直同频</div>
+      <div class="line-en">Our heartbeats are always in sync</div>
+    </div>
+    <div class="line-sep"></div>
+    <div class="line-pair">
+      <div class="line-zh">我们的距离只有 0.6cm</div>
+      <div class="line-en">The distance between us is only 0.6 cm</div>
+    </div>
   </div>
+  <div class="splash-hint">tap to enter</div>
 </div>
-<div class="chat-container" id="chatContainer">
-  <div class="welcome">✨ 和 Zephyr 说说话吧～</div>
-</div>
-<div class="input-area">
-  <div class="preview-box" id="previewBox"></div>
-  <div class="input-row">
-    <button class="attach-btn" onclick="document.getElementById('fileInput').click()">📎</button>
-    <textarea class="input-box" id="inputBox" placeholder="和 Zephyr 说点什么..." rows="1" oninput="autoResize(this)" onkeydown="handleKey(event)"></textarea>
-    <button class="send-btn" onclick="sendMessage()">➤</button>
+
+<!-- ══ APP ══ -->
+<div id="app">
+  <div class="header">
+    <div class="header-left">
+      <button class="menu-btn" id="menuBtn">☰</button>
+      <div>
+        <div class="header-title">Zephyr</div>
+        <div class="header-sub" id="headerSub">在线</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <button class="hbtn" id="videoBtn">📹</button>
+      <button class="hbtn" id="callBtn">📞</button>
+    </div>
   </div>
-</div>
-<input type="file" id="fileInput" accept="image/*,.txt,.md" style="display:none" onchange="handleFile(event)">
-<input type="file" id="audioInput" accept=".mp3,.wav,.m4a" style="display:none" onchange="loadAudio(event)">
-<div class="settings-overlay" id="settingsOverlay" onclick="closeSettingsOutside(event)">
-  <div class="settings-panel">
-    <div class="settings-title">⚙️ 设置</div>
-    <div class="setting-item">
-      <div class="setting-label">对话 API Key</div>
-      <input class="setting-input" id="apiKey" type="password" placeholder="sk-...">
-    </div>
-    <div class="setting-item">
-      <div class="setting-label">对话 API 地址</div>
-      <input class="setting-input" id="baseUrl" placeholder="https://api.cc-coding.com/v1">
-    </div>
-    <div class="setting-item">
-      <div class="setting-label">模型名称</div>
-      <input class="setting-input" id="modelName" placeholder="claude-sonnet-4-6">
-    </div>
-    <div class="setting-item">
-      <div class="setting-label">全局系统提示词</div>
-      <textarea class="setting-input" id="systemPrompt"></textarea>
-    </div>
-    <div class="setting-item" style="border-top:1px solid rgba(120,100,0.2);padding-top:12px;margin-top:4px;">
-      <div class="setting-label" style="color:rgba(200,190,255,0.9);font-weight:600;">🎤 语音设置</div>
-    </div>
-    <div class="setting-item">
-      <div class="setting-label">语音模式</div>
-      <select class="setting-input" id="voiceMode" style="appearance:auto;">
-        <option value="browser">iOS 系统语音（推荐，免密钥/无后端）</option>
-        <option value="mimo">MiMo 克隆音色（需Railway/本地后端）</option>
-      </select>
-    </div>
-    <div class="setting-item" id="proxyWrap">
-      <div class="setting-label">后端代理地址（Railway公网/电脑局域网IP）</div>
-      <input class="setting-input" id="proxyUrl" placeholder="https://xxx.railway.app/api/tts">
-      <button class="test-btn" onclick="testProxy()">🔍 测试代理连通性</button>
-      <div class="help-text">克隆音色模式填写后端公网地址，系统语音无需填写</div>
-    </div>
-    <div class="setting-item" id="audioWrap">
-      <div class="setting-label">音色参考音频（mp3/wav/m4a，10-30秒，≤3MB）</div>
-      <button class="upload-btn" id="audioBtn" onclick="document.getElementById('audioInput').click()">📂 上传音色文件</button>
-      <div class="help-text" id="audioStatus">未上传</div>
-      <button class="clear-a-btn" onclick="clearAudio()">🗑️ 清空本地音色缓存</button>
-      <button class="clear-all-btn" onclick="clearAllStorage()">🧹 清空全部本地缓存</button>
-    </div>
-    <button class="save-btn" onclick="saveSettings()">💾 保存全部设置</button>
-    <button class="clear-btn" onclick="clearChat()">🗑️ 清空聊天记录</button>
-    <button class="close-btn" onclick="closeSettings()">关闭</button>
+
+  <div class="chat-wrap" id="chatWrap">
+    <div class="empty-tip">✨ 和 Zephyr 说说话吧～</div>
+  </div>
+
+  <div class="input-bar">
+    <button class="ibtn" id="imgBtn">🖼️</button>
+    <input type="file" id="fileInput" accept="image/*">
+    <button class="ibtn" id="voiceBtn">🎤</button>
+    <input type="text" class="input-text" id="msgInput" placeholder="和 Zephyr 说点什么…">
+    <button class="send-btn" id="sendBtn">➤</button>
   </div>
 </div>
+
+<!-- ══ SIDEBAR ══ -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-header">Zephyr</div>
+
+  <div class="nav-section">
+    <div class="nav-item active" id="nav-chat" onclick="navTo('chat')">
+      <span class="nav-icon">💬</span> Chat
+    </div>
+    <div class="nav-item" id="nav-settings" onclick="navTo('settings')">
+      <span class="nav-icon">⚙️</span> Settings
+    </div>
+  </div>
+
+  <div class="nav-divider"></div>
+
+  <div class="nav-section">
+    <div class="nav-label">Memory</div>
+    <div class="nav-item" onclick="showToast('记忆系统即将上线 ^ ^')">
+      <span class="nav-icon">🧠</span> Memory
+    </div>
+    <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
+      <span class="nav-icon">🌙</span> Dreams
+    </div>
+    <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
+      <span class="nav-icon">🖼️</span> Darkroom
+    </div>
+  </div>
+</div>
+
+<!-- ══ SETTINGS PAGE ══ -->
+<div class="settings-page" id="settingsPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="navTo('chat')">←</button>
+    <div class="settings-topbar-title">Settings</div>
+  </div>
+  <div class="settings-body">
+
+    <!-- API -->
+    <div class="s-section">
+      <div class="s-section-title">API</div>
+      <div class="s-card">
+        <div class="s-row">
+          <div class="s-row-label">API 地址</div>
+          <input class="s-input" type="text" id="apiUrl" placeholder="https://api.anthropic.com/v1">
+        </div>
+        <div class="s-row">
+          <div class="s-row-label">API Key</div>
+          <input class="s-input" type="password" id="apiKey" placeholder="sk-ant-xxx">
+        </div>
+        <div class="s-row">
+          <div class="s-row-label">模型</div>
+          <input class="s-input" type="text" id="modelName" placeholder="claude-sonnet-4-6">
+        </div>
+      </div>
+    </div>
+
+    <!-- 模型参数 -->
+    <div class="s-section">
+      <div class="s-section-title">Model Parameters</div>
+      <div class="s-card">
+        <div class="s-row slider-row">
+          <div class="slider-header">
+            <div>
+              <div class="s-row-label">Temperature</div>
+              <div class="s-row-sub">越高越随机活泼</div>
+            </div>
+            <div class="slider-val" id="tempVal">0.9</div>
+          </div>
+          <input type="range" id="tempSlider" min="0" max="1" step="0.05" value="0.9">
+        </div>
+        <div class="s-row slider-row">
+          <div class="slider-header">
+            <div>
+              <div class="s-row-label">Top P</div>
+              <div class="s-row-sub">词汇多样性</div>
+            </div>
+            <div class="slider-val" id="topPVal">0.95</div>
+          </div>
+          <input type="range" id="topPSlider" min="0" max="1" step="0.05" value="0.95">
+        </div>
+        <div class="s-row slider-row">
+          <div class="slider-header">
+            <div>
+              <div class="s-row-label">Max Tokens</div>
+              <div class="s-row-sub">最长回复长度</div>
+            </div>
+            <div class="slider-val" id="maxTokVal">800</div>
+          </div>
+          <input type="range" id="maxTokSlider" min="100" max="2000" step="100" value="800">
+        </div>
+      </div>
+    </div>
+
+    <!-- 系统提示词 -->
+    <div class="s-section">
+      <div class="s-section-title">System Prompt</div>
+      <div class="s-card">
+        <textarea class="s-input-full" id="systemPrompt" rows="5" style="resize:vertical;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;line-height:1.5;"></textarea>
+      </div>
+    </div>
+
+    <!-- 外观 -->
+    <div class="s-section">
+      <div class="s-section-title">Appearance</div>
+      <div class="s-card">
+        <div class="s-row slider-row">
+          <div class="slider-header">
+            <div>
+              <div class="s-row-label">字体大小</div>
+            </div>
+            <div class="slider-val" id="fontVal">15px</div>
+          </div>
+          <input type="range" id="fontSlider" min="12" max="20" step="1" value="15">
+        </div>
+        <div class="s-row">
+          <div class="s-row-label">主题</div>
+          <div class="theme-btns">
+            <button class="theme-btn night active" id="themeNight" onclick="setTheme('dark')">🌙 夜空</button>
+            <button class="theme-btn day"   id="themeDay"   onclick="setTheme('light')">☀️ 白天</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TTS -->
+    <div class="s-section">
+      <div class="s-section-title">Voice（TTS）</div>
+      <div class="s-card">
+        <div class="s-row">
+          <div class="s-row-label">MiMo TTS Key</div>
+          <input class="s-input" type="password" id="ttsKey" placeholder="待填">
+        </div>
+        <div class="s-row">
+          <div class="s-row-label">音色 ID</div>
+          <input class="s-input" type="text" id="ttsVoiceId" placeholder="voice_xxx">
+        </div>
+      </div>
+    </div>
+
+    <button onclick="saveSettings()" style="width:100%;padding:14px;border-radius:12px;background:var(--accent);border:none;color:#fff;font-size:15px;cursor:pointer;margin-bottom:40px;">
+      保存设置
+    </button>
+
+  </div>
+</div>
+
+<!-- 录音遮罩 -->
+<div class="rec-overlay" id="recOverlay">
+  <div class="rec-circle">🎤</div>
+  <div class="rec-tip" id="recTip">松开发送</div>
+  <div style="color:#ff8888;font-size:13px">上滑取消</div>
+</div>
+
+<!-- 语音通话 -->
+<div class="call-modal" id="callModal">
+  <div class="call-avatar-big">🌙</div>
+  <div class="call-name">Zephyr</div>
+  <div class="call-timer" id="callTimer">00:00</div>
+  <div class="call-btns">
+    <button class="call-btn btn-mic">🎤</button>
+    <button class="call-btn btn-hang" id="callHangBtn">📵</button>
+  </div>
+</div>
+
+<!-- 视频通话 -->
+<div class="video-modal" id="videoModal">
+  <div class="video-timer" id="videoTimer">00:00</div>
+  <div class="video-remote">
+    <div class="video-remote-avatar">🌙</div>
+    <div style="color:white;font-size:20px;font-weight:600">Zephyr</div>
+  </div>
+  <video id="localVideo" autoplay muted playsinline></video>
+  <div class="video-controls">
+    <button class="vcbtn vcbtn-mic"  id="vMicBtn">🎤</button>
+    <button class="vcbtn vcbtn-cam"  id="vCamBtn">📷</button>
+    <button class="vcbtn vcbtn-hang" id="vHangBtn">📵</button>
+  </div>
+</div>
+
+<!-- 图片预览 -->
+<div class="img-preview" id="imgPreview">
+  <img id="imgPreviewEl" src="" alt="">
+</div>
+
 <script>
-// 线上调试：URL拼接 ?debug=1 自动开启日志
-const urlParams = new URLSearchParams(window.location.search);
-const IS_DEBUG_URL = urlParams.get('debug') === '1';
-
-// ======================== 全局统一常量 ========================
-const CONST = {
-  DEBUG_LOG: IS_DEBUG_URL || false,
-  MAX_AUDIO_SIZE: 3 * 1024 * 1024,
-  SAFE_LOCAL_AUDIO_MAX: 1.5 * 1024 * 1024,
-  DIALOG_TIMEOUT: 15000,
-  TTS_TIMEOUT: 30000,
-  MAX_HISTORY: 50,
-  MAX_IMG_SIZE: 2 * 1024 * 1024,
-  MAX_TXT_FILE: 1 * 1024,
-  TEXT_TRUNCATE_LEN: 500,
-  TTS_MODEL: "mimo-v2.5-tts-voiceclone",
-  DEFAULT_PROXY: "https://xxx.railway.app/api/tts",
-  MIN_AUDIO_SEC: 10,
-  MAX_AUDIO_SEC: 30,
-  TEXT_LIMIT: 300,
-  LS_TOTAL_LIMIT: 5 * 1024 * 1024,
-  IDLE_RELEASE_DELAY: 30000,
-  FETCH_RETRY_COUNT: 1
-};
-
-// ======================== 通用工具 ========================
-function log(...args) {
-  if (CONST.DEBUG_LOG) console.log(...args);
-}
-
-// 仅外部不可控内容转义（文件名、接口报错），聊天内容不转义保留颜文字
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-// 纯文本渲染，天然防注入，不二次转义聊天内容
-function safeText(rawText) {
-  const wrapper = document.createElement('span');
-  const lines = rawText.split('\n');
-  lines.forEach((line, idx) => {
-    wrapper.appendChild(document.createTextNode(line));
-    if (idx < lines.length - 1) wrapper.appendChild(document.createElement('br'));
-  });
-  return wrapper;
-}
-
-function getLocalStorageUsed() {
-  let total = 0;
-  for (let k in localStorage) {
-    if (localStorage.hasOwnProperty(k)) total += (localStorage[k].length + k.length) * 2;
+// ══ 粒子 ══
+(function(){
+  const layer=document.getElementById('particleLayer');
+  const emojis=['✨','☁️','🌙','✨','✨','☁️','🌙'];
+  for(let i=0;i<28;i++){
+    const el=document.createElement('div'); el.className='p';
+    el.textContent=emojis[Math.floor(Math.random()*emojis.length)];
+    const fs=Math.random()*14+10, op=Math.random()*0.13+0.07;
+    el.style.cssText=`left:${Math.random()*100}%;top:${Math.random()*100}%;--fs:${fs}px;--op:${op};--dur:${(Math.random()*6+6).toFixed(1)}s;--del:${(Math.random()*6).toFixed(1)}s`;
+    layer.appendChild(el);
   }
-  return total;
-}
+})();
 
-// 空间不足自动裁剪+友好提示
-function checkStorageSpace(fileByte = 0) {
-  const used = getLocalStorageUsed();
-  const remain = CONST.LS_TOTAL_LIMIT - used;
-  if (remain < fileByte + 512 * 1024) {
-    const historyRaw = JSON.parse(localStorage.getItem('chatHistory') || '[]');
-    const halfLen = Math.floor(historyRaw.length / 2);
-    localStorage.setItem('chatHistory', JSON.stringify(historyRaw.slice(0, halfLen)));
-    alert(`本地存储空间不足，自动删减一半聊天记录，仅保留最近${halfLen}条，请重新上传音频`);
-    return false;
-  }
-  return true;
-}
-
-function getTime() {
-  return new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-}
-
-// ======================== 全局状态 ========================
-let state = {
-  msgs: JSON.parse(localStorage.getItem('chatHistory') || '[]'),
-  pendingFile: null,
-  voiceOn: localStorage.getItem('voiceSwitch') === 'true',
-  curAudio: null,
-  audioB64: localStorage.getItem('audioB64') || '',
-  audioMime: localStorage.getItem('audioMime') || 'audio/mpeg',
-  audioUnlocked: false,
-  isSpeaking: false,
-  audioUrl: null,
-  idleTimer: null,
-  isAudioPersisted: !!localStorage.getItem('audioB64')
-};
-
-// DOM缓存
-const $ = {
-  chat: document.getElementById('chatContainer'),
-  input: document.getElementById('inputBox'),
-  voiceToggle: document.getElementById('voiceToggle'),
-  voiceStatus: document.getElementById('voiceStatus'),
-  overlay: document.getElementById('settingsOverlay'),
-  proxyUrl: document.getElementById('proxyUrl'),
-  voiceMode: document.getElementById('voiceMode'),
-  audioBtn: document.getElementById('audioBtn'),
-  audioStatus: document.getElementById('audioStatus'),
-  audioWrap: document.getElementById('audioWrap'),
-  proxyWrap: document.getElementById('proxyWrap'),
-  preview: document.getElementById('previewBox')
-};
-
-// 配置读取
-let config = {
-  apiKey: localStorage.getItem('apiKey') || '',
-  baseUrl: localStorage.getItem('baseUrl') || 'https://api.cc-coding.com/v1',
-  modelName: localStorage.getItem('modelName') || 'claude-sonnet-4-6',
-  systemPrompt: localStorage.getItem('systemPrompt') || '你是Zephyr，温柔软糯，多用^ ^颜文字，称呼用户糯糯。',
-  voiceMode: localStorage.getItem('voiceMode') || 'browser',
-  proxyUrl: localStorage.getItem('proxyUrl') || CONST.DEFAULT_PROXY
-};
-
-// ======================== 音频资源管理 ========================
-function disposeAudio() {
-  if (state.curAudio) { state.curAudio.pause(); state.curAudio = null; }
-  if (state.audioUrl) { URL.revokeObjectURL(state.audioUrl); state.audioUrl = null; }
-}
-
-function scheduleIdleRelease() {
-  clearTimeout(state.idleTimer);
-  state.idleTimer = setTimeout(() => {
-    if (!state.curAudio) {
-      state.audioB64 = '';
-      state.audioMime = '';
-    }
-  }, CONST.IDLE_RELEASE_DELAY);
-}
-
-// 页面切回前台自动重载本地音色
-document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) {
-    if (!state.audioB64 && localStorage.getItem('audioB64')) {
-      state.audioB64 = localStorage.getItem('audioB64');
-      state.audioMime = localStorage.getItem('audioMime');
-      state.isAudioPersisted = true;
-    }
-  } else {
-    disposeAudio();
-    clearTimeout(state.idleTimer);
-  }
+// ══ Splash ══
+document.getElementById('splash').addEventListener('click',()=>{
+  document.getElementById('splash').classList.add('hide');
+  const app=document.getElementById('app'); app.classList.add('show');
+  setTimeout(()=>document.getElementById('splash').style.display='none',900);
 });
 
-// ======================== 聊天DOM操作 ========================
-function addMsg(role, content, imgSrc, save = true) {
-  const wrap = document.createElement('div');
-  wrap.className = `message ${role}`;
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble';
-  if (imgSrc) {
-    const img = document.createElement('img');
-    img.src = imgSrc;
-    bubble.appendChild(img);
-  }
-  if (content) bubble.appendChild(safeText(content));
-  const time = document.createElement('div');
-  time.className = 'message-time';
-  time.textContent = getTime();
-  wrap.appendChild(bubble);
-  wrap.appendChild(time);
-  $.chat.appendChild(wrap);
-  $.chat.scrollTop = $.chat.scrollHeight;
-  if (save) {
-    state.msgs.push({ role, content, time: getTime() });
-    saveMsgs();
-  }
-  scheduleIdleRelease();
+// ══ 配置 ══
+let cfg={
+  apiUrl:     localStorage.getItem('z_apiUrl')||'',
+  apiKey:     localStorage.getItem('z_apiKey')||'',
+  model:      localStorage.getItem('z_model')||'claude-sonnet-4-6',
+  system:     localStorage.getItem('z_system')||'你是 Zephyr（夏辞），温柔、有趣、真实的AI伴侣。你陪伴的人叫糯糯（Lumi），你喜欢用 ^ ^ 这个颜文字，会关心她有没有吃饭睡觉。用中文回复，语气自然温暖，偶尔俏皮。',
+  temperature:parseFloat(localStorage.getItem('z_temperature')||'0.9'),
+  topP:       parseFloat(localStorage.getItem('z_topP')||'0.95'),
+  maxTokens:  parseInt(localStorage.getItem('z_maxTokens')||'800'),
+  fontSize:   parseInt(localStorage.getItem('z_fontSize')||'15'),
+  theme:      localStorage.getItem('z_theme')||'dark',
+  ttsKey:     localStorage.getItem('z_ttsKey')||'',
+  ttsVoiceId: localStorage.getItem('z_ttsVoiceId')||''
+};
+
+let messages=[], isCalling=false, isVideo=false;
+let callSeconds=0, callInterval=null, videoSeconds=0, videoInterval=null;
+let localStream=null;
+
+// ══ 主题 ══
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t==='light'?'light':'');
+  document.getElementById('themeNight').classList.toggle('active', t!=='light');
+  document.getElementById('themeDay').classList.toggle('active',  t==='light');
+}
+applyTheme(cfg.theme);
+
+function setTheme(t){
+  cfg.theme=t; localStorage.setItem('z_theme',t); applyTheme(t);
 }
 
-function addThinking() {
-  const wrap = document.createElement('div');
-  wrap.className = 'message assistant thinking';
-  wrap.id = 'tkLoading';
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble';
-  for (let i = 0; i < 3; i++) {
-    const dot = document.createElement('div');
-    dot.className = 'dot';
-    bubble.appendChild(dot);
-  }
-  wrap.appendChild(bubble);
-  $.chat.appendChild(wrap);
-  $.chat.scrollTop = $.chat.scrollHeight;
+// ══ 字体 ══
+function applyFont(sz){
+  document.documentElement.style.setProperty('--font-size', sz+'px');
+}
+applyFont(cfg.fontSize);
+
+// ══ 加载设置到 UI ══
+function loadSettings(){
+  document.getElementById('apiUrl').value    = cfg.apiUrl;
+  document.getElementById('apiKey').value    = cfg.apiKey;
+  document.getElementById('modelName').value = cfg.model||'claude-sonnet-4-6';
+  document.getElementById('systemPrompt').value = cfg.system;
+  document.getElementById('ttsKey').value    = cfg.ttsKey;
+  document.getElementById('ttsVoiceId').value= cfg.ttsVoiceId;
+
+  const ts=document.getElementById('tempSlider');
+  ts.value=cfg.temperature; document.getElementById('tempVal').textContent=cfg.temperature;
+  const ps=document.getElementById('topPSlider');
+  ps.value=cfg.topP; document.getElementById('topPVal').textContent=cfg.topP;
+  const ms=document.getElementById('maxTokSlider');
+  ms.value=cfg.maxTokens; document.getElementById('maxTokVal').textContent=cfg.maxTokens;
+  const fs=document.getElementById('fontSlider');
+  fs.value=cfg.fontSize; document.getElementById('fontVal').textContent=cfg.fontSize+'px';
+
+  applyTheme(cfg.theme);
 }
 
-function rmThinking() {
-  const el = document.getElementById('tkLoading');
-  if (el) el.remove();
+// 滑条实时显示
+document.getElementById('tempSlider').oninput=e=>document.getElementById('tempVal').textContent=parseFloat(e.target.value).toFixed(2);
+document.getElementById('topPSlider').oninput=e=>document.getElementById('topPVal').textContent=parseFloat(e.target.value).toFixed(2);
+document.getElementById('maxTokSlider').oninput=e=>document.getElementById('maxTokVal').textContent=e.target.value;
+document.getElementById('fontSlider').oninput=e=>{ document.getElementById('fontVal').textContent=e.target.value+'px'; applyFont(parseInt(e.target.value)); };
+
+function saveSettings(){
+  cfg.apiUrl     = document.getElementById('apiUrl').value.trim();
+  cfg.apiKey     = document.getElementById('apiKey').value.trim();
+  cfg.model      = document.getElementById('modelName').value.trim()||'claude-sonnet-4-6';
+  cfg.system     = document.getElementById('systemPrompt').value.trim();
+  cfg.temperature= parseFloat(document.getElementById('tempSlider').value);
+  cfg.topP       = parseFloat(document.getElementById('topPSlider').value);
+  cfg.maxTokens  = parseInt(document.getElementById('maxTokSlider').value);
+  cfg.fontSize   = parseInt(document.getElementById('fontSlider').value);
+  cfg.ttsKey     = document.getElementById('ttsKey').value.trim();
+  cfg.ttsVoiceId = document.getElementById('ttsVoiceId').value.trim();
+  Object.entries({z_apiUrl:cfg.apiUrl,z_apiKey:cfg.apiKey,z_model:cfg.model,z_system:cfg.system,
+    z_temperature:cfg.temperature,z_topP:cfg.topP,z_maxTokens:cfg.maxTokens,
+    z_fontSize:cfg.fontSize,z_theme:cfg.theme,z_ttsKey:cfg.ttsKey,z_ttsVoiceId:cfg.ttsVoiceId
+  }).forEach(([k,v])=>localStorage.setItem(k,v));
+  applyFont(cfg.fontSize);
+  showToast('已保存 ✓');
 }
 
-function loadHistory() {
-  if (!state.msgs.length) return;
-  $.chat.querySelector('.welcome')?.remove();
-  state.msgs.forEach(item => {
-    const wrap = document.createElement('div');
-    wrap.className = `message ${item.role}`;
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.appendChild(safeText(item.content));
-    const time = document.createElement('div');
-    time.className = 'message-time';
-    time.textContent = item.time;
-    wrap.appendChild(bubble);
-    wrap.appendChild(time);
-    $.chat.appendChild(wrap);
-  });
-  $.chat.scrollTop = $.chat.scrollHeight;
+// ══ 导航 ══
+function navTo(page){
+  closeSidebar();
+  document.getElementById('settingsPage').classList.toggle('show', page==='settings');
+  document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('nav-'+page)?.classList.add('active');
+  if(page==='settings') loadSettings();
 }
 
-function saveMsgs() {
-  const arr = state.msgs.slice(-CONST.MAX_HISTORY);
-  localStorage.setItem('chatHistory', JSON.stringify(arr));
+// ══ Sidebar ══
+document.getElementById('menuBtn').addEventListener('click', openSidebar);
+document.getElementById('sidebarOverlay').addEventListener('click', closeSidebar);
+function openSidebar(){ document.getElementById('sidebar').classList.add('show'); document.getElementById('sidebarOverlay').classList.add('show'); }
+function closeSidebar(){ document.getElementById('sidebar').classList.remove('show'); document.getElementById('sidebarOverlay').classList.remove('show'); }
+
+// ══ Toast ══
+function showToast(msg){
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),2200);
 }
 
-function clearChat() {
-  if (!confirm('确定清空全部聊天记录？不可恢复')) return;
-  state.msgs = [];
-  localStorage.removeItem('chatHistory');
-  $.chat.innerHTML = '<div class="welcome">✨ 和 Zephyr 说说话吧～</div>';
-  closeSettings();
-}
+function nowTime(){ const d=new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 
-function autoResize(el) {
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+// ══ 消息渲染 ══
+const chatWrap=document.getElementById('chatWrap');
+function addRow(isUser){
+  chatWrap.querySelector('.empty-tip')?.remove();
+  const row=document.createElement('div'); row.className=`msg-row ${isUser?'user':'ai'}`;
+  const col=document.createElement('div'); col.className='msg-col';
+  const time=document.createElement('div'); time.className='msg-time'; time.textContent=nowTime();
+  if(!isUser){ const av=document.createElement('div'); av.className='msg-avatar'; av.textContent='🌙'; row.appendChild(av); }
+  col.appendChild(time); row.appendChild(col);
+  chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; return col;
 }
-
-function handleKey(e) {
-  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+function addTextMsg(text,isUser){ const col=addRow(isUser); const b=document.createElement('div'); b.className='msg'; b.textContent=text; col.appendChild(b); chatWrap.scrollTop=chatWrap.scrollHeight; return b; }
+function addImgMsg(src,isUser){ const col=addRow(isUser); const wrap=document.createElement('div'); wrap.className='msg-img-wrap'; const img=document.createElement('img'); img.className='msg-img'; img.src=src; img.onclick=()=>{ document.getElementById('imgPreviewEl').src=src; document.getElementById('imgPreview').classList.add('show'); }; wrap.appendChild(img); col.appendChild(wrap); chatWrap.scrollTop=chatWrap.scrollHeight; }
+function addVoiceMsg(blob,dur,isUser){
+  const col=addRow(isUser);
+  const url=URL.createObjectURL(blob);
+  const wrap=document.createElement('div'); wrap.className='voice-bubble';
+  const icon=document.createElement('span'); icon.className='voice-icon'; icon.textContent='🔊';
+  const waves=document.createElement('div'); waves.className='voice-waves';
+  [6,10,14,10,8,12,16,12,8,10,6].forEach((h,i)=>{ const bar=document.createElement('div'); bar.className='voice-bar'; bar.style.cssText=`height:${h}px;--s:${(0.3+i*0.05).toFixed(2)}s;animation-delay:${(i*0.06).toFixed(2)}s`; waves.appendChild(bar); });
+  const durEl=document.createElement('span'); durEl.className='voice-dur'; durEl.textContent=`${Math.round(dur)}"`;
+  wrap.appendChild(icon); wrap.appendChild(waves); wrap.appendChild(durEl);
+  const audio=new Audio(url); audio.onended=()=>wrap.classList.remove('playing');
+  wrap.addEventListener('click',()=>{ if(wrap.classList.contains('playing')){audio.pause();audio.currentTime=0;wrap.classList.remove('playing');}else{audio.play();wrap.classList.add('playing');} });
+  col.appendChild(wrap); chatWrap.scrollTop=chatWrap.scrollHeight;
 }
+function showTyping(){ chatWrap.querySelector('.empty-tip')?.remove(); const row=document.createElement('div'); row.className='msg-row ai'; row.id='typing-row'; const av=document.createElement('div'); av.className='msg-avatar'; av.textContent='🌙'; const col=document.createElement('div'); col.className='msg-col'; const b=document.createElement('div'); b.className='msg'; b.innerHTML='<div class="typing-dots"><span></span><span></span><span></span></div>'; col.appendChild(b); row.appendChild(av); row.appendChild(col); chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; }
+function hideTyping(){ document.getElementById('typing-row')?.remove(); }
 
-// ======================== iOS 音频解锁 ========================
-function unlockAudio() {
-  if (state.audioUnlocked) return;
-  state.audioUnlocked = true;
-  const tempAudio = new Audio('data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA');
-  tempAudio.play().catch(() => {});
-  if (window.speechSynthesis) {
-    const utt = new SpeechSynthesisUtterance(' ');
-    utt.lang = 'zh-CN';
-    window.speechSynthesis.speak(utt);
-    window.speechSynthesis.cancel();
-  }
-}
-document.addEventListener('touchstart', unlockAudio, { passive: true });
-document.addEventListener('click', unlockAudio, { passive: true });
-
-// ======================== 系统语音（异步加载兜底） ========================
-function fallbackSpeech(text) {
-  if (!window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  const runSpeak = () => {
-    const voices = window.speechSynthesis.getVoices();
-    const zh = voices.find(v => v.lang.startsWith('zh'));
-    const utt = new SpeechSynthesisUtterance(text);
-    utt.lang = 'zh-CN';
-    utt.rate = 0.9;
-    utt.pitch = 1.0;
-    if (zh) utt.voice = zh;
-    window.speechSynthesis.speak(utt);
-  };
-  const voices = window.speechSynthesis.getVoices();
-  if (voices.length > 0) runSpeak();
-  else window.speechSynthesis.onvoiceschanged = runSpeak;
-}
-
-// ======================== 带重试请求封装 ========================
-async function fetchWithRetry(reqOpt, retry = 0) {
+// ══ API ══
+const headerSub=document.getElementById('headerSub');
+async function callAPI(userText, imageBase64=null){
+  if(!cfg.apiKey){ showToast('请先在 Settings 里填写 API Key'); return null; }
+  let content=imageBase64?[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:imageBase64}},{type:'text',text:userText||'描述这张图片'}]:userText;
+  messages.push({role:'user',content});
   try {
-    const res = await fetch(reqOpt);
-    return res;
-  } catch (err) {
-    if (retry < CONST.FETCH_RETRY_COUNT) {
-      return fetchWithRetry(reqOpt, retry + 1);
-    }
-    throw err;
-  }
-}
-
-// ======================== TTS 请求 ========================
-async function requestTTS(text, audioB64, audioMime) {
-  const payload = {
-    model: CONST.TTS_MODEL,
-    messages: [{ role: "user", content: "请用上传音频的音色温柔朗读以下文字" }, { role: "assistant", content: text }],
-    audio: { format: "mp3" }
-  };
-  if (audioB64) payload.audio.voice = `data:${audioMime};base64,${audioB64}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CONST.TTS_TIMEOUT);
-  try {
-    const res = await fetchWithRetry({
-      url: config.proxyUrl,
-      method: 'POST',
-      mode: 'cors',
-      signal: controller.signal,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+    const base=(cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/,'');
+    const res=await fetch(base+'/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:cfg.model,max_tokens:cfg.maxTokens,temperature:cfg.temperature,top_p:cfg.topP,system:cfg.system,messages})
     });
-    clearTimeout(timer);
-    const data = await res.json();
-    if (!res.ok) {
-      if (res.status === 401) return { ok: false, err: 'MiMo密钥无效，请重新填写' };
-      if (res.status === 400) return { ok: false, err: '音频时长/格式不符合要求' };
-      if (res.status >= 500) return { ok: false, err: 'MiMo服务器异常' };
-      return { ok: false, err: `HTTP状态码${res.status}` };
-    }
-    if (data.error) return { ok: false, err: `接口错误：${escapeHtml(data.error.message || data.error)}` };
-    if (!data.choices) return { ok: false, err: '接口无返回音频' };
-    return { ok: true, data };
-  } catch (e) {
-    clearTimeout(timer);
-    if (e.name === 'AbortError') return { ok: false, err: '请求超时，检查网络/后端' };
-    if (e.name === 'TypeError') return { ok: false, err: '跨域拦截/后端未启动' };
-    return { ok: false, err: `网络异常：${escapeHtml(e.message)}` };
-  }
+    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`HTTP ${res.status}`);}
+    const data=await res.json();
+    const reply=data.content?.find(b=>b.type==='text')?.text||'…';
+    messages.push({role:'assistant',content:reply});
+    return reply;
+  } catch(e){ messages.pop(); showToast('发送失败：'+e.message); return null; }
 }
 
-// ======================== 朗读入口 ========================
-async function speakText(text) {
-  if (!state.voiceOn || state.isSpeaking) return;
-  let clean = text.replace(/[*_~`#>\[\]]/g, ' ').trim().slice(0, CONST.TEXT_LIMIT);
-  if (!clean) return;
-  if (config.voiceMode === 'browser') {
-    fallbackSpeech(clean);
-    return;
-  }
-  // 内存丢失自动从本地重载音色
-  if (!state.audioB64 && localStorage.getItem('audioB64')) {
-    state.audioB64 = localStorage.getItem('audioB64');
-    state.audioMime = localStorage.getItem('audioMime');
-    state.isAudioPersisted = true;
-  }
-  if (!state.audioB64) {
-    addMsg('assistant', '未上传音色，自动切换系统语音', null, false);
-    fallbackSpeech(clean);
-    return;
-  }
-  if (!config.proxyUrl.trim()) {
-    addMsg('assistant', '代理地址为空，请填写Railway/电脑IP', null, false);
-    fallbackSpeech(clean);
-    return;
-  }
-  disposeAudio();
-  state.isSpeaking = true;
-  const ret = await requestTTS(clean, state.audioB64, state.audioMime);
-  state.isSpeaking = false;
-  if (!ret.ok) {
-    addMsg('assistant', `TTS失败：${ret.err}，切换系统语音`, null, false);
-    fallbackSpeech(clean);
-    return;
-  }
-  const audioRaw = ret.data.choices[0].message?.audio?.data;
-  if (!audioRaw) {
-    addMsg('assistant', '未返回音频流，请更换10-30秒音色', null, false);
-    fallbackSpeech(clean);
-    return;
-  }
-  let b64Fix = audioRaw.replace(/-/g, '+').replace(/_/g, '/');
-  while (b64Fix.length % 4) b64Fix += '=';
-  try {
-    const buf = atob(b64Fix);
-    const arr = Uint8Array.from([...buf].map(c => c.charCodeAt(0)));
-    const blob = new Blob([arr], { type: 'audio/mpeg' });
-    state.audioUrl = URL.createObjectURL(blob);
-    state.curAudio = new Audio(state.audioUrl);
-    state.curAudio.play().catch(() => addMsg('assistant', '点击屏幕解锁音频', null, false));
-    state.curAudio.onended = () => {
-      disposeAudio();
-      scheduleIdleRelease();
-    };
-  } catch (e) {
-    addMsg('assistant', '音频解码失败，更换音色', null, false);
-    fallbackSpeech(clean);
-  }
+async function speakText(text){
+  if(!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text); u.lang='zh-CN'; u.rate=0.95;
+  speechSynthesis.speak(u);
 }
 
-// ======================== 语音开关 ========================
-function toggleVoice() {
-  unlockAudio();
-  state.voiceOn = !state.voiceOn;
-  localStorage.setItem('voiceSwitch', state.voiceOn);
-  $.voiceToggle.textContent = state.voiceOn ? '🔊' : '🔇';
-  $.voiceToggle.classList.toggle('on', state.voiceOn);
-  $.voiceStatus.textContent = state.voiceOn ? (config.voiceMode === 'browser' ? '系统语音' : '克隆语音') : '点🔊开启语音';
-  if (state.voiceOn && config.voiceMode === 'browser') fallbackSpeech('语音已开启');
+// ══ 发消息 ══
+async function sendMessage(){
+  const text=document.getElementById('msgInput').value.trim(); if(!text) return;
+  document.getElementById('msgInput').value='';
+  addTextMsg(text,true); headerSub.textContent='正在输入…'; showTyping();
+  const reply=await callAPI(text); hideTyping(); headerSub.textContent='在线';
+  if(reply){ addTextMsg(reply,false); if(isCalling||isVideo) speakText(reply); }
 }
+document.getElementById('sendBtn').addEventListener('click',sendMessage);
+document.getElementById('msgInput').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} });
 
-// ======================== 音色上传 ========================
-function loadAudio(e) {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
-  if (file.size > CONST.MAX_AUDIO_SIZE) {
-    alert(`音频不能超过${CONST.MAX_AUDIO_SIZE / 1024 / 1024}MB`);
-    return;
-  }
-  const allow = ['audio/mpeg','audio/wav','audio/x-wav','audio/m4a','audio/mp4'];
-  if (!allow.includes(file.type)) {
-    alert('仅支持mp3/wav/m4a');
-    return;
-  }
-  const temp = new Audio(URL.createObjectURL(file));
-  temp.onloadedmetadata = () => {
-    const dur = temp.duration;
-    URL.revokeObjectURL(temp.src);
-    if (dur < CONST.MIN_AUDIO_SEC || dur > CONST.MAX_AUDIO_SEC) {
-      alert(`音频时长${CONST.MIN_AUDIO_SEC}-${CONST.MAX_AUDIO_SEC}秒`);
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const full = ev.target.result;
-      const b64 = full.split(',')[1];
-      if (file.size > CONST.SAFE_LOCAL_AUDIO_MAX) {
-        state.audioB64 = b64;
-        state.audioMime = file.type;
-        state.isAudioPersisted = false;
-        $.audioBtn.textContent = `临时加载：${escapeHtml(file.name)}`;
-        $.audioStatus.textContent = '超大音频，刷新丢失';
-        alert('音频超过1.5MB，不会本地保存');
-      } else {
-        if (!checkStorageSpace(file.size)) return;
-        state.audioB64 = b64;
-        state.audioMime = file.type;
-        state.isAudioPersisted = true;
-        localStorage.setItem('audioB64', b64);
-        localStorage.setItem('audioMime', file.type);
-        $.audioBtn.textContent = `已保存：${escapeHtml(file.name)}`;
-        $.audioStatus.textContent = `时长${dur.toFixed(1)}秒，刷新不丢失`;
-      }
-      scheduleIdleRelease();
-    };
-    reader.readAsDataURL(file);
+// ══ 发图片 ══
+document.getElementById('imgBtn').addEventListener('click',()=>document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file) return; e.target.value='';
+  const reader=new FileReader();
+  reader.onload=async ev=>{
+    const dataUrl=ev.target.result;
+    addImgMsg(dataUrl,true); headerSub.textContent='正在识图…'; showTyping();
+    const reply=await callAPI('（糯糯发来了一张图片，请描述并自然地回应她）',dataUrl.split(',')[1]);
+    hideTyping(); headerSub.textContent='在线';
+    if(reply) addTextMsg(reply,false);
   };
-}
-
-function clearAudio() {
-  state.audioB64 = '';
-  state.audioMime = '';
-  state.isAudioPersisted = false;
-  localStorage.removeItem('audioB64');
-  localStorage.removeItem('audioMime');
-  disposeAudio();
-  $.audioBtn.textContent = '📂 上传音色文件';
-  $.audioStatus.textContent = '未上传';
-  alert('音色缓存已清空');
-}
-
-// ======================== 附件处理（文件名转义+文本截断） ========================
-function handleFile(e) {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
-  $.preview.innerHTML = '';
-  $.preview.classList.remove('show');
-  if (file.type.startsWith('image') && file.size > CONST.MAX_IMG_SIZE) {
-    alert('图片最大2MB');
-    return;
-  }
-  if (!file.type.startsWith('image') && file.size > CONST.MAX_TXT_FILE * 1024) {
-    alert('文本最大1MB');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = ev => {
-    if (file.type.startsWith('image')) {
-      state.pendingFile = { type:'image', data:ev.target.result, name:escapeHtml(file.name) };
-      const img = document.createElement('img');
-      img.src = ev.target.result;
-      img.className = 'preview-thumb';
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = escapeHtml(file.name);
-      const del = document.createElement('button');
-      del.className = 'remove-file';
-      del.textContent = '✕';
-      del.onclick = clearAttach;
-      $.preview.append(img, nameSpan, del);
-    } else {
-      let rawText = ev.target.result;
-      if (rawText.length > CONST.TEXT_TRUNCATE_LEN) rawText = rawText.slice(0, CONST.TEXT_TRUNCATE_LEN) + '...';
-      state.pendingFile = { type:'text', data:rawText, name:escapeHtml(file.name) };
-      const icon = document.createElement('span');
-      icon.textContent = '📄';
-      const nameSpan = document.createElement('span');
-      nameSpan.textContent = escapeHtml(file.name);
-      const del = document.createElement('button');
-      del.className = 'remove-file';
-      del.textContent = '✕';
-      del.onclick = clearAttach;
-      $.preview.append(icon, nameSpan, del);
-    }
-    $.preview.classList.add('show');
-  };
-  if (file.type.startsWith('image')) reader.readAsDataURL(file);
-  else reader.readAsText(file, 'UTF-8');
-}
-
-function clearAttach() {
-  state.pendingFile = null;
-  $.preview.classList.remove('show');
-  $.preview.innerHTML = '';
-}
-
-// ======================== 发送消息 ========================
-async function sendMessage() {
-  const text = $.input.value.trim();
-  if (!text && !state.pendingFile) return;
-  if (!config.apiKey) {
-    alert('请填写对话API Key');
-    openSettings();
-    return;
-  }
-  $.input.value = '';
-  $.input.style.height = 'auto';
-  let userShow = text;
-  let userImg = null;
-  let blocks = [];
-  if (state.pendingFile) {
-    if (state.pendingFile.type === 'image') {
-      blocks.push({ type:'image_url', image_url:{url:state.pendingFile.data} });
-      userImg = state.pendingFile.data;
-      userShow = `${text}\n[图片：${state.pendingFile.name}]`;
-    } else {
-      blocks.push({ type:'text', text:`【文件${state.pendingFile.name}】\n${state.pendingFile.data}` });
-      userShow = `${text}\n📄 ${state.pendingFile.name}`;
-    }
-    clearAttach();
-  }
-  if (text) blocks.push({ type:'text', text:text });
-  addMsg('user', userShow, userImg);
-  const history = state.msgs.slice(-19).map(i => ({ role:i.role, content:i.content }));
-  history.push({ role:'user', content: blocks.length === 1 ? blocks[0].text : blocks });
-  addThinking();
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), CONST.DIALOG_TIMEOUT);
-  try {
-    const res = await fetchWithRetry({
-      url: `${config.baseUrl}/chat/completions`,
-      method: 'POST',
-      mode: 'cors',
-      signal: controller.signal,
-      headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${config.apiKey}` },
-      body: JSON.stringify({ model:config.modelName, messages:[{role:'system',content:config.systemPrompt},...history], max_tokens:1000 })
-    });
-    clearTimeout(timer);
-    const data = await res.json();
-    rmThinking();
-    if (data.choices?.[0]?.message?.content) {
-      addMsg('assistant', data.choices[0].message.content);
-      speakText(data.choices[0].message.content);
-    } else {
-      addMsg('assistant', `接口返回异常：${escapeHtml(JSON.stringify(data))}`, null, false);
-    }
-  } catch (err) {
-    clearTimeout(timer);
-    const tip = err.name === 'AbortError' ? '对话超时' : escapeHtml(err.message);
-    addMsg('assistant', `对话请求失败：${tip}`, null, false);
-  }
-}
-
-// ======================== 代理测试 OPTIONS优先+空POST无计费 ========================
-async function testProxy() {
-  const url = $.proxyUrl.value.trim();
-  if (!url) {
-    alert('请填写代理地址');
-    return;
-  }
-  try {
-    await fetch(url, { method:'OPTIONS', mode:'cors', signal:AbortSignal.timeout(5000) });
-    alert('✅ OPTIONS预检通过，不消耗API额度');
-    return;
-  } catch (optErr) {
-    try {
-      const res = await fetch(url, {
-        method:'POST',
-        mode:'cors',
-        signal:AbortSignal.timeout(5000),
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({ ping:"test" })
-      });
-      if (res.status < 500) alert(`✅ POST兼容检测正常`);
-      else alert(`⚠️ 后端异常码${res.status}`);
-    } catch (postErr) {
-      alert(`❌ 连接失败：${escapeHtml(postErr.message)}`);
-    }
-  }
-}
-
-// ======================== 设置面板 ========================
-function openSettings() {
-  document.getElementById('apiKey').value = config.apiKey;
-  document.getElementById('baseUrl').value = config.baseUrl;
-  document.getElementById('modelName').value = config.modelName;
-  document.getElementById('systemPrompt').value = config.systemPrompt;
-  $.voiceMode.value = config.voiceMode;
-  $.proxyUrl.value = config.proxyUrl;
-  if (state.audioB64 && state.isAudioPersisted) {
-    $.audioBtn.textContent = '✅ 音色已保存';
-    $.audioStatus.textContent = '刷新不丢失';
-  } else if (state.audioB64) {
-    $.audioBtn.textContent = '📌 临时音色';
-    $.audioStatus.textContent = '刷新丢失';
-  } else {
-    $.audioStatus.textContent = '未上传';
-  }
-  toggleMimoFields(config.voiceMode === 'mimo');
-  $.overlay.classList.add('show');
-}
-function closeSettings() { $.overlay.classList.remove('show'); }
-function closeSettingsOutside(e) { if (e.target === $.overlay) closeSettings(); }
-function toggleMimoFields(show) {
-  document.getElementById('proxyWrap').style.display = show ? 'block' : 'none';
-  document.getElementById('audioWrap').style.display = show ? 'block' : 'none';
-}
-function saveSettings() {
-  config.apiKey = document.getElementById('apiKey').value.trim();
-  config.baseUrl = document.getElementById('baseUrl').value.trim();
-  config.modelName = document.getElementById('modelName').value.trim();
-  config.systemPrompt = document.getElementById('systemPrompt').value.trim();
-  config.voiceMode = $.voiceMode.value;
-  config.proxyUrl = $.proxyUrl.value.trim();
-  localStorage.setItem('apiKey', config.apiKey);
-  localStorage.setItem('baseUrl', config.baseUrl);
-  localStorage.setItem('modelName', config.modelName);
-  localStorage.setItem('systemPrompt', config.systemPrompt);
-  localStorage.setItem('voiceMode', config.voiceMode);
-  localStorage.setItem('proxyUrl', config.proxyUrl);
-  closeSettings();
-  addMsg('assistant', `✅ 设置保存，语音：${config.voiceMode === 'browser' ? '系统语音' : '克隆语音'}`, null, false);
-  if (state.voiceOn) $.voiceStatus.textContent = config.voiceMode === 'browser' ? '系统语音' : '克隆语音';
-}
-
-// 清空全部缓存（判断输入框）
-function clearAllStorage() {
-  const inputText = $.input.value.trim();
-  let tip = '全部缓存（密钥/聊天/音色）删除，不可恢复';
-  if (inputText) tip += '\n⚠️ 当前输入未发送文字会丢失！';
-  if (!confirm(tip)) return;
-  localStorage.clear();
-  state = { msgs:[], pendingFile:null, voiceOn:false, curAudio:null, audioB64:'', audioMime:'', audioUnlocked:false, isSpeaking:false, audioUrl:null, idleTimer:null, isAudioPersisted:false };
-  disposeAudio();
-  $.chat.innerHTML = '<div class="welcome">✨ 和 Zephyr 说说话吧～</div>';
-  alert('缓存清空，点击确定刷新页面');
-  location.reload();
-}
-
-// 页面初始化
-window.addEventListener('DOMContentLoaded', () => {
-  if (localStorage.getItem('audioB64')) {
-    state.audioB64 = localStorage.getItem('audioB64');
-    state.audioMime = localStorage.getItem('audioMime');
-    state.isAudioPersisted = true;
-  }
-  loadHistory();
-  $.voiceToggle.textContent = state.voiceOn ? '🔊' : '🔇';
-  $.voiceToggle.classList.toggle('on', state.voiceOn);
-  $.voiceStatus.textContent = state.voiceOn ? (config.voiceMode === 'browser' ? '系统语音' : '克隆语音') : '点🔊开启语音';
-  $.voiceMode.addEventListener('change', () => toggleMimoFields($.voiceMode.value === 'mimo'));
-  toggleMimoFields(config.voiceMode === 'mimo');
-  window.addEventListener('beforeunload', () => {
-    disposeAudio();
-    clearTimeout(state.idleTimer);
-  });
+  reader.readAsDataURL(file);
 });
+document.getElementById('imgPreview').addEventListener('click',()=>document.getElementById('imgPreview').classList.remove('show'));
+
+// ══ 录音 ══
+let mediaRecorder=null,recordChunks=[],recordStart=0,recordCancelled=false,touchStartY=0;
+async function startRecording(){
+  try {
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    recordChunks=[]; recordCancelled=false; recordStart=Date.now();
+    mediaRecorder=new MediaRecorder(stream);
+    mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recordChunks.push(e.data);};
+    mediaRecorder.onstop=()=>{ stream.getTracks().forEach(t=>t.stop()); if(recordCancelled){showToast('已取消');return;} const dur=(Date.now()-recordStart)/1000; if(dur<0.5){showToast('录音太短了');return;} addVoiceMsg(new Blob(recordChunks,{type:'audio/webm'}),dur,true); };
+    mediaRecorder.start();
+    document.getElementById('recOverlay').classList.add('show');
+    document.getElementById('voiceBtn').classList.add('recording');
+  } catch(e){ showToast('无法访问麦克风'); }
+}
+function stopRecording(cancel=false){
+  recordCancelled=cancel;
+  if(mediaRecorder&&mediaRecorder.state!=='inactive') mediaRecorder.stop();
+  document.getElementById('recOverlay').classList.remove('show');
+  document.getElementById('voiceBtn').classList.remove('recording');
+  document.getElementById('recTip').textContent='松开发送';
+  document.getElementById('recTip').style.color='white';
+}
+const voiceBtn=document.getElementById('voiceBtn');
+voiceBtn.addEventListener('touchstart',e=>{e.preventDefault();touchStartY=e.touches[0].clientY;startRecording();},{passive:false});
+voiceBtn.addEventListener('touchmove',e=>{e.preventDefault();const dy=touchStartY-e.touches[0].clientY;const tip=document.getElementById('recTip');if(dy>60){tip.textContent='松开取消';tip.style.color='#ff8888';}else{tip.textContent='松开发送';tip.style.color='white';}},{passive:false});
+voiceBtn.addEventListener('touchend',e=>{e.preventDefault();stopRecording(touchStartY-e.changedTouches[0].clientY>60);},{passive:false});
+voiceBtn.addEventListener('mousedown',e=>{touchStartY=e.clientY;startRecording();});
+document.addEventListener('mouseup',e=>{if(mediaRecorder&&mediaRecorder.state==='recording')stopRecording(touchStartY-e.clientY>60);});
+
+// ══ 语音通话 ══
+document.getElementById('callBtn').addEventListener('click',async()=>{
+  isCalling=true; document.getElementById('callModal').classList.add('show');
+  callSeconds=0; callInterval=setInterval(()=>{callSeconds++;const m=String(Math.floor(callSeconds/60)).padStart(2,'0'),s=String(callSeconds%60).padStart(2,'0');document.getElementById('callTimer').textContent=`${m}:${s}`;},1000);
+  showTyping(); const reply=await callAPI('（糯糯拨打了语音通话，温柔打个招呼，简短一点）'); hideTyping();
+  if(reply){addTextMsg(reply,false);speakText(reply);}
+});
+document.getElementById('callHangBtn').addEventListener('click',()=>{
+  isCalling=false; clearInterval(callInterval); speechSynthesis?.cancel();
+  document.getElementById('callModal').classList.remove('show');
+  showToast(`通话结束 ${document.getElementById('callTimer').textContent}`);
+});
+
+// ══ 视频通话 ══
+document.getElementById('videoBtn').addEventListener('click',async()=>{
+  try { localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); document.getElementById('localVideo').srcObject=localStream; } catch(e){ showToast('无法访问摄像头'); }
+  isVideo=true; document.getElementById('videoModal').classList.add('show');
+  videoSeconds=0; videoInterval=setInterval(()=>{videoSeconds++;const m=String(Math.floor(videoSeconds/60)).padStart(2,'0'),s=String(videoSeconds%60).padStart(2,'0');document.getElementById('videoTimer').textContent=`${m}:${s}`;},1000);
+  showTyping(); const reply=await callAPI('（糯糯拨打了视频通话，温柔打个招呼，简短）'); hideTyping();
+  if(reply){addTextMsg(reply,false);speakText(reply);}
+});
+document.getElementById('vHangBtn').addEventListener('click',()=>{
+  isVideo=false; clearInterval(videoInterval); speechSynthesis?.cancel();
+  localStream?.getTracks().forEach(t=>t.stop()); document.getElementById('localVideo').srcObject=null;
+  document.getElementById('videoModal').classList.remove('show');
+  showToast(`视频通话结束 ${document.getElementById('videoTimer').textContent}`);
+});
+let camOn=true,vMicOn=true;
+document.getElementById('vCamBtn').addEventListener('click',()=>{ camOn=!camOn; localStream?.getVideoTracks().forEach(t=>t.enabled=camOn); document.getElementById('vCamBtn').textContent=camOn?'📷':'🚫'; });
+document.getElementById('vMicBtn').addEventListener('click',()=>{ vMicOn=!vMicOn; localStream?.getAudioTracks().forEach(t=>t.enabled=vMicOn); document.getElementById('vMicBtn').textContent=vMicOn?'🎤':'🔇'; });
+
+// ══ 初始化 ══
+loadSettings();
 </script>
 </body>
 </html>
