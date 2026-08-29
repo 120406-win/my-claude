@@ -656,8 +656,11 @@
       </div>
     </div>
 
-    <button onclick="saveSettings()" style="width:100%;padding:14px;border-radius:12px;background:var(--accent);border:none;color:#fff;font-size:15px;cursor:pointer;margin-bottom:40px;">
+    <button onclick="saveSettings()" style="width:100%;padding:14px;border-radius:12px;background:var(--accent);border:none;color:#fff;font-size:15px;cursor:pointer;margin-bottom:12px;">
       保存设置
+    </button>
+    <button onclick="clearChatHistory()" style="width:100%;padding:14px;border-radius:12px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#ef9999;font-size:15px;cursor:pointer;margin-bottom:40px;">
+      🗑️ 清空聊天记录
     </button>
 
   </div>
@@ -734,7 +737,8 @@ let cfg={
   fontSize:   parseInt(localStorage.getItem('z_fontSize')||'15'),
   theme:      localStorage.getItem('z_theme')||'dark',
   ttsKey:     localStorage.getItem('z_ttsKey')||'',
-  ttsVoiceId: localStorage.getItem('z_ttsVoiceId')||''
+  ttsVoiceId: localStorage.getItem('z_ttsVoiceId')||'',
+  ttsUrl:     localStorage.getItem('z_ttsUrl')||''
 };
 
 let messages=[], isCalling=false, isVideo=false;
@@ -832,6 +836,56 @@ function showToast(msg){
 
 function nowTime(){ const d=new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 
+// ══ 聊天记录持久化 ══
+function saveChatHistory(){
+  try {
+    localStorage.setItem('z_messages', JSON.stringify(messages));
+  } catch(e) {
+    // 存储超限时，只保留最近的对话，丢弃旧的图片等大内容
+    try {
+      const trimmed = messages.slice(-30);
+      localStorage.setItem('z_messages', JSON.stringify(trimmed));
+    } catch(e2) { console.log('聊天记录保存失败', e2); }
+  }
+}
+
+function clearChatHistory(){
+  if(!confirm('确定要清空所有聊天记录吗？这个操作无法撤销。')) return;
+  messages = [];
+  localStorage.removeItem('z_messages');
+  chatWrap.innerHTML = '<div class="empty-tip">✨ 和 Zephyr 说说话吧～</div>';
+  navTo('chat');
+  showToast('聊天记录已清空');
+}
+
+function loadChatHistory(){
+  try {
+    const saved = localStorage.getItem('z_messages');
+    if(!saved) return;
+    const loaded = JSON.parse(saved);
+    if(!Array.isArray(loaded) || loaded.length===0) return;
+    messages = loaded;
+    chatWrap.querySelector('.empty-tip')?.remove();
+    messages.forEach(m=>{
+      const isUser = m.role === 'user';
+      if(typeof m.content === 'string'){
+        addTextMsg(m.content, isUser);
+      } else if(Array.isArray(m.content)){
+        const hasMedia = m.content.some(b=>b.type==='image'||b.type==='document');
+        m.content.forEach(block=>{
+          if(block.type === 'image' && block.source?.data){
+            addImgMsg(`data:${block.source.media_type};base64,${block.source.data}`, isUser);
+          } else if(block.type === 'document'){
+            addTextMsg('📄 文件', isUser);
+          } else if(block.type === 'text' && !hasMedia){
+            addTextMsg(block.text, isUser);
+          }
+        });
+      }
+    });
+  } catch(e) { console.log('聊天记录加载失败', e); }
+}
+
 // ══ 消息渲染 ══
 const chatWrap=document.getElementById('chatWrap');
 function addRow(isUser){
@@ -843,8 +897,8 @@ function addRow(isUser){
   col.appendChild(time); row.appendChild(col);
   chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; return col;
 }
-function addTextMsg(text,isUser){ const col=addRow(isUser); const b=document.createElement('div'); b.className='msg'; b.textContent=text; col.appendChild(b); chatWrap.scrollTop=chatWrap.scrollHeight; return b; }
-function addImgMsg(src,isUser){ const col=addRow(isUser); const wrap=document.createElement('div'); wrap.className='msg-img-wrap'; const img=document.createElement('img'); img.className='msg-img'; img.src=src; img.onclick=()=>{ document.getElementById('imgPreviewEl').src=src; document.getElementById('imgPreview').classList.add('show'); }; wrap.appendChild(img); col.appendChild(wrap); chatWrap.scrollTop=chatWrap.scrollHeight; }
+function addTextMsg(text,isUser,skipSave){ const col=addRow(isUser); const b=document.createElement('div'); b.className='msg'; b.textContent=text; col.appendChild(b); chatWrap.scrollTop=chatWrap.scrollHeight; return b; }
+function addImgMsg(src,isUser,skipSave){ const col=addRow(isUser); const wrap=document.createElement('div'); wrap.className='msg-img-wrap'; const img=document.createElement('img'); img.className='msg-img'; img.src=src; img.onclick=()=>{ document.getElementById('imgPreviewEl').src=src; document.getElementById('imgPreview').classList.add('show'); }; wrap.appendChild(img); col.appendChild(wrap); chatWrap.scrollTop=chatWrap.scrollHeight; }
 function addVoiceMsg(blob,dur,isUser){
   const col=addRow(isUser);
   const url=URL.createObjectURL(blob);
@@ -878,6 +932,7 @@ async function callAPI(userText, extraBlocks=null){
     const data=await res.json();
     const reply=data.content?.find(b=>b.type==='text')?.text||'…';
     messages.push({role:'assistant',content:reply});
+    saveChatHistory();
     return reply;
   } catch(e){ messages.pop(); showToast('发送失败：'+e.message); return null; }
 }
@@ -1092,6 +1147,7 @@ document.getElementById('vMicBtn').addEventListener('click',()=>{ vMicOn=!vMicOn
 
 // ══ 初始化 ══
 loadSettings();
+loadChatHistory();
 </script>
 </body>
 </html>
