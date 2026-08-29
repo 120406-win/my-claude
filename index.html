@@ -407,7 +407,7 @@
       font-size:16px; -webkit-tap-highlight-color:transparent;
     }
     .send-btn:active { opacity:0.8; }
-    #fileInput { display:none; }
+    #fileInput, #docInput { display:none; }
 
     /* ══════════════════════════
        通话 / 视频
@@ -504,6 +504,8 @@
   <div class="input-bar">
     <button class="ibtn" id="imgBtn">🖼️</button>
     <input type="file" id="fileInput" accept="image/*">
+    <button class="ibtn" id="docBtn">📎</button>
+    <input type="file" id="docInput" accept=".txt,.md,.csv,.json,.pdf,.js,.py,.html,.css,.xml,.log">
     <button class="ibtn" id="voiceBtn">🎤</button>
     <input type="text" class="input-text" id="msgInput" placeholder="和 Zephyr 说点什么…">
     <button class="send-btn" id="sendBtn">➤</button>
@@ -861,9 +863,9 @@ function hideTyping(){ document.getElementById('typing-row')?.remove(); }
 
 // ══ API ══
 const headerSub=document.getElementById('headerSub');
-async function callAPI(userText, imageBase64=null){
+async function callAPI(userText, extraBlocks=null){
   if(!cfg.apiKey){ showToast('请先在 Settings 里填写 API Key'); return null; }
-  let content=imageBase64?[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:imageBase64}},{type:'text',text:userText||'描述这张图片'}]:userText;
+  let content = extraBlocks ? [...extraBlocks, {type:'text', text:userText||'请看一下这个'}] : userText;
   messages.push({role:'user',content});
   try {
     const base=(cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/,'');
@@ -935,14 +937,61 @@ document.getElementById('fileInput').addEventListener('change',async e=>{
   const reader=new FileReader();
   reader.onload=async ev=>{
     const dataUrl=ev.target.result;
+    const mediaType = file.type || 'image/jpeg';
     addImgMsg(dataUrl,true); headerSub.textContent='正在识图…'; showTyping();
-    const reply=await callAPI('（糯糯发来了一张图片，请描述并自然地回应她）',dataUrl.split(',')[1]);
+    const block = {type:'image', source:{type:'base64', media_type: mediaType, data: dataUrl.split(',')[1]}};
+    const reply=await callAPI('（糯糯发来了一张图片，请描述并自然地回应她）',[block]);
     hideTyping(); headerSub.textContent='在线';
     if(reply) addTextMsg(reply,false);
   };
   reader.readAsDataURL(file);
 });
 document.getElementById('imgPreview').addEventListener('click',()=>document.getElementById('imgPreview').classList.remove('show'));
+
+// ══ 发文件 ══
+document.getElementById('docBtn').addEventListener('click',()=>document.getElementById('docInput').click());
+document.getElementById('docInput').addEventListener('change', async e=>{
+  const file = e.target.files[0]; if(!file) return; e.target.value='';
+  const name = file.name;
+  const ext = name.split('.').pop().toLowerCase();
+  headerSub.textContent = '正在读取文件…';
+
+  // 文件消息气泡
+  const col = addRow(true);
+  const fileBubble = document.createElement('div');
+  fileBubble.className = 'msg';
+  fileBubble.textContent = '📄 ' + name;
+  col.appendChild(fileBubble);
+  chatWrap.scrollTop = chatWrap.scrollHeight;
+
+  try {
+    if (ext === 'pdf') {
+      // PDF 走 document 类型，base64 直传
+      const reader = new FileReader();
+      const dataUrl = await new Promise((res, rej) => {
+        reader.onload = ev => res(ev.target.result);
+        reader.onerror = rej;
+        reader.readAsDataURL(file);
+      });
+      const b64 = dataUrl.split(',')[1];
+      showTyping();
+      const block = {type:'document', source:{type:'base64', media_type:'application/pdf', data: b64}};
+      const reply = await callAPI(`（糯糯发来了一个PDF文件"${name}"，请阅读并回应她）`, [block]);
+      hideTyping(); headerSub.textContent='在线';
+      if (reply) addTextMsg(reply, false);
+    } else {
+      // 文本类文件，直接读文字内容拼进消息
+      const text = await file.text();
+      showTyping();
+      const reply = await callAPI(`（糯糯发来了一个文件"${name}"，内容如下，请阅读并回应她）\n\n${text}`);
+      hideTyping(); headerSub.textContent='在线';
+      if (reply) addTextMsg(reply, false);
+    }
+  } catch(err) {
+    hideTyping(); headerSub.textContent='在线';
+    showToast('文件读取失败：' + err.message);
+  }
+});
 
 // ══ 录音 ══
 let mediaRecorder=null,recordChunks=[],recordStart=0,recordCancelled=false,touchStartY=0;
