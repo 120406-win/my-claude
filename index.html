@@ -790,9 +790,11 @@ function saveSettings(){
   cfg.fontSize   = parseInt(document.getElementById('fontSlider').value);
   cfg.ttsKey     = document.getElementById('ttsKey').value.trim();
   cfg.ttsVoiceId = document.getElementById('ttsVoiceId').value.trim();
+  cfg.ttsUrl = document.getElementById('ttsUrl').value.trim();
   Object.entries({z_apiUrl:cfg.apiUrl,z_apiKey:cfg.apiKey,z_model:cfg.model,z_system:cfg.system,
     z_temperature:cfg.temperature,z_topP:cfg.topP,z_maxTokens:cfg.maxTokens,
-    z_fontSize:cfg.fontSize,z_theme:cfg.theme,z_ttsKey:cfg.ttsKey,z_ttsVoiceId:cfg.ttsVoiceId
+    z_fontSize:cfg.fontSize,z_theme:cfg.theme,z_ttsKey:cfg.ttsKey,z_ttsVoiceId:cfg.ttsVoiceId,
+    z_ttsUrl:cfg.ttsUrl
   }).forEach(([k,v])=>localStorage.setItem(k,v));
   applyFont(cfg.fontSize);
   showToast('已保存 ✓');
@@ -873,6 +875,25 @@ async function callAPI(userText, imageBase64=null){
 }
 
 async function speakText(text){
+  const ttsUrl = cfg.ttsUrl || '';
+  if(ttsUrl) {
+    try {
+      const resp = await fetch(ttsUrl + '/tts', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text})
+      });
+      const data = await resp.json();
+      if(data.audio) {
+        const audioBytes = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
+        const blob = new Blob([audioBytes], {type: 'audio/wav'});
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.play();
+        return;
+      }
+    } catch(e) { console.log('MiMo TTS failed, fallback to system voice', e); }
+  }
   if(!window.speechSynthesis) return;
   speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(text); u.lang='zh-CN'; u.rate=0.95;
