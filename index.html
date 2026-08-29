@@ -491,6 +491,7 @@
       </div>
     </div>
     <div class="header-right">
+      <button class="hbtn" id="voiceToggleBtn" title="语音朗读">🔇</button>
       <button class="hbtn" id="videoBtn">📹</button>
       <button class="hbtn" id="callBtn">📞</button>
     </div>
@@ -673,7 +674,7 @@
   <div class="call-name">Zephyr</div>
   <div class="call-timer" id="callTimer">00:00</div>
   <div class="call-btns">
-    <button class="call-btn btn-mic">🎤</button>
+    <button class="call-btn btn-mic" id="callMicBtn">🎤</button>
     <button class="call-btn btn-hang" id="callHangBtn">📵</button>
   </div>
 </div>
@@ -905,13 +906,24 @@ async function speakText(text){
   speechSynthesis.speak(u);
 }
 
+// ══ 语音朗读开关 ══
+let voiceEnabled = localStorage.getItem('z_voiceEnabled') === 'true';
+const voiceToggleBtn = document.getElementById('voiceToggleBtn');
+voiceToggleBtn.textContent = voiceEnabled ? '🔊' : '🔇';
+voiceToggleBtn.addEventListener('click', () => {
+  voiceEnabled = !voiceEnabled;
+  localStorage.setItem('z_voiceEnabled', voiceEnabled);
+  voiceToggleBtn.textContent = voiceEnabled ? '🔊' : '🔇';
+  showToast(voiceEnabled ? '语音朗读已开启' : '语音朗读已关闭');
+});
+
 // ══ 发消息 ══
 async function sendMessage(){
   const text=document.getElementById('msgInput').value.trim(); if(!text) return;
   document.getElementById('msgInput').value='';
   addTextMsg(text,true); headerSub.textContent='正在输入…'; showTyping();
   const reply=await callAPI(text); hideTyping(); headerSub.textContent='在线';
-  if(reply){ addTextMsg(reply,false); if(isCalling||isVideo) speakText(reply); }
+  if(reply){ addTextMsg(reply,false); if(voiceEnabled||isCalling||isVideo) speakText(reply); }
 }
 document.getElementById('sendBtn').addEventListener('click',sendMessage);
 document.getElementById('msgInput').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} });
@@ -962,16 +974,53 @@ voiceBtn.addEventListener('mousedown',e=>{touchStartY=e.clientY;startRecording()
 document.addEventListener('mouseup',e=>{if(mediaRecorder&&mediaRecorder.state==='recording')stopRecording(touchStartY-e.clientY>60);});
 
 // ══ 语音通话 ══
+let callRecognition = null;
+let callMicActive = false;
+
+function startCallSTT() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { showToast('浏览器不支持语音识别'); return; }
+  callRecognition = new SR();
+  callRecognition.lang = 'zh-CN';
+  callRecognition.continuous = false;
+  callRecognition.interimResults = false;
+  callRecognition.onresult = async (e) => {
+    const text = e.results[0][0].transcript;
+    if (!text) return;
+    addTextMsg(text, true);
+    headerSub.textContent = '正在回复…';
+    showTyping();
+    const reply = await callAPI(text);
+    hideTyping(); headerSub.textContent = '通话中';
+    if (reply) { addTextMsg(reply, false); speakText(reply); }
+    // 自动继续监听
+    if (isCalling && callMicActive) startCallSTT();
+  };
+  callRecognition.onerror = () => { if (isCalling && callMicActive) startCallSTT(); };
+  callRecognition.start();
+}
+
 document.getElementById('callBtn').addEventListener('click',async()=>{
   isCalling=true; document.getElementById('callModal').classList.add('show');
   callSeconds=0; callInterval=setInterval(()=>{callSeconds++;const m=String(Math.floor(callSeconds/60)).padStart(2,'0'),s=String(callSeconds%60).padStart(2,'0');document.getElementById('callTimer').textContent=`${m}:${s}`;},1000);
   showTyping(); const reply=await callAPI('（糯糯拨打了语音通话，温柔打个招呼，简短一点）'); hideTyping();
   if(reply){addTextMsg(reply,false);speakText(reply);}
+  // 自动开启 STT
+  callMicActive = true;
+  startCallSTT();
 });
 document.getElementById('callHangBtn').addEventListener('click',()=>{
-  isCalling=false; clearInterval(callInterval); speechSynthesis?.cancel();
+  isCalling=false; callMicActive=false;
+  callRecognition?.stop();
+  clearInterval(callInterval); speechSynthesis?.cancel();
   document.getElementById('callModal').classList.remove('show');
   showToast(`通话结束 ${document.getElementById('callTimer').textContent}`);
+});
+// 通话中麦克风按钮 - 切换静音
+document.getElementById('callMicBtn').addEventListener('click',()=>{
+  callMicActive = !callMicActive;
+  if(callMicActive){ startCallSTT(); document.getElementById('callMicBtn').textContent='🎤'; }
+  else { callRecognition?.stop(); document.getElementById('callMicBtn').textContent='🔇'; }
 });
 
 // ══ 视频通话 ══
