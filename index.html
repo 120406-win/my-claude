@@ -639,6 +639,10 @@
       <div class="s-section-title">Voice（TTS）</div>
       <div class="s-card">
         <div class="s-row">
+          <div class="s-row-label">TTS 后端地址</div>
+          <input class="s-input" type="text" id="ttsUrl" placeholder="https://zephyr-tts.xxx.workers.dev">
+        </div>
+        <div class="s-row">
           <div class="s-row-label">MiMo TTS Key</div>
           <input class="s-input" type="password" id="ttsKey" placeholder="待填">
         </div>
@@ -758,6 +762,7 @@ function loadSettings(){
   document.getElementById('apiKey').value    = cfg.apiKey;
   document.getElementById('modelName').value = cfg.model||'claude-sonnet-4-6';
   document.getElementById('systemPrompt').value = cfg.system;
+  document.getElementById('ttsUrl').value    = cfg.ttsUrl||'';
   document.getElementById('ttsKey').value    = cfg.ttsKey;
   document.getElementById('ttsVoiceId').value= cfg.ttsVoiceId;
 
