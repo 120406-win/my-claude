@@ -222,6 +222,18 @@
     .nav-item.active { color:var(--accent-s); }
     .nav-icon { font-size:17px; width:22px; text-align:center; flex-shrink:0; }
     .nav-divider { height:1px; background:var(--border); margin:8px 12px; }
+    .conv-item {
+      display:flex; align-items:center; gap:10px;
+      padding:10px 12px; border-radius:10px;
+      color:var(--text-dim); font-size:14px; cursor:pointer;
+      transition: background 0.15s, color 0.15s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .conv-item:hover, .conv-item.active { background:var(--surface); color:var(--text); }
+    .conv-item.active { color:var(--accent-s); }
+    .conv-title { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .conv-del { background:none; border:none; color:var(--text-pale); font-size:13px; cursor:pointer; padding:2px 4px; flex-shrink:0; }
+    .conv-del:hover { color:#ef9999; }
 
     /* ══════════════════════════
        CHAT
@@ -528,6 +540,16 @@
 
   <div class="nav-divider"></div>
 
+  <div class="nav-section" id="convSection">
+    <div class="nav-label" style="display:flex;align-items:center;justify-content:space-between;padding-right:12px;">
+      <span>对话</span>
+      <button id="newConvBtn" style="background:none;border:none;color:var(--accent-s);font-size:16px;cursor:pointer;padding:0 4px;">＋</button>
+    </div>
+    <div id="convList"></div>
+  </div>
+
+  <div class="nav-divider"></div>
+
   <div class="nav-section">
     <div class="nav-label">Memory</div>
     <div class="nav-item" onclick="showToast('记忆系统即将上线 ^ ^')">
@@ -826,6 +848,7 @@ document.getElementById('menuBtn').addEventListener('click', openSidebar);
 document.getElementById('sidebarOverlay').addEventListener('click', closeSidebar);
 function openSidebar(){ document.getElementById('sidebar').classList.add('show'); document.getElementById('sidebarOverlay').classList.add('show'); }
 function closeSidebar(){ document.getElementById('sidebar').classList.remove('show'); document.getElementById('sidebarOverlay').classList.remove('show'); }
+document.getElementById('newConvBtn').addEventListener('click', newConversation);
 
 // ══ Toast ══
 function showToast(msg){
@@ -836,54 +859,157 @@ function showToast(msg){
 
 function nowTime(){ const d=new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 
-// ══ 聊天记录持久化 ══
-function saveChatHistory(){
+// ══ 多窗口 / 多对话系统 ══
+let conversations = [];   // [{id, title, messages}]
+let activeConvId = null;
+
+function genConvId(){ return 'conv_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
+
+function saveConversations(){
   try {
-    localStorage.setItem('z_messages', JSON.stringify(messages));
+    localStorage.setItem('z_conversations', JSON.stringify(conversations));
+    localStorage.setItem('z_activeConvId', activeConvId);
   } catch(e) {
-    // 存储超限时，只保留最近的对话，丢弃旧的图片等大内容
-    try {
-      const trimmed = messages.slice(-30);
-      localStorage.setItem('z_messages', JSON.stringify(trimmed));
-    } catch(e2) { console.log('聊天记录保存失败', e2); }
+    // 存储已满：不自动删除任何历史，只提示用户自行清理旧对话
+    showToast('存储空间已满，请删除一些旧对话');
   }
 }
 
+function loadConversations(){
+  try {
+    const saved = localStorage.getItem('z_conversations');
+    const savedActive = localStorage.getItem('z_activeConvId');
+    if(saved){
+      conversations = JSON.parse(saved);
+    } else {
+      // 兼容旧版单对话数据，迁移进新结构
+      const old = localStorage.getItem('z_messages');
+      if(old){
+        try {
+          const oldMsgs = JSON.parse(old);
+          if(Array.isArray(oldMsgs) && oldMsgs.length){
+            conversations = [{ id: genConvId(), title: '日常聊天', messages: oldMsgs }];
+          }
+        } catch(e){}
+      }
+    }
+    if(!Array.isArray(conversations) || conversations.length === 0){
+      conversations = [{ id: genConvId(), title: '日常聊天', messages: [] }];
+    }
+    activeConvId = savedActive && conversations.find(c=>c.id===savedActive) ? savedActive : conversations[0].id;
+  } catch(e){
+    conversations = [{ id: genConvId(), title: '日常聊天', messages: [] }];
+    activeConvId = conversations[0].id;
+  }
+}
+
+function getActiveConv(){ return conversations.find(c=>c.id===activeConvId) || conversations[0]; }
+
+function newConversation(){
+  const conv = { id: genConvId(), title: '新对话', messages: [] };
+  conversations.unshift(conv);
+  activeConvId = conv.id;
+  messages = conv.messages;
+  saveConversations();
+  renderConvList();
+  renderMessagesIntoChat();
+  closeSidebar();
+  showToast('已新建对话');
+}
+
+function switchConversation(id){
+  if(id === activeConvId){ closeSidebar(); return; }
+  activeConvId = id;
+  messages = getActiveConv().messages;
+  saveConversations();
+  renderConvList();
+  renderMessagesIntoChat();
+  closeSidebar();
+}
+
+function deleteConversation(id, event){
+  event?.stopPropagation();
+  if(conversations.length <= 1){ showToast('至少保留一个对话'); return; }
+  if(!confirm('删除这个对话？无法撤销。')) return;
+  conversations = conversations.filter(c=>c.id!==id);
+  if(activeConvId === id){
+    activeConvId = conversations[0].id;
+    messages = getActiveConv().messages;
+    renderMessagesIntoChat();
+  }
+  saveConversations();
+  renderConvList();
+}
+
+function renderConvList(){
+  const list = document.getElementById('convList');
+  list.innerHTML = conversations.map(c=>{
+    const title = c.title || '新对话';
+    return `<div class="conv-item ${c.id===activeConvId?'active':''}" onclick="switchConversation('${c.id}')">
+      <span class="conv-title">${title}</span>
+      <button class="conv-del" onclick="deleteConversation('${c.id}', event)">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function updateConvTitleFromFirstMessage(){
+  const conv = getActiveConv();
+  if(conv.title && conv.title !== '新对话') return;
+  const firstUserMsg = conv.messages.find(m=>m.role==='user');
+  if(!firstUserMsg) return;
+  let text = typeof firstUserMsg.content === 'string' ? firstUserMsg.content : '图片/文件';
+  conv.title = text.slice(0, 16) || '新对话';
+  renderConvList();
+}
+
+// ══ 聊天记录持久化（保存到当前对话，不做任何截断） ══
+function saveChatHistory(){
+  const conv = getActiveConv();
+  conv.messages = messages;
+  updateConvTitleFromFirstMessage();
+  saveConversations();
+}
+
 function clearChatHistory(){
-  if(!confirm('确定要清空所有聊天记录吗？这个操作无法撤销。')) return;
+  if(!confirm('确定要清空当前对话的聊天记录吗？这个操作无法撤销。')) return;
   messages = [];
-  localStorage.removeItem('z_messages');
-  chatWrap.innerHTML = '<div class="empty-tip">✨ 和 Zephyr 说说话吧～</div>';
+  getActiveConv().messages = [];
+  getActiveConv().title = '新对话';
+  saveConversations();
+  renderConvList();
+  renderMessagesIntoChat();
   navTo('chat');
   showToast('聊天记录已清空');
 }
 
+function renderMessagesIntoChat(){
+  chatWrap.innerHTML = '<div class="empty-tip">✨ 和 Zephyr 说说话吧～</div>';
+  if(!messages.length) return;
+  chatWrap.querySelector('.empty-tip')?.remove();
+  messages.forEach(m=>{
+    const isUser = m.role === 'user';
+    if(typeof m.content === 'string'){
+      addTextMsg(m.content, isUser);
+    } else if(Array.isArray(m.content)){
+      const hasMedia = m.content.some(b=>b.type==='image'||b.type==='document');
+      m.content.forEach(block=>{
+        if(block.type === 'image' && block.source?.data){
+          addImgMsg(`data:${block.source.media_type};base64,${block.source.data}`, isUser);
+        } else if(block.type === 'document'){
+          addTextMsg('📄 文件', isUser);
+        } else if(block.type === 'text' && !hasMedia){
+          addTextMsg(block.text, isUser);
+        }
+      });
+    }
+  });
+}
+
 function loadChatHistory(){
-  try {
-    const saved = localStorage.getItem('z_messages');
-    if(!saved) return;
-    const loaded = JSON.parse(saved);
-    if(!Array.isArray(loaded) || loaded.length===0) return;
-    messages = loaded;
-    chatWrap.querySelector('.empty-tip')?.remove();
-    messages.forEach(m=>{
-      const isUser = m.role === 'user';
-      if(typeof m.content === 'string'){
-        addTextMsg(m.content, isUser);
-      } else if(Array.isArray(m.content)){
-        const hasMedia = m.content.some(b=>b.type==='image'||b.type==='document');
-        m.content.forEach(block=>{
-          if(block.type === 'image' && block.source?.data){
-            addImgMsg(`data:${block.source.media_type};base64,${block.source.data}`, isUser);
-          } else if(block.type === 'document'){
-            addTextMsg('📄 文件', isUser);
-          } else if(block.type === 'text' && !hasMedia){
-            addTextMsg(block.text, isUser);
-          }
-        });
-      }
-    });
-  } catch(e) { console.log('聊天记录加载失败', e); }
+  loadConversations();
+  messages = getActiveConv().messages;
+  renderConvList();
+  renderMessagesIntoChat();
 }
 
 // ══ 消息渲染 ══
