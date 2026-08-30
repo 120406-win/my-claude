@@ -47,6 +47,63 @@
       --sidebar-bg:  #eae7df;
       --font-size:   15px;
     }
+    /* 淡紫奶油 */
+    [data-theme="purple"] {
+      --bg:        #f0eef8;
+      --bg2:       #e8e4f4;
+      --bg3:       #dbd5ef;
+      --surface:   rgba(108,92,207,0.06);
+      --border:    rgba(108,92,207,0.12);
+      --text:      #2d2640;
+      --text-dim:  #7a7090;
+      --text-pale: #a8a0c0;
+      --accent:    #6c7cff;
+      --accent-s:  #9b8ee8;
+      --bubble-user: #6c7cff;
+      --bubble-ai:   rgba(255,255,255,0.92);
+      --header-bg:   rgba(220,215,240,0.85);
+      --input-bg:    rgba(235,230,250,0.95);
+      --sidebar-bg:  #e8e4f4;
+      --font-size:   15px;
+    }
+    /* 墨绿深林 */
+    [data-theme="forest"] {
+      --bg:        #0d1a14;
+      --bg2:       #142010;
+      --bg3:       #1e3020;
+      --surface:   rgba(255,255,255,0.05);
+      --border:    rgba(255,255,255,0.08);
+      --text:      #d8eed8;
+      --text-dim:  #8ab890;
+      --text-pale: #5a8060;
+      --accent:    #4caf70;
+      --accent-s:  #a8d8a8;
+      --bubble-user: #3a8a50;
+      --bubble-ai:   rgba(20,40,20,0.88);
+      --header-bg:   rgba(20,50,30,0.7);
+      --input-bg:    rgba(10,25,15,0.92);
+      --sidebar-bg:  #101e14;
+      --font-size:   15px;
+    }
+    /* 玫瑰暮光 */
+    [data-theme="rose"] {
+      --bg:        #1e0e14;
+      --bg2:       #280e18;
+      --bg3:       #3a1424;
+      --surface:   rgba(255,255,255,0.05);
+      --border:    rgba(255,150,150,0.1);
+      --text:      #fce8ee;
+      --text-dim:  #c890a0;
+      --text-pale: #905060;
+      --accent:    #e05070;
+      --accent-s:  #f0a0b8;
+      --bubble-user: #c04060;
+      --bubble-ai:   rgba(50,15,25,0.88);
+      --header-bg:   rgba(50,15,30,0.7);
+      --input-bg:    rgba(30,10,18,0.92);
+      --sidebar-bg:  #180c12;
+      --font-size:   15px;
+    }
 
     html, body {
       width:100%; height:100%;
@@ -650,11 +707,16 @@
           <input type="range" id="fontSlider" min="12" max="20" step="1" value="15">
         </div>
         <div class="s-row">
-          <div class="s-row-label">主题</div>
-          <div class="theme-btns">
-            <button class="theme-btn night active" id="themeNight" onclick="setTheme('dark')">🌙 夜空</button>
-            <button class="theme-btn day"   id="themeDay"   onclick="setTheme('light')">☀️ 白天</button>
+          <div>
+            <div class="s-row-label">主题</div>
           </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 16px 14px;">
+          <button id="themeNight"  onclick="setTheme('dark')"   class="theme-btn" style="background:#09091e;color:#c8c0e8;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🌙 深蓝夜空</button>
+          <button id="themeDay"    onclick="setTheme('light')"  class="theme-btn" style="background:#f5f3ee;color:#2a2820;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">☀️ 奶油白天</button>
+          <button id="themePurple" onclick="setTheme('purple')" class="theme-btn" style="background:#e8e4f4;color:#6c7cff;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🌸 淡紫奶油</button>
+          <button id="themeForest" onclick="setTheme('forest')" class="theme-btn" style="background:#0d1a14;color:#a8d8a8;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🌲 墨绿深林</button>
+          <button id="themeRose"   onclick="setTheme('rose')"   class="theme-btn" style="background:#1e0e14;color:#f0a0b8;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🌹 玫瑰暮光</button>
         </div>
       </div>
     </div>
@@ -674,6 +736,27 @@
         <div class="s-row">
           <div class="s-row-label">音色 ID</div>
           <input class="s-input" type="text" id="ttsVoiceId" placeholder="voice_xxx">
+        </div>
+      </div>
+    </div>
+
+    <!-- 头像 -->
+    <div class="s-section">
+      <div class="s-section-title">头像</div>
+      <div class="s-card">
+        <div class="s-row" style="gap:16px;">
+          <div style="text-align:center;flex:1;">
+            <div style="font-size:12px;color:var(--text-pale);margin-bottom:8px;">Zephyr 的头像</div>
+            <div id="avatarZephyrPreview" onclick="document.getElementById('avatarZephyrInput').click()" style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#1a1a5e,#4b4bcc);display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;margin:0 auto;overflow:hidden;border:2px solid var(--border);">🌙</div>
+            <input type="file" id="avatarZephyrInput" accept="image/*" style="display:none">
+            <div style="font-size:11px;color:var(--text-pale);margin-top:4px;">点击更换</div>
+          </div>
+          <div style="text-align:center;flex:1;">
+            <div style="font-size:12px;color:var(--text-pale);margin-bottom:8px;">糯糯的头像</div>
+            <div id="avatarUserPreview" onclick="document.getElementById('avatarUserInput').click()" style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#4b4bcc,#8080ff);display:flex;align-items:center;justify-content:center;font-size:28px;cursor:pointer;margin:0 auto;overflow:hidden;border:2px solid var(--border);">🐱</div>
+            <input type="file" id="avatarUserInput" accept="image/*" style="display:none">
+            <div style="font-size:11px;color:var(--text-pale);margin-top:4px;">点击更换</div>
+          </div>
         </div>
       </div>
     </div>
@@ -760,7 +843,9 @@ let cfg={
   theme:      localStorage.getItem('z_theme')||'dark',
   ttsKey:     localStorage.getItem('z_ttsKey')||'',
   ttsVoiceId: localStorage.getItem('z_ttsVoiceId')||'',
-  ttsUrl:     localStorage.getItem('z_ttsUrl')||''
+  ttsUrl:     localStorage.getItem('z_ttsUrl')||'',
+  avatarUser: localStorage.getItem('z_avatarUser')||'',   // base64 or emoji
+  avatarZephyr: localStorage.getItem('z_avatarZephyr')||'🌙',
 };
 
 let messages=[], isCalling=false, isVideo=false;
@@ -769,9 +854,18 @@ let localStream=null;
 
 // ══ 主题 ══
 function applyTheme(t){
-  document.documentElement.setAttribute('data-theme', t==='light'?'light':'');
-  document.getElementById('themeNight').classList.toggle('active', t!=='light');
-  document.getElementById('themeDay').classList.toggle('active',  t==='light');
+  const themes = ['dark','light','purple','forest','rose'];
+  // remove all theme attrs
+  document.documentElement.removeAttribute('data-theme');
+  if(t !== 'dark') document.documentElement.setAttribute('data-theme', t);
+  // update active state on buttons
+  themes.forEach(name => {
+    const btn = document.getElementById('theme' + name.charAt(0).toUpperCase() + name.slice(1));
+    if(btn) btn.style.borderColor = t === name ? 'var(--accent)' : 'transparent';
+  });
+  // fix dark button id
+  const nightBtn = document.getElementById('themeNight');
+  if(nightBtn) nightBtn.style.borderColor = t === 'dark' ? '#5254d4' : 'transparent';
 }
 applyTheme(cfg.theme);
 
@@ -1012,6 +1106,56 @@ function loadChatHistory(){
   renderMessagesIntoChat();
 }
 
+// ══ 头像 ══
+function getAvatarEl(isUser){
+  const av = document.createElement('div');
+  av.className = 'msg-avatar';
+  const src = isUser ? cfg.avatarUser : cfg.avatarZephyr;
+  if(src && src.startsWith('data:')){
+    const img = document.createElement('img');
+    img.src = src; img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:50%;';
+    av.appendChild(img);
+  } else {
+    av.textContent = src || (isUser ? '🐱' : '🌙');
+  }
+  return av;
+}
+
+function setupAvatarUpload(inputId, previewId, cfgKey, storeKey){
+  document.getElementById(inputId).addEventListener('change', e=>{
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ev=>{
+      const data = ev.target.result;
+      cfg[cfgKey] = data;
+      localStorage.setItem(storeKey, data);
+      const preview = document.getElementById(previewId);
+      preview.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = data; img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:50%;';
+      preview.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadAvatarPreviews(){
+  ['Zephyr','User'].forEach(name=>{
+    const key = 'avatar'+name;
+    const val = cfg[key.charAt(0).toLowerCase()+key.slice(1)] || (name==='Zephyr'?'🌙':'🐱');
+    const preview = document.getElementById('avatar'+name+'Preview');
+    if(!preview) return;
+    if(val && val.startsWith('data:')){
+      preview.innerHTML = '';
+      const img = document.createElement('img');
+      img.src = val; img.style.cssText='width:100%;height:100%;object-fit:cover;border-radius:50%;';
+      preview.appendChild(img);
+    } else {
+      preview.textContent = val;
+    }
+  });
+}
+
 // ══ 消息渲染 ══
 const chatWrap=document.getElementById('chatWrap');
 function addRow(isUser){
@@ -1019,7 +1163,9 @@ function addRow(isUser){
   const row=document.createElement('div'); row.className=`msg-row ${isUser?'user':'ai'}`;
   const col=document.createElement('div'); col.className='msg-col';
   const time=document.createElement('div'); time.className='msg-time'; time.textContent=nowTime();
-  if(!isUser){ const av=document.createElement('div'); av.className='msg-avatar'; av.textContent='🌙'; row.appendChild(av); }
+  const av = getAvatarEl(isUser);
+  if(!isUser){ row.appendChild(av); }
+  else { row.appendChild(av); } // user avatar on right side via flex-direction:row-reverse
   col.appendChild(time); row.appendChild(col);
   chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; return col;
 }
@@ -1038,11 +1184,11 @@ function addVoiceMsg(blob,dur,isUser){
   wrap.addEventListener('click',()=>{ if(wrap.classList.contains('playing')){audio.pause();audio.currentTime=0;wrap.classList.remove('playing');}else{audio.play();wrap.classList.add('playing');} });
   col.appendChild(wrap); chatWrap.scrollTop=chatWrap.scrollHeight;
 }
-function showTyping(){ chatWrap.querySelector('.empty-tip')?.remove(); const row=document.createElement('div'); row.className='msg-row ai'; row.id='typing-row'; const av=document.createElement('div'); av.className='msg-avatar'; av.textContent='🌙'; const col=document.createElement('div'); col.className='msg-col'; const b=document.createElement('div'); b.className='msg'; b.innerHTML='<div class="typing-dots"><span></span><span></span><span></span></div>'; col.appendChild(b); row.appendChild(av); row.appendChild(col); chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; }
+function showTyping(){ chatWrap.querySelector('.empty-tip')?.remove(); const row=document.createElement('div'); row.className='msg-row ai'; row.id='typing-row'; const av=getAvatarEl(false); const col=document.createElement('div'); col.className='msg-col'; const b=document.createElement('div'); b.className='msg'; b.innerHTML='<div class="typing-dots"><span></span><span></span><span></span></div>'; col.appendChild(b); row.appendChild(av); row.appendChild(col); chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; }
 function hideTyping(){ document.getElementById('typing-row')?.remove(); }
 
-// ══ API ══
 const headerSub=document.getElementById('headerSub');
+// ══ API（流式）══
 async function callAPI(userText, extraBlocks=null){
   if(!cfg.apiKey){ showToast('请先在 Settings 里填写 API Key'); return null; }
   let content = extraBlocks ? [...extraBlocks, {type:'text', text:userText||'请看一下这个'}] : userText;
@@ -1052,11 +1198,43 @@ async function callAPI(userText, extraBlocks=null){
     const res=await fetch(base+'/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:cfg.model,max_tokens:cfg.maxTokens,temperature:cfg.temperature,top_p:cfg.topP,system:cfg.system,messages})
+      body:JSON.stringify({model:cfg.model,max_tokens:cfg.maxTokens,temperature:cfg.temperature,top_p:cfg.topP,system:cfg.system,messages,stream:true})
     });
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`HTTP ${res.status}`);}
-    const data=await res.json();
-    const reply=data.content?.find(b=>b.type==='text')?.text||'…';
+
+    // 流式解析 SSE
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let reply = '';
+    let bubble = null;
+
+    hideTyping();
+    const col = addRow(false);
+    bubble = document.createElement('div');
+    bubble.className = 'msg';
+    bubble.textContent = '';
+    col.appendChild(bubble);
+
+    while(true){
+      const {done, value} = await reader.read();
+      if(done) break;
+      const chunk = decoder.decode(value, {stream:true});
+      const lines = chunk.split('\n');
+      for(const line of lines){
+        if(!line.startsWith('data:')) continue;
+        const data = line.slice(5).trim();
+        if(data === '[DONE]') break;
+        try {
+          const parsed = JSON.parse(data);
+          if(parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta'){
+            reply += parsed.delta.text;
+            bubble.textContent = reply;
+            chatWrap.scrollTop = chatWrap.scrollHeight;
+          }
+        } catch(e){}
+      }
+    }
+
     messages.push({role:'assistant',content:reply});
     saveChatHistory();
     return reply;
@@ -1105,8 +1283,8 @@ async function sendMessage(){
   const text=document.getElementById('msgInput').value.trim(); if(!text) return;
   document.getElementById('msgInput').value='';
   addTextMsg(text,true); headerSub.textContent='正在输入…'; showTyping();
-  const reply=await callAPI(text); hideTyping(); headerSub.textContent='在线';
-  if(reply){ addTextMsg(reply,false); if(voiceEnabled||isCalling||isVideo) speakText(reply); }
+  const reply=await callAPI(text); headerSub.textContent='在线';
+  if(reply && (voiceEnabled||isCalling||isVideo)) speakText(reply);
 }
 document.getElementById('sendBtn').addEventListener('click',sendMessage);
 document.getElementById('msgInput').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} });
