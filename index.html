@@ -694,6 +694,9 @@
     <div class="nav-item" id="nav-weather" onclick="navTo('weather')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18.5h9.3a4.2 4.2 0 0 0 .9-8.3A5.8 5.8 0 0 0 5.9 8.7 3.8 3.8 0 0 0 7 18.5z"/></svg></span> Weather
     </div>
+    <div class="nav-item" id="nav-studio" onclick="navTo('studio')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 6.5L3 12l5.5 5.5M15.5 6.5L21 12l-5.5 5.5"/></svg></span> Studio
+    </div>
     <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span> Dreams
     </div>
@@ -1112,6 +1115,38 @@
   </div>
 </div>
 
+<!-- ══ STUDIO PAGE ══ -->
+<div class="settings-page" id="studioPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="navTo('chat')">←</button>
+    <div class="settings-topbar-title">Studio</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">Zephyr 的创作室：说一句想做什么，Zephyr 就会写出一个小页面或小游戏，在下面的沙箱里直接运行。生成的代码与你的数据完全隔离，安全放心。</div>
+    <div class="s-section">
+      <div class="s-card" style="padding:14px 16px;">
+        <textarea id="studioPrompt" rows="2" placeholder="例如：做一个小猫接鱼干的小游戏，要可爱一点…" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;line-height:1.6;resize:vertical;"></textarea>
+        <button id="studioGenBtn" onclick="generateStudio()" style="width:100%;padding:12px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:14px;cursor:pointer;margin-top:10px;">让 Zephyr 做出来</button>
+        <div id="studioReviseRow" style="display:none;gap:8px;margin-top:10px;">
+          <input id="studioRevise" type="text" placeholder="想改哪里？例如：把背景换成夜晚…" style="flex:1;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;outline:none;">
+          <button id="studioReviseBtn" onclick="reviseStudio()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">改一下</button>
+        </div>
+      </div>
+    </div>
+    <div id="studioPreviewWrap" style="display:none;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <input id="studioName" type="text" placeholder="作品名字" style="flex:1;padding:9px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;outline:none;">
+        <button onclick="saveStudioProject()" style="padding:10px 16px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">保存作品</button>
+      </div>
+      <iframe id="studioFrame" sandbox="allow-scripts" style="width:100%;height:440px;border:1px solid var(--border);border-radius:12px;background:#fff;"></iframe>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">我的作品</div>
+      <div id="studioList"></div>
+    </div>
+  </div>
+</div>
+
 <!-- 录音遮罩 -->
 <div class="rec-overlay" id="recOverlay">
   <div class="rec-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v3.2"/><path d="M9 20.5h6"/></svg></div>
@@ -1396,6 +1431,7 @@ function navTo(page){
   document.getElementById('calendarPage').classList.toggle('show', page==='calendar');
   document.getElementById('galleryPage').classList.toggle('show', page==='gallery');
   document.getElementById('weatherPage').classList.toggle('show', page==='weather');
+  document.getElementById('studioPage').classList.toggle('show', page==='studio');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   if(page==='settings') loadSettings();
@@ -1406,6 +1442,7 @@ function navTo(page){
   if(page==='calendar') renderCalendar();
   if(page==='gallery') renderGallery();
   if(page==='weather') renderWeather();
+  if(page==='studio') renderStudioProjects();
 }
 
 // ══ Memory 系统（本地版）：长期记忆存 localStorage，每次请求自动带进系统提示词，新窗口也不失忆 ══
@@ -2486,6 +2523,142 @@ function importChatFile(input){
     showToast('导入完成 ✓');
   };
   reader.readAsText(file);
+}
+
+// ══ Studio：Zephyr 生成单文件小作品，在 sandbox iframe 里隔离运行，可保存/重开/继续修改 ══
+const STUDIO_PROMPT = '你是一位擅长做可爱小作品的前端创作者。请根据用户的想法，生成一个完整独立的单文件 HTML 页面（小游戏、互动页面或小工具）。要求：1) 只输出 HTML 代码本身，不要任何解释文字，不要 markdown 代码块标记；2) CSS 和 JS 全部内联，不引用任何外部资源；3) 适配手机屏幕，能触摸操作；4) 风格可爱、配色柔和、圆角元素；5) 必须能独立运行、无报错；6) 给页面一个 <title> 作为作品名。';
+let studioHtml = '';
+let studioProjectId = null;
+let studioBusy = false;
+function loadStudio(){ try{ const a = JSON.parse(localStorage.getItem('z_studio')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeStudio(list){ try{ localStorage.setItem('z_studio', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间不够了 qwq'); return false; } }
+function extractHtml(text){
+  let t = String(text || '').trim();
+  const fence = t.match(/```(?:html)?\s*([\s\S]*?)```/);
+  if(fence) t = fence[1].trim();
+  const start = t.search(/<!DOCTYPE html|<html[\s>]/i);
+  const end = t.lastIndexOf('</html>');
+  if(start >= 0 && end > start) return t.slice(start, end + 7);
+  if(start >= 0) return t.slice(start);
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>作品</title></head><body style="font-family:sans-serif;padding:20px;line-height:1.7;">' + t.replace(/</g, '&lt;').replace(/\n/g, '<br>') + '</body></html>';
+}
+function showStudioPreview(html){
+  studioHtml = html;
+  document.getElementById('studioFrame').srcdoc = html;
+  document.getElementById('studioPreviewWrap').style.display = '';
+  document.getElementById('studioReviseRow').style.display = 'flex';
+  const titleMatch = html.match(/<title>([^<]{1,40})<\/title>/i);
+  const nameInput = document.getElementById('studioName');
+  if(titleMatch && !nameInput.value) nameInput.value = titleMatch[1].trim();
+}
+async function callStudioModel(userContent, btn, busyText){
+  if(studioBusy) return null;
+  studioBusy = true;
+  const oldText = btn.textContent;
+  btn.textContent = busyText;
+  btn.disabled = true;
+  try{
+    const base = (cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/, '');
+    const res = await fetch(base + '/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({ model:cfg.model, max_tokens:4000, system:STUDIO_PROMPT, messages:[{role:'user', content:userContent}] })
+    });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const out = (data.content || []).filter(b=>b.type==='text').map(b=>b.text).join('');
+    if(!out.trim()) throw new Error('empty');
+    return extractHtml(out);
+  }catch(e){
+    showToast('没做出来，待会儿再试试 qwq');
+    return null;
+  }finally{
+    studioBusy = false;
+    btn.textContent = oldText;
+    btn.disabled = false;
+  }
+}
+async function generateStudio(){
+  const prompt = document.getElementById('studioPrompt').value.trim();
+  if(!prompt){ showToast('先说说想做什么呀 ~'); return; }
+  const html = await callStudioModel(prompt, document.getElementById('studioGenBtn'), 'Zephyr 正在创作中…');
+  if(html){
+    studioProjectId = null;
+    document.getElementById('studioName').value = '';
+    showStudioPreview(html);
+    showToast('做好啦，看看预览 ~');
+  }
+}
+async function reviseStudio(){
+  const instruction = document.getElementById('studioRevise').value.trim();
+  if(!instruction || !studioHtml){ showToast('先说说想改哪里 ~'); return; }
+  const html = await callStudioModel('这是现有的 HTML 代码：\n' + studioHtml.slice(0, 20000) + '\n\n请按这个要求修改，并输出修改后的完整 HTML：' + instruction, document.getElementById('studioReviseBtn'), '正在改…');
+  if(html){
+    showStudioPreview(html);
+    document.getElementById('studioRevise').value = '';
+    showToast('改好啦');
+  }
+}
+function saveStudioProject(){
+  if(!studioHtml){ showToast('还没有作品可以保存'); return; }
+  const name = document.getElementById('studioName').value.trim() || '未命名作品';
+  const list = loadStudio();
+  if(studioProjectId){
+    const p = list.find(x=>x.id===studioProjectId);
+    if(p){ p.html = studioHtml; p.name = name; p.ts = Date.now(); }
+    showToast('作品已更新');
+  } else {
+    const id = 's' + Date.now().toString(36) + Math.floor(Math.random()*999);
+    list.unshift({ id, name, prompt: document.getElementById('studioPrompt').value.trim(), html: studioHtml, ts: Date.now() });
+    studioProjectId = id;
+    showToast('作品保存好啦');
+  }
+  if(storeStudio(list)) renderStudioProjects();
+}
+function openStudioProject(id){
+  const p = loadStudio().find(x=>x.id===id);
+  if(!p) return;
+  studioProjectId = id;
+  document.getElementById('studioName').value = p.name;
+  document.getElementById('studioPrompt').value = p.prompt || '';
+  showStudioPreview(p.html);
+  const body = document.querySelector('#studioPage .settings-body');
+  if(body) body.scrollTop = 0;
+}
+function renderStudioProjects(){
+  const wrap = document.getElementById('studioList');
+  if(!wrap) return;
+  const list = loadStudio();
+  wrap.innerHTML = '';
+  if(!list.length){
+    wrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:16px 0;">还没有作品。上面说一句话，让 Zephyr 做第一个吧 ~</div>';
+    return;
+  }
+  list.slice().sort((a,b)=>b.ts-a.ts).forEach(p=>{
+    const card = document.createElement('div');
+    card.className = 's-card';
+    card.style.cssText = 'display:flex;align-items:center;gap:10px;padding:12px 16px;margin-bottom:8px;';
+    const main = document.createElement('div');
+    main.style.cssText = 'flex:1;min-width:0;';
+    const name = document.createElement('div');
+    name.style.cssText = 'font-size:14px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+    name.textContent = p.name;
+    const meta = document.createElement('div');
+    const d = new Date(p.ts);
+    meta.style.cssText = 'font-size:11px;color:var(--text-pale);margin-top:2px;';
+    meta.textContent = d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate();
+    main.appendChild(name); main.appendChild(meta);
+    const openBtn = document.createElement('button');
+    openBtn.textContent = '打开';
+    openBtn.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;cursor:pointer;padding:6px 12px;flex-shrink:0;';
+    openBtn.onclick = ()=>openStudioProject(p.id);
+    const del = document.createElement('button');
+    del.textContent = '删除';
+    del.style.cssText = 'background:none;border:none;color:#e0657a;font-size:12px;cursor:pointer;padding:2px 4px;flex-shrink:0;';
+    del.onclick = ()=>{ storeStudio(loadStudio().filter(x=>x.id!==p.id)); renderStudioProjects(); };
+    card.appendChild(main); card.appendChild(openBtn); card.appendChild(del);
+    wrap.appendChild(card);
+  });
 }
 
 // ══ Sidebar ══
