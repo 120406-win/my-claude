@@ -944,7 +944,7 @@
     <div class="s-section">
       <div class="s-section-title">导入聊天记录</div>
       <div class="s-card" style="padding:14px 16px;">
-        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-bottom:12px;">把以前在别的前端（比如 Kelivo）或其他地方的聊天记录带进 Zephyr。支持 JSON / JSONL / TXT / Markdown。原始记录会完整保存成一个历史对话。</div>
+        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-bottom:12px;">把以前在别的前端或其他地方的聊天记录带进 Zephyr。支持 Kelivo 备份包（.zip，聊天记录和 Kelivo 的长期记忆都能一起搬过来）/ JSON / JSONL / TXT / Markdown。</div>
         <div style="display:flex;gap:8px;">
           <select id="importMode" style="flex:1;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
             <option value="both">存为历史 + 提取记忆</option>
@@ -953,7 +953,7 @@
           </select>
           <button onclick="document.getElementById('chatImportInput').click()" style="padding:11px 16px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">选择文件</button>
         </div>
-        <input type="file" id="chatImportInput" accept=".json,.jsonl,.txt,.md,.markdown" style="display:none" onchange="importChatFile(this)">
+        <input type="file" id="chatImportInput" accept=".json,.jsonl,.txt,.md,.markdown,.zip" style="display:none" onchange="importChatFile(this)">
         <div id="importStatus" style="font-size:12px;color:var(--text-pale);margin-top:10px;line-height:1.6;"></div>
       </div>
     </div>
@@ -2618,12 +2618,226 @@ async function extractMemoriesFromImport(msgs){
   if(added.length) storeMemories(existing.concat(added));
   return added.length;
 }
+// [KELIVO-PARSER-BEGIN]
+// ══ Kelivo 备份 ZIP 解析（现代版 SQLite + 旧版 chats.json），纯逻辑便于测试 ══
+const KELIVO_TYPE_CAT = { identity:'身份', workflow:'项目', voice:'偏好', instruction:'偏好' };
+function kelivoTs(v){
+  if(v == null) return 0;
+  if(typeof v === 'string'){ const p = Date.parse(v); return isNaN(p) ? 0 : p; }
+  const n = Number(v) || 0;
+  if(n > 1e14) return Math.floor(n / 1000);
+  if(n > 1e11) return Math.floor(n);
+  if(n > 1e9) return Math.floor(n * 1000);
+  return n;
+}
+function kelivoMsgText(m){
+  if(m && Array.isArray(m.parts) && m.parts.length){
+    return m.parts.filter(p=>p && p.kind === 'text').map(p=>String(p.payload == null ? '' : p.payload)).join('');
+  }
+  return String((m && m.content) || '');
+}
+function kelivoLegacyConvs(data){
+  const byId = {};
+  (data.messages || []).forEach(m=>{ if(m && m.id) byId[m.id] = m; });
+  const out = [];
+  (data.conversations || []).forEach(c=>{
+    if(!c) return;
+    const msgs = [];
+    (Array.isArray(c.messageIds) ? c.messageIds : []).forEach(id=>{
+      const m = byId[id]; if(!m) return;
+      const text = kelivoMsgText(m).trim();
+      if(!text) return;
+      msgs.push({ role: m.role === 'user' ? 'user' : 'assistant', content: text });
+    });
+    if(msgs.length) out.push({ title: String(c.title || '未命名对话'), updated: kelivoTs(c.updatedAt), messages: msgs });
+  });
+  out.sort((a,b)=>b.updated - a.updated);
+  return out;
+}
+function kelivoQuery(db, sql){
+  let res;
+  try{ res = db.exec(sql); }catch(e){ return []; }
+  if(!res || !res.length) return [];
+  const cols = res[0].columns;
+  return res[0].values.map(v=>{ const o = {}; cols.forEach((c,i)=>{ o[c] = v[i]; }); return o; });
+}
+function kelivoDbExtract(db){
+  const textByRevision = {};
+  kelivoQuery(db, "SELECT revision_id, kind, payload FROM message_part_rows ORDER BY ordinal ASC").forEach(p=>{
+    if(p.kind !== 'text') return;
+    textByRevision[p.revision_id] = (textByRevision[p.revision_id] || '') + String(p.payload == null ? '' : p.payload);
+  });
+  const convRows = kelivoQuery(db, "SELECT id, title, updated_at, version_selections_json FROM conversation_rows");
+  const msgRows = kelivoQuery(db, "SELECT id, conversation_id, role, timestamp, group_id, version, message_order FROM message_rows ORDER BY message_order ASC");
+  const byConv = {};
+  msgRows.forEach(m=>{
+    if(m.role !== 'user' && m.role !== 'assistant') return;
+    (byConv[m.conversation_id] = byConv[m.conversation_id] || []).push(m);
+  });
+  const convs = [];
+  convRows.forEach(c=>{
+    const rows = byConv[c.id] || [];
+    if(!rows.length) return;
+    let selections = {};
+    try{ selections = JSON.parse(c.version_selections_json || '{}') || {}; }catch(e){}
+    const groups = new Map();
+    rows.forEach(m=>{
+      const key = m.group_id || m.id;
+      if(!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(m);
+    });
+    const msgs = [];
+    groups.forEach((revisions, key)=>{
+      let chosen = revisions[revisions.length - 1];
+      const sel = selections[key];
+      if(sel != null){
+        const hit = revisions.find(r=>r.version === sel);
+        if(hit) chosen = hit;
+      }
+      const text = (textByRevision[chosen.id] || '').trim();
+      if(!text) return;
+      msgs.push({ role: chosen.role, content: text, order: chosen.message_order || 0 });
+    });
+    msgs.sort((a,b)=>a.order - b.order);
+    if(msgs.length) convs.push({ title: String(c.title || '未命名对话'), updated: kelivoTs(c.updated_at), messages: msgs.map(m=>({ role: m.role, content: m.content })) });
+  });
+  convs.sort((a,b)=>b.updated - a.updated);
+  const memories = [];
+  const seenMem = new Set();
+  kelivoQuery(db, "SELECT type, content FROM memory_entry_rows WHERE status = 'active'").forEach(r=>{
+    const text = String(r.content || '').trim();
+    if(!text) return;
+    const key = text.replace(/\s+/g, '');
+    if(seenMem.has(key)) return;
+    seenMem.add(key);
+    memories.push({ cat: KELIVO_TYPE_CAT[r.type] || '共同经历', text });
+  });
+  return { convs, memories: memories.slice(0, 100) };
+}
+async function parseKelivoZip(buf, libs){
+  const files = libs.unzipSync(new Uint8Array(buf));
+  const names = Object.keys(files);
+  const dec = new TextDecoder();
+  const readJson = name => { try{ return JSON.parse(dec.decode(files[name])); }catch(e){ return null; } };
+  const chatsName = names.find(n=>/(^|\/)chats\.json$/.test(n));
+  if(chatsName){
+    const data = readJson(chatsName);
+    if(data && Array.isArray(data.conversations) && Array.isArray(data.messages)){
+      return { kind: 'legacy', convs: kelivoLegacyConvs(data), memories: [] };
+    }
+  }
+  const manifestName = names.find(n=>/(^|\/)manifest\.json$/.test(n));
+  const manifest = manifestName ? readJson(manifestName) : null;
+  if(!manifest || manifest.format !== 'kelivo-backup') throw new Error('not-kelivo');
+  if(manifest.payloadKind === 'settings-only') throw new Error('settings-only');
+  const dbEntry = (manifest.database && manifest.database.entry) || 'database/kelivo.db';
+  const dbName = names.find(n=>n === dbEntry) || names.find(n=>/\.db$/.test(n));
+  if(!dbName) throw new Error('no-db');
+  const SQL = await libs.initSqlJs();
+  const db = new SQL.Database(files[dbName]);
+  try{
+    const out = kelivoDbExtract(db);
+    out.kind = 'modern';
+    return out;
+  } finally { try{ db.close(); }catch(e){} }
+}
+// [KELIVO-PARSER-END]
+
+// ══ Kelivo ZIP 导入：按需加载解析组件（fflate + sql.js）══
+function loadScriptOnce(src){
+  return new Promise((resolve, reject)=>{
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = ()=>reject(new Error('load'));
+    document.head.appendChild(s);
+  });
+}
+let kelivoLibsPromise = null;
+function getKelivoLibs(){
+  if(kelivoLibsPromise) return kelivoLibsPromise;
+  kelivoLibsPromise = (async()=>{
+    if(!window.fflate) await loadScriptOnce('https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js');
+    if(!window.initSqlJs) await loadScriptOnce('https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/sql-wasm.js');
+    if(!window.fflate || !window.initSqlJs) throw new Error('libs');
+    return {
+      unzipSync: window.fflate.unzipSync,
+      initSqlJs: ()=>window.initSqlJs({ locateFile: f=>'https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/' + f })
+    };
+  })().catch(e=>{ kelivoLibsPromise = null; throw e; });
+  return kelivoLibsPromise;
+}
+async function importKelivoZipFile(file, mode, status){
+  const fail = msg => { status.textContent = msg; showToast('导入失败 qwq'); };
+  try{
+    status.textContent = '正在读取备份文件…';
+    const buf = await file.arrayBuffer();
+    const head = new Uint8Array(buf.slice(0, 2));
+    if(!(head[0] === 0x50 && head[1] === 0x4B)){
+      return fail('这个文件不像 Kelivo 的备份包。如果是加密备份，请先在 Kelivo 里导出一份未加密的备份再试。');
+    }
+    status.textContent = '正在加载解析组件（第一次需要联网下载约 1MB）…';
+    let libs;
+    try{ libs = await getKelivoLibs(); }
+    catch(e){ return fail('解析组件没加载成功，检查一下网络再试试。'); }
+    status.textContent = '正在解析 Kelivo 备份…';
+    let parsed;
+    try{ parsed = await parseKelivoZip(buf, libs); }
+    catch(e){
+      if(e && e.message === 'not-kelivo') return fail('这不是 Kelivo 的备份文件 qwq');
+      if(e && e.message === 'settings-only') return fail('这个 Kelivo 备份只包含设置，没有聊天记录。导出时记得勾选聊天记录。');
+      if(e && e.message === 'no-db') return fail('备份包里找不到聊天数据库，可能是不完整的备份。');
+      return fail('解析这个备份时出错了 qwq 可能是备份版本太新或文件损坏。');
+    }
+    const convs = parsed.convs || [];
+    const totalMsgs = convs.reduce((s,c)=>s + c.messages.length, 0);
+    if(!convs.length && !(parsed.memories || []).length){
+      return fail('备份解析成功，但里面没有可导入的聊天记录。');
+    }
+    const parts = [];
+    if(mode === 'history' || mode === 'both'){
+      const asc = convs.slice().sort((a,b)=>a.updated - b.updated);
+      asc.forEach(c=>{
+        conversations.unshift({ id: genConvId(), title: String(c.title || '导入的对话').slice(0, 40), messages: c.messages.slice(0, 2000) });
+      });
+      if(asc.length){ saveConversations(); renderConvList(); }
+      parts.push('导入了 ' + asc.length + ' 个对话（共 ' + totalMsgs + ' 条消息）');
+    }
+    if(mode === 'memory' || mode === 'both'){
+      if(parsed.memories && parsed.memories.length){
+        const existing = loadMemories();
+        const seen = new Set(existing.map(m=>m.text.replace(/\s+/g, '')));
+        const added = [];
+        for(const km of parsed.memories){
+          const key = km.text.replace(/\s+/g, '');
+          if(seen.has(key)) continue;
+          seen.add(key);
+          added.push({ id: 'm' + Date.now().toString(36) + Math.floor(Math.random()*9999), cat: MEM_CATS.includes(km.cat) ? km.cat : '共同经历', text: km.text, ts: Date.now(), auto: true });
+          if(added.length >= 50) break;
+        }
+        if(added.length) storeMemories(existing.concat(added));
+        parts.push(added.length ? '从 Kelivo 搬来了 ' + added.length + ' 条长期记忆' : 'Kelivo 的记忆都已存在，没有重复添加');
+      } else if(convs.length){
+        status.textContent = '正在从对话里提取长期记忆，稍等…';
+        const flat = [];
+        convs.forEach(c=>c.messages.forEach(m=>flat.push(m)));
+        const n = await extractMemoriesFromImport(flat.slice(0, 400));
+        parts.push(n ? '提取了 ' + n + ' 条长期记忆' : '没有提取到新的长期记忆');
+      } else {
+        parts.push('没有可提取的记忆');
+      }
+    }
+    status.textContent = parts.join('；') + '。';
+    showToast('导入完成 ✓');
+  }catch(e){
+    fail('导入时出了点问题 qwq 再试一次看看。');
+  }
+}
 function importChatFile(input){
   const file = input.files && input.files[0];
   input.value = '';
   if(!file) return;
   const mode = document.getElementById('importMode').value;
   const status = document.getElementById('importStatus');
+  if(/\.zip$/i.test(file.name)){ importKelivoZipFile(file, mode, status); return; }
   const reader = new FileReader();
   reader.onload = async ()=>{
     const msgs = parseChatImport(String(reader.result || ''));
