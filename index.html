@@ -688,6 +688,9 @@
     <div class="nav-item" id="nav-calendar" onclick="navTo('calendar')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span> Calendar
     </div>
+    <div class="nav-item" id="nav-gallery" onclick="navTo('gallery')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5.5-5.5 3 3L17 11l3.5 3.5"/></svg></span> Gallery
+    </div>
     <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span> Dreams
     </div>
@@ -1029,6 +1032,39 @@
   </div>
 </div>
 
+<!-- ══ GALLERY PAGE ══ -->
+<div class="settings-page" id="galleryPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="navTo('chat')">←</button>
+    <div class="settings-topbar-title">Gallery</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">属于你们的相册：特别的瞬间、想留住的画面，都收在这里。照片存在这台设备上（会自动压缩，大概能存十几张，记得偶尔导出备份）。</div>
+    <div class="s-section">
+      <div class="s-card" style="padding:14px 16px;">
+        <div id="galleryPending" style="display:none;margin-bottom:12px;">
+          <img id="galleryPendingImg" style="width:100%;border-radius:10px;display:block;">
+        </div>
+        <input id="galleryCaption" type="text" placeholder="给这张照片写一句标注…" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;padding:2px 0;">
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <select id="galleryBy" style="padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="both">我们一起</option>
+            <option value="lumi">糯糯存的</option>
+            <option value="zephyr">Zephyr 存的</option>
+          </select>
+          <button id="galleryPickBtn" onclick="document.getElementById('galleryFileInput').click()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">选择照片</button>
+          <button id="gallerySaveBtn" onclick="saveGalleryPhoto()" style="display:none;flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">存进相册</button>
+        </div>
+        <input type="file" id="galleryFileInput" accept="image/*" style="display:none" onchange="pickGalleryPhoto(this)">
+      </div>
+    </div>
+    <div id="galleryGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"></div>
+  </div>
+</div>
+<div id="galleryViewer" onclick="this.style.display='none'" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:200;align-items:center;justify-content:center;padding:20px;">
+  <img id="galleryViewerImg" style="max-width:100%;max-height:100%;border-radius:8px;">
+</div>
+
 <!-- 录音遮罩 -->
 <div class="rec-overlay" id="recOverlay">
   <div class="rec-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v3.2"/><path d="M9 20.5h6"/></svg></div>
@@ -1311,6 +1347,7 @@ function navTo(page){
   document.getElementById('wishesPage').classList.toggle('show', page==='wishes');
   document.getElementById('lettersPage').classList.toggle('show', page==='letters');
   document.getElementById('calendarPage').classList.toggle('show', page==='calendar');
+  document.getElementById('galleryPage').classList.toggle('show', page==='gallery');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   if(page==='settings') loadSettings();
@@ -1319,6 +1356,7 @@ function navTo(page){
   if(page==='wishes') renderWishes();
   if(page==='letters') renderLetters();
   if(page==='calendar') renderCalendar();
+  if(page==='gallery') renderGallery();
 }
 
 // ══ Memory 系统（本地版）：长期记忆存 localStorage，每次请求自动带进系统提示词，新窗口也不失忆 ══
@@ -2069,6 +2107,92 @@ function addEvent(){
     renderCalendar();
     showToast('记进 Zephyr 的历史啦');
   }
+}
+
+// ══ Gallery：属于我们的相册。照片压缩后存本地，点开可看大图 ══
+let pendingGalleryImg = null;
+function loadGallery(){ try{ const a = JSON.parse(localStorage.getItem('z_gallery')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeGallery(list){ try{ localStorage.setItem('z_gallery', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间满了，这张存不下 qwq 先导出备份或删几张旧的'); return false; } }
+function pickGalleryPhoto(input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const max = 1080;
+      let w = img.width, h = img.height;
+      if(w > max || h > max){ const r = max / Math.max(w, h); w = Math.round(w * r); h = Math.round(h * r); }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      pendingGalleryImg = canvas.toDataURL('image/jpeg', 0.82);
+      document.getElementById('galleryPendingImg').src = pendingGalleryImg;
+      document.getElementById('galleryPending').style.display = '';
+      document.getElementById('gallerySaveBtn').style.display = '';
+      document.getElementById('galleryPickBtn').textContent = '换一张';
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+function saveGalleryPhoto(){
+  if(!pendingGalleryImg){ showToast('先选一张照片呀 ~'); return; }
+  const list = loadGallery();
+  list.push({ id:'g'+Date.now().toString(36)+Math.floor(Math.random()*999), img:pendingGalleryImg, caption:document.getElementById('galleryCaption').value.trim(), by:document.getElementById('galleryBy').value, ts:Date.now() });
+  if(storeGallery(list)){
+    pendingGalleryImg = null;
+    document.getElementById('galleryPending').style.display = 'none';
+    document.getElementById('gallerySaveBtn').style.display = 'none';
+    document.getElementById('galleryPickBtn').textContent = '选择照片';
+    document.getElementById('galleryCaption').value = '';
+    renderGallery();
+    showToast('存进相册啦');
+  }
+}
+function renderGallery(){
+  const grid = document.getElementById('galleryGrid');
+  if(!grid) return;
+  const list = loadGallery().slice().sort((a,b)=>b.ts-a.ts);
+  grid.innerHTML = '';
+  if(!list.length){
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-pale);font-size:13px;padding:24px 0;">相册还是空的，存进第一张照片吧 ~</div>';
+    return;
+  }
+  const BY = { both:'我们一起', lumi:'糯糯存的', zephyr:'Zephyr 存的' };
+  list.forEach(p=>{
+    const card = document.createElement('div');
+    card.className = 's-card';
+    card.style.cssText = 'overflow:hidden;';
+    const img = document.createElement('img');
+    img.src = p.img;
+    img.style.cssText = 'width:100%;height:130px;object-fit:cover;display:block;cursor:pointer;';
+    img.onclick = ()=>{
+      document.getElementById('galleryViewerImg').src = p.img;
+      document.getElementById('galleryViewer').style.display = 'flex';
+    };
+    card.appendChild(img);
+    const info = document.createElement('div');
+    info.style.cssText = 'padding:8px 10px 10px;';
+    const cap = document.createElement('div');
+    cap.style.cssText = 'font-size:12px;line-height:1.5;color:var(--text);word-break:break-word;';
+    cap.textContent = p.caption || '（没有标注）';
+    const meta = document.createElement('div');
+    meta.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-top:5px;';
+    const d = new Date(p.ts);
+    const when = document.createElement('span');
+    when.style.cssText = 'font-size:10px;color:var(--text-pale);';
+    when.textContent = (BY[p.by] || '我们一起') + ' · ' + d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate();
+    const del = document.createElement('button');
+    del.textContent = '删除';
+    del.style.cssText = 'background:none;border:none;color:#e0657a;font-size:11px;cursor:pointer;padding:2px;';
+    del.onclick = ()=>{ storeGallery(loadGallery().filter(x=>x.id!==p.id)); renderGallery(); };
+    meta.appendChild(when); meta.appendChild(del);
+    info.appendChild(cap); info.appendChild(meta);
+    card.appendChild(info);
+    grid.appendChild(card);
+  });
 }
 
 // ══ Sidebar ══
