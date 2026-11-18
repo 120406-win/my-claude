@@ -891,6 +891,24 @@
       </div>
     </div>
 
+    <!-- 导入聊天记录 -->
+    <div class="s-section">
+      <div class="s-section-title">导入聊天记录</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-bottom:12px;">把以前在别的前端（比如 Kelivo）或其他地方的聊天记录带进 Zephyr。支持 JSON / JSONL / TXT / Markdown。原始记录会完整保存成一个历史对话。</div>
+        <div style="display:flex;gap:8px;">
+          <select id="importMode" style="flex:1;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="both">存为历史 + 提取记忆</option>
+            <option value="history">只存为历史对话</option>
+            <option value="memory">只提取长期记忆</option>
+          </select>
+          <button onclick="document.getElementById('chatImportInput').click()" style="padding:11px 16px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">选择文件</button>
+        </div>
+        <input type="file" id="chatImportInput" accept=".json,.jsonl,.txt,.md,.markdown" style="display:none" onchange="importChatFile(this)">
+        <div id="importStatus" style="font-size:12px;color:var(--text-pale);margin-top:10px;line-height:1.6;"></div>
+      </div>
+    </div>
+
     <button onclick="saveSettings()" style="width:100%;padding:14px;border-radius:12px;background:var(--accent);border:none;color:#fff;font-size:15px;cursor:pointer;margin-bottom:12px;">
       保存设置
     </button>
@@ -2334,6 +2352,140 @@ function useMyLocation(){
     () => showToast('没拿到定位，可以手动输入城市 ~'),
     { timeout: 8000 }
   );
+}
+
+// ══ 导入聊天记录：解析外部记录 → 存为历史对话 / 提取长期记忆 / 两者都要（糯糯在总纲里定的三种模式） ══
+function normalizeImportedMsg(item){
+  if(!item || typeof item !== 'object') return null;
+  let role = String(item.role || item.author || item.sender || '').toLowerCase();
+  if(['user','human','me','lumi','糯糯','用户'].includes(role)) role = 'user';
+  else if(['assistant','ai','claude','zephyr','bot'].includes(role)) role = 'assistant';
+  else return null;
+  let content = item.content ?? item.text ?? item.message ?? item.value ?? '';
+  if(Array.isArray(content)) content = content.map(b => typeof b === 'string' ? b : (b && b.type === 'text' ? b.text : '')).join('\n');
+  if(typeof content !== 'string') content = String(content || '');
+  content = content.trim();
+  if(!content) return null;
+  return { role, content };
+}
+function findMessageArray(obj, depth){
+  if(!obj || depth > 3) return null;
+  if(Array.isArray(obj)){
+    const mapped = obj.map(normalizeImportedMsg).filter(Boolean);
+    return mapped.length >= 1 ? mapped : null;
+  }
+  if(typeof obj === 'object'){
+    for(const k of ['messages','conversation','history','chat','records','data']){
+      if(obj[k]){ const r = findMessageArray(obj[k], depth + 1); if(r) return r; }
+    }
+    for(const k of Object.keys(obj)){
+      const r = findMessageArray(obj[k], depth + 1);
+      if(r) return r;
+    }
+  }
+  return null;
+}
+function parseChatImport(text){
+  const trimmed = text.trim();
+  if(!trimmed) return null;
+  // JSON / JSONL
+  if(trimmed.startsWith('{') || trimmed.startsWith('[')){
+    try{ const r = findMessageArray(JSON.parse(trimmed), 0); if(r) return r; }catch(e){}
+    const lines = trimmed.split('\n').map(l=>l.trim()).filter(Boolean);
+    const out = [];
+    let ok = false;
+    for(const line of lines){
+      try{ const m = normalizeImportedMsg(JSON.parse(line)); if(m){ out.push(m); ok = true; } }catch(e){}
+    }
+    if(ok) return out;
+  }
+  // TXT / Markdown：按「说话人：」前缀切分
+  const speakerRe = /^(user|assistant|human|ai|claude|zephyr|用户|助手|我|糯糯|lumi)\s*[:：]\s*/i;
+  const userSpeakers = ['user','human','用户','我','糯糯','lumi'];
+  const out = [];
+  let current = null;
+  trimmed.split('\n').forEach(line=>{
+    const mm = line.match(speakerRe);
+    if(mm){
+      if(current) out.push(current);
+      const name = mm[1].toLowerCase();
+      current = { role: userSpeakers.includes(name) ? 'user' : 'assistant', content: line.slice(mm[0].length) };
+    } else if(current){
+      current.content += '\n' + line;
+    }
+  });
+  if(current) out.push(current);
+  const cleaned = out.map(m=>({ role:m.role, content:m.content.trim() })).filter(m=>m.content);
+  return cleaned.length ? cleaned : null;
+}
+async function extractMemoriesFromImport(msgs){
+  const transcript = msgs.map(m=>(m.role==='user' ? 'Lumi：' : 'Zephyr：') + msgToText(m)).join('\n');
+  const chunks = [];
+  for(let i = 0; i < transcript.length && chunks.length < 3; i += 8000) chunks.push(transcript.slice(i, i + 8000));
+  const existing = loadMemories();
+  const seen = new Set(existing.map(m=>m.text.replace(/\s+/g, '')));
+  const added = [];
+  const base = (cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/, '');
+  for(const chunk of chunks){
+    try{
+      const res = await fetch(base + '/messages', {
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+        body: JSON.stringify({ model:cfg.model, max_tokens:700, system:AUTO_MEM_PROMPT, messages:[{role:'user', content:'请整理这段对话：\n' + chunk}] })
+      });
+      if(!res.ok) continue;
+      const data = await res.json();
+      const out = (data.content || []).filter(b=>b.type==='text').map(b=>b.text).join('');
+      const s = out.indexOf('['), e2 = out.lastIndexOf(']');
+      if(s < 0 || e2 <= s) continue;
+      const items = JSON.parse(out.slice(s, e2 + 1));
+      for(const it of (Array.isArray(items) ? items : [])){
+        const text = (it && typeof it.text === 'string') ? it.text.trim() : '';
+        if(!text || text.length > 220) continue;
+        const key = text.replace(/\s+/g, '');
+        if(seen.has(key)) continue;
+        seen.add(key);
+        added.push({ id:'m'+Date.now().toString(36)+Math.floor(Math.random()*9999), cat: MEM_CATS.includes(it.cat) ? it.cat : '共同经历', text, ts:Date.now(), auto:true });
+        if(added.length >= 20) break;
+      }
+    }catch(e){}
+    if(added.length >= 20) break;
+  }
+  if(added.length) storeMemories(existing.concat(added));
+  return added.length;
+}
+function importChatFile(input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file) return;
+  const mode = document.getElementById('importMode').value;
+  const status = document.getElementById('importStatus');
+  const reader = new FileReader();
+  reader.onload = async ()=>{
+    const msgs = parseChatImport(String(reader.result || ''));
+    if(!msgs || !msgs.length){
+      status.textContent = '没能识别这个文件的格式 qwq 换成 JSON / JSONL / 带「用户：」「Claude：」前缀的 TXT 试试。';
+      showToast('导入失败：无法识别格式');
+      return;
+    }
+    const capped = msgs.slice(0, 2000);
+    let parts = [];
+    if(mode === 'history' || mode === 'both'){
+      const conv = { id: genConvId(), title: '导入：' + file.name.replace(/\.[^.]+$/, '').slice(0, 20), messages: capped };
+      conversations.unshift(conv);
+      saveConversations();
+      renderConvList();
+      parts.push('已存为历史对话（' + capped.length + ' 条消息）');
+    }
+    if(mode === 'memory' || mode === 'both'){
+      status.textContent = '已识别 ' + capped.length + ' 条消息，正在提取长期记忆，稍等…';
+      const n = await extractMemoriesFromImport(capped);
+      parts.push(n ? '提取了 ' + n + ' 条长期记忆' : '没有提取到新的长期记忆');
+    }
+    status.textContent = parts.join('；') + '。';
+    showToast('导入完成 ✓');
+  };
+  reader.readAsText(file);
 }
 
 // ══ Sidebar ══
