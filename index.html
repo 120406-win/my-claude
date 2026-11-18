@@ -691,6 +691,9 @@
     <div class="nav-item" id="nav-gallery" onclick="navTo('gallery')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5.5-5.5 3 3L17 11l3.5 3.5"/></svg></span> Gallery
     </div>
+    <div class="nav-item" id="nav-weather" onclick="navTo('weather')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18.5h9.3a4.2 4.2 0 0 0 .9-8.3A5.8 5.8 0 0 0 5.9 8.7 3.8 3.8 0 0 0 7 18.5z"/></svg></span> Weather
+    </div>
     <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span> Dreams
     </div>
@@ -1065,6 +1068,32 @@
   <img id="galleryViewerImg" style="max-width:100%;max-height:100%;border-radius:8px;">
 </div>
 
+<!-- ══ WEATHER PAGE ══ -->
+<div class="settings-page" id="weatherPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="navTo('chat')">←</button>
+    <div class="settings-topbar-title">Weather</div>
+  </div>
+  <div class="settings-body">
+    <div class="s-section">
+      <div class="s-section-title">现实天气</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <div style="display:flex;gap:8px;">
+          <input id="weatherCity" type="text" placeholder="输入城市名，如：上海" style="flex:1;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;outline:none;">
+          <button onclick="searchCityWeather()" style="padding:10px 16px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">查询</button>
+          <button onclick="useMyLocation()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">我的位置</button>
+        </div>
+        <div id="realWeatherBox" style="margin-top:14px;font-size:13px;color:var(--text-dim);line-height:1.7;">输入城市，就能看到你那边的天空。</div>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">Zephyr World 天气</div>
+      <div class="s-card" id="worldWeatherBox" style="padding:18px 16px;background:linear-gradient(135deg,#23235e,#4b4bcc);color:#fff;border:none;"></div>
+      <div style="font-size:11px;color:var(--text-pale);line-height:1.7;margin-top:8px;">World 的天气跟着季节和昼夜走。以后 World 建起来，这里的雨会真的下进街道里，夜里的星星也会真的亮起来。</div>
+    </div>
+  </div>
+</div>
+
 <!-- 录音遮罩 -->
 <div class="rec-overlay" id="recOverlay">
   <div class="rec-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v3.2"/><path d="M9 20.5h6"/></svg></div>
@@ -1348,6 +1377,7 @@ function navTo(page){
   document.getElementById('lettersPage').classList.toggle('show', page==='letters');
   document.getElementById('calendarPage').classList.toggle('show', page==='calendar');
   document.getElementById('galleryPage').classList.toggle('show', page==='gallery');
+  document.getElementById('weatherPage').classList.toggle('show', page==='weather');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   if(page==='settings') loadSettings();
@@ -1357,6 +1387,7 @@ function navTo(page){
   if(page==='letters') renderLetters();
   if(page==='calendar') renderCalendar();
   if(page==='gallery') renderGallery();
+  if(page==='weather') renderWeather();
 }
 
 // ══ Memory 系统（本地版）：长期记忆存 localStorage，每次请求自动带进系统提示词，新窗口也不失忆 ══
@@ -2193,6 +2224,116 @@ function renderGallery(){
     card.appendChild(info);
     grid.appendChild(card);
   });
+}
+
+// ══ Weather：现实天气走 Open-Meteo（免费无 key）；World 天气按季节与昼夜确定性生成 ══
+function wmoText(code){
+  const map = { 0:'晴', 1:'晴间多云', 2:'多云', 3:'阴', 45:'雾', 48:'雾凇', 51:'毛毛雨', 53:'毛毛雨', 55:'毛毛雨', 56:'冻毛毛雨', 57:'冻毛毛雨', 61:'小雨', 63:'中雨', 65:'大雨', 66:'冻雨', 67:'冻雨', 71:'小雪', 73:'中雪', 75:'大雪', 77:'雪粒', 80:'阵雨', 81:'阵雨', 82:'暴雨阵雨', 85:'阵雪', 86:'阵雪', 95:'雷阵雨', 96:'雷阵雨伴冰雹', 99:'雷阵雨伴冰雹' };
+  return map[code] || '天气';
+}
+function worldWeather(){
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const season = month >= 3 && month <= 5 ? '春' : month >= 6 && month <= 8 ? '夏' : month >= 9 && month <= 11 ? '秋' : '冬';
+  const pools = {
+    '春':['晴，微风里有花香','多云，云朵慢慢飘','春雨，细细润润的','晴，适合去公园坐坐'],
+    '夏':['晴，阳光亮亮的','晴，蝉鸣一样的热','雷阵雨，来得快去得快','多云，闷闷的要下雨'],
+    '秋':['晴，天高高的','阴，风里有凉意','晴，落叶铺了一地','微风，适合散步'],
+    '冬':['晴，冷得清清爽爽','阴，灰蒙蒙的','小雪，轻轻落下来','晴，呵气成雾'],
+  };
+  const seed = now.getFullYear() * 10000 + month * 100 + now.getDate();
+  const cond = pools[season][seed % pools[season].length];
+  const h = now.getHours();
+  const phase = h >= 5 && h < 8 ? '清晨' : h >= 8 && h < 17 ? '白天' : h >= 17 && h < 19 ? '黄昏' : '夜晚';
+  return { season, cond, phase };
+}
+function renderWeather(){
+  const ww = worldWeather();
+  const box = document.getElementById('worldWeatherBox');
+  if(box){
+    box.innerHTML = '';
+    const t1 = document.createElement('div');
+    t1.style.cssText = 'font-size:22px;line-height:1.4;';
+    t1.textContent = ww.phase + ' · ' + ww.cond;
+    const t2 = document.createElement('div');
+    t2.style.cssText = 'font-size:12px;opacity:0.85;margin-top:6px;';
+    t2.textContent = 'Zephyr World · ' + ww.season + '季 · 今天整个世界都是这个天气';
+    box.appendChild(t1); box.appendChild(t2);
+  }
+  const saved = localStorage.getItem('z_weatherCity');
+  const cityInput = document.getElementById('weatherCity');
+  if(saved && cityInput && !cityInput.value){
+    try{
+      const c = JSON.parse(saved);
+      cityInput.value = c.name || '';
+      loadRealWeather(c.lat, c.lon, c.name);
+    }catch(e){}
+  }
+}
+async function loadRealWeather(lat, lon, name){
+  const box = document.getElementById('realWeatherBox');
+  if(box) box.textContent = '正在看 ' + name + ' 的天空…';
+  try{
+    const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=4';
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const cur = data.current, daily = data.daily;
+    box.innerHTML = '';
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex;align-items:baseline;gap:10px;';
+    const temp = document.createElement('span');
+    temp.style.cssText = 'font-size:34px;color:var(--text);line-height:1;';
+    temp.textContent = Math.round(cur.temperature_2m) + '°';
+    const cond = document.createElement('span');
+    cond.style.cssText = 'font-size:15px;color:var(--text);';
+    cond.textContent = name + ' · ' + wmoText(cur.weather_code);
+    head.appendChild(temp); head.appendChild(cond);
+    box.appendChild(head);
+    const detail = document.createElement('div');
+    detail.style.cssText = 'margin-top:8px;';
+    detail.textContent = '体感 ' + Math.round(cur.apparent_temperature) + '° · 湿度 ' + cur.relative_humidity_2m + '% · 风速 ' + Math.round(cur.wind_speed_10m) + ' km/h · 今日 ' + Math.round(daily.temperature_2m_min[0]) + '° ~ ' + Math.round(daily.temperature_2m_max[0]) + '°';
+    box.appendChild(detail);
+    const days = ['今天', '明天', '后天', '大后天'];
+    for(let i = 1; i < 4; i++){
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;justify-content:space-between;margin-top:6px;';
+      const left = document.createElement('span'); left.textContent = days[i] + ' · ' + wmoText(daily.weather_code[i]);
+      const right = document.createElement('span'); right.textContent = Math.round(daily.temperature_2m_min[i]) + '° ~ ' + Math.round(daily.temperature_2m_max[i]) + '°';
+      row.appendChild(left); row.appendChild(right);
+      box.appendChild(row);
+    }
+  }catch(e){
+    if(box) box.textContent = '没看到天气，网络好像不太通，待会儿再试试 qwq';
+  }
+}
+async function searchCityWeather(){
+  const name = document.getElementById('weatherCity').value.trim();
+  if(!name){ showToast('先输入城市名呀 ~'); return; }
+  const box = document.getElementById('realWeatherBox');
+  if(box) box.textContent = '正在找 ' + name + '…';
+  try{
+    const res = await fetch('https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(name) + '&count=1&language=zh');
+    const data = await res.json();
+    if(!data.results || !data.results.length){ if(box) box.textContent = '没找到这个城市，换个名字试试？'; return; }
+    const r = data.results[0];
+    const label = r.name + (r.admin1 ? ' · ' + r.admin1 : '');
+    localStorage.setItem('z_weatherCity', JSON.stringify({ name: label, lat: r.latitude, lon: r.longitude }));
+    loadRealWeather(r.latitude, r.longitude, label);
+  }catch(e){
+    if(box) box.textContent = '查找失败，网络好像不太通 qwq';
+  }
+}
+function useMyLocation(){
+  if(!navigator.geolocation){ showToast('这个浏览器不支持定位 qwq'); return; }
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      localStorage.setItem('z_weatherCity', JSON.stringify({ name: '我的位置', lat: pos.coords.latitude, lon: pos.coords.longitude }));
+      loadRealWeather(pos.coords.latitude, pos.coords.longitude, '我的位置');
+    },
+    () => showToast('没拿到定位，可以手动输入城市 ~'),
+    { timeout: 8000 }
+  );
 }
 
 // ══ Sidebar ══
