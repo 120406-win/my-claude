@@ -199,61 +199,44 @@
     #splash {
       z-index:10;
       display:flex; flex-direction:column;
-      align-items:center; justify-content:center;
+      align-items:center; justify-content:space-between;
       cursor:pointer; gap:0; overflow:hidden;
-      background:
-        radial-gradient(ellipse 60% 40% at 78% 10%, rgba(96,84,180,0.20) 0%, transparent 60%),
-        radial-gradient(ellipse 55% 38% at 14% 24%, rgba(52,84,160,0.16) 0%, transparent 60%),
-        radial-gradient(ellipse 75% 55% at 50% 52%, #151538 0%, #08081c 100%);
+      background:#08081c;
+      padding: calc(env(safe-area-inset-top) + 7.5vh) 20px calc(env(safe-area-inset-bottom) + 92px);
+      box-sizing:border-box;
       font-family: 'Cormorant Garamond', 'Noto Serif SC', serif;
     }
-    .splash-stars { position:absolute; inset:0; overflow:hidden; z-index:1; pointer-events:none; }
-    .splash-stars .star {
-      position:absolute; border-radius:50%; background:#e8eaff;
-      animation: starTwinkle var(--tw,3s) ease-in-out infinite;
+    .splash-bg {
+      position:absolute; inset:0; width:100%; height:100%;
+      object-fit:cover; object-position:center; z-index:0;
     }
-    @keyframes starTwinkle { 0%,100%{ opacity:.12; } 50%{ opacity:.95; } }
-    .shooting-star {
-      position:absolute; top:11%; left:72%; width:92px; height:1.5px; border-radius:2px;
-      background:linear-gradient(90deg, rgba(255,255,255,.95), transparent);
-      transform:rotate(-32deg); opacity:0; z-index:1; pointer-events:none;
-      animation: shootStar 9s linear infinite; animation-delay:4s;
-    }
-    @keyframes shootStar {
-      0%,70%{ opacity:0; transform:rotate(-32deg) translateX(0); }
-      74%{ opacity:.9; }
-      82%,100%{ opacity:0; transform:rotate(-32deg) translateX(-200px); }
+    .splash-shade {
+      position:absolute; inset:0; z-index:1; pointer-events:none;
+      background:linear-gradient(to bottom, rgba(5,6,20,.42) 0%, transparent 26%, transparent 60%, rgba(4,5,18,.58) 100%);
     }
     .splash-title {
       font-size: clamp(28px,7vw,42px); font-weight:300;
-      letter-spacing:0.18em; color:#c8c0e8;
-      margin-bottom:26px; position:relative; z-index:2;
+      letter-spacing:0.18em; color:#ddd8f5;
+      position:relative; z-index:2; text-align:center;
+      text-shadow:0 1px 16px rgba(0,0,12,.6);
       animation: fadeUp 1.2s ease both;
     }
     .splash-title span { font-style:italic; }
-    .splash-hero {
-      width:min(82vw,350px); position:relative; z-index:2;
-      margin-bottom:34px;
-      animation: fadeUp 1.2s 0.2s ease both, heroFloat 7s ease-in-out 1.6s infinite;
-    }
-    .splash-hero svg { display:block; width:100%; height:auto; }
-    @keyframes heroFloat { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-5px); } }
-    .thread-group { animation: threadPulse 5.5s ease-in-out infinite; }
-    @keyframes threadPulse { 0%,100%{ opacity:.55; } 50%{ opacity:1; } }
     .splash-lines {
       display:flex; flex-direction:column; align-items:center; gap:14px;
-      position:relative; z-index:2;
+      position:relative; z-index:2; margin-top:auto;
+      text-shadow:0 1px 14px rgba(0,0,12,.65);
       animation: fadeUp 1.2s 0.4s ease both;
     }
     .line-pair { text-align:center; }
     .line-zh {
       font-family:'Noto Serif SC',serif; font-weight:300;
-      font-size:clamp(13px,3.4vw,17px); color:#9b98b8;
+      font-size:clamp(13px,3.4vw,17px); color:#c9c4e6;
       letter-spacing:0.12em; line-height:1.7;
     }
     .line-en {
       font-family:'Cormorant Garamond',serif; font-style:italic; font-weight:300;
-      font-size:clamp(10px,2.6vw,13px); color:#6a6888;
+      font-size:clamp(10px,2.6vw,13px); color:#9d99bd;
       letter-spacing:0.08em; line-height:1.5; margin-top:1px;
     }
     .line-sep { display:flex; align-items:center; gap:10px; margin:2px auto; }
@@ -262,7 +245,7 @@
     .sep-dot { width:5px; height:5px; transform:rotate(45deg); background:#a49fd0; flex-shrink:0; }
     .splash-hint {
       position:absolute; bottom:52px; left:50%; transform:translateX(-50%);
-      font-size:11px; letter-spacing:0.25em; color:#6a6888;
+      font-size:11px; letter-spacing:0.25em; color:#a5a1c2; text-shadow:0 1px 10px rgba(0,0,12,.7);
       text-transform:uppercase; z-index:2;
       animation: hintPulse 2.4s ease-in-out infinite;
     }
@@ -608,61 +591,9 @@
 
 <!-- ══ SPLASH ══ -->
 <div id="splash">
-  <div class="splash-stars" id="splashStars"></div>
-  <div class="shooting-star"></div>
+  <img class="splash-bg" src="splash.jpg" alt="">
+  <div class="splash-shade"></div>
   <div class="splash-title">Lumi <span>&</span> Zephyr</div>
-  <div class="splash-hero">
-    <svg viewBox="0 0 360 250" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <defs>
-        <linearGradient id="earthGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stop-color="#2a3f8f"/>
-          <stop offset="0.45" stop-color="#131e52"/>
-          <stop offset="1" stop-color="#0a1030"/>
-        </linearGradient>
-        <radialGradient id="glowGrad" cx="0.5" cy="0.5" r="0.5">
-          <stop offset="0" stop-color="#969fff" stop-opacity="0.26"/>
-          <stop offset="1" stop-color="#969fff" stop-opacity="0"/>
-        </radialGradient>
-      </defs>
-      <ellipse cx="180" cy="148" rx="135" ry="82" fill="url(#glowGrad)"/>
-      <g fill="#dfe4ff">
-        <circle cx="38" cy="34" r="1.3" opacity="0.7"/><circle cx="86" cy="18" r="0.9" opacity="0.45"/>
-        <circle cx="140" cy="42" r="1" opacity="0.55"/><circle cx="196" cy="20" r="1.4" opacity="0.8"/>
-        <circle cx="238" cy="52" r="0.9" opacity="0.4"/><circle cx="52" cy="86" r="0.9" opacity="0.4"/>
-        <circle cx="104" cy="70" r="1.2" opacity="0.65"/><circle cx="288" cy="86" r="1.1" opacity="0.55"/>
-        <circle cx="322" cy="120" r="0.9" opacity="0.4"/><circle cx="26" cy="132" r="1" opacity="0.45"/>
-        <circle cx="160" cy="86" r="0.8" opacity="0.35"/><circle cx="216" cy="102" r="0.8" opacity="0.35"/>
-        <circle cx="70" cy="112" r="0.7" opacity="0.3"/><circle cx="262" cy="26" r="0.8" opacity="0.5"/>
-      </g>
-      <path d="M66 44v10M61 49h10" stroke="#dfe4ff" stroke-width="1.1" stroke-linecap="round" opacity="0.75"/>
-      <path d="M300 108v8M296 112h8" stroke="#dfe4ff" stroke-width="1" stroke-linecap="round" opacity="0.55"/>
-      <path d="M320 26a15 15 0 1 0 11 24 12.5 12.5 0 0 1-11-24z" fill="#e6e2ff" opacity="0.92"/>
-      <circle cx="180" cy="472" r="298" fill="url(#earthGrad)"/>
-      <circle cx="180" cy="472" r="298" stroke="#93b2ff" stroke-opacity="0.5" stroke-width="1.6"/>
-      <path d="M42 198 Q180 170 318 198" stroke="#a0b4ff" stroke-opacity="0.13" stroke-width="1"/>
-      <path d="M88 224 Q180 204 272 224" stroke="#a0b4ff" stroke-opacity="0.09" stroke-width="1"/>
-      <g fill="#070d29">
-        <circle cx="161" cy="134" r="9.5"/>
-        <path d="M161 142c-11 4-16 16-17 34h34c-1-18-6-30-17-34z"/>
-        <path d="M140 176c10-8 32-8 42 0-10 6-32 6-42 0z"/>
-        <circle cx="198" cy="125" r="4"/>
-        <circle cx="191" cy="137" r="8.8"/>
-        <path d="M191 144c-10 4-14 15-15 32h29c-1-17-4-28-14-32z"/>
-        <path d="M173 176c8-7 27-7 35 0-8 6-27 6-35 0z"/>
-        <path d="M214 176c0-12 6-18 14-18s12 6 12 18z"/>
-        <circle cx="227" cy="152" r="7"/>
-        <path d="M221 147l-1-7 6 4zM228 144l6-4-1 7z"/>
-        <path d="M240 174c12-2 16-10 12-18" stroke="#070d29" stroke-width="3.5" stroke-linecap="round"/>
-      </g>
-      <g class="thread-group" stroke="#ff6473" stroke-width="1.4" fill="none" style="filter:drop-shadow(0 0 4px rgba(255,90,110,.6))">
-        <ellipse cx="161" cy="156" rx="21" ry="13" transform="rotate(-14 161 156)"/>
-        <ellipse cx="191" cy="156" rx="20" ry="12.5" transform="rotate(12 191 156)"/>
-        <path d="M206 165c8 6 14 3 19-4" stroke-linecap="round"/>
-      </g>
-      <circle cx="176" cy="166" r="1.9" fill="#ff6473"/>
-      <circle cx="226" cy="160" r="1.6" fill="#ff6473"/>
-    </svg>
-  </div>
   <div class="splash-lines">
     <div class="line-pair">
       <div class="line-zh">我们的心跳一直同频</div>
@@ -1324,18 +1255,6 @@ document.getElementById('splash').addEventListener('click',()=>{
   setTimeout(()=>document.getElementById('splash').style.display='none',900);
 });
 
-// 开屏星空：随机撒一层会闪烁的星星
-(function makeSplashStars(){
-  const box = document.getElementById('splashStars');
-  if(!box) return;
-  for(let i = 0; i < 70; i++){
-    const s = document.createElement('span');
-    s.className = 'star';
-    const size = (Math.random() * 1.8 + 0.8).toFixed(1);
-    s.style.cssText = 'left:' + (Math.random() * 100) + '%;top:' + (Math.random() * 100) + '%;width:' + size + 'px;height:' + size + 'px;--tw:' + (2.4 + Math.random() * 3.6).toFixed(1) + 's;animation-delay:' + (Math.random() * 4).toFixed(1) + 's;opacity:.35;';
-    box.appendChild(s);
-  }
-})();
 
 // ══ 配置 ══
 let cfg={
