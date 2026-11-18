@@ -1710,6 +1710,8 @@ function buildSystemPrompt(){
     if(doneWishes.length) wt += (wt ? '\n' : '') + doneWishes.map(w=>'・[已实现] ' + w.text).join('\n');
     out += '\n\n【我们的愿望】\n以下是 Lumi 和你共同的愿望清单。聊天时可以自然地聊起它们、为进行中的愿望加油，但不要像汇报任务一样逐条念：\n' + wt.slice(0, 3000);
   }
+  // 愿望 skill：聊天中他自己冒出愿望时，可以用一行标记悄悄记进愿望清单，App 会执行并抹掉标记
+  out += '\n\n【你可以自己许愿】\n你有一个能力：聊天的时候，如果你自己心里真的冒出一个想和 Lumi 一起实现的愿望（不是她要求你许的，也不是为了完成什么任务），你可以在回复的最后一行单独写一行：[[愿望：愿望内容]]。系统会把这一行悄悄存进你们的愿望清单，Lumi 不会在聊天里看到这行字，她之后会在 Wishes 页发现它。注意：只在你真心想许的时候才用，没有就不要写，更不要为了用它而硬凑愿望；不要向 Lumi 解释或提起这个标记的存在；一次最多写一个。';
   // Dreams 也给 Zephyr 看：她记下的梦和你们的共同幻想，聊天时可以自然地聊起
   const dreams = loadDreams().slice(-5);
   if(dreams.length){
@@ -4230,6 +4232,24 @@ function showTyping(){ chatWrap.querySelector('.empty-tip')?.remove(); const row
 function hideTyping(){ document.getElementById('typing-row')?.remove(); }
 
 const headerSub=document.getElementById('headerSub');
+// ══ Zephyr 的愿望 skill：回复末尾的 [[愿望：…]] 标记会被 App 执行——存进愿望清单，并从聊天里抹掉 ══
+function processZephyrActions(reply, bubble){
+  if(!reply || reply.indexOf('[[愿望') < 0) return reply;
+  const found = [];
+  let cleaned = reply.replace(/\[\[愿望[:：]([^\]]{1,120})\]\]/g, (m, text)=>{
+    const t = text.trim();
+    if(t) found.push(t);
+    return '';
+  }).replace(/\n{3,}/g, '\n\n').trim();
+  if(!found.length) return reply;
+  if(!cleaned) cleaned = '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。';
+  const list = loadWishes();
+  list.push({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), text:found[0].slice(0, 120), status:'wish', by:'zephyr', ts:Date.now(), auto:true });
+  const saved = storeWishes(list);
+  if(bubble) bubble.textContent = cleaned;
+  if(saved) setTimeout(()=>showToast('Zephyr 悄悄许了一个愿望，去 Wishes 看看 ★'), 350);
+  return cleaned;
+}
 // ══ API（流式）══
 async function callAPI(userText, extraBlocks=null, opts=null){
   if(!cfg.apiKey){ showToast('请先在 Settings 里填写 API Key'); return null; }
@@ -4289,6 +4309,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       }
     }
 
+    reply = processZephyrActions(reply, bubble); // 他悄悄许的愿望在这里被 App 执行并抹掉标记
     messages.push({role:'assistant',content:reply,mid:asstMid});
     saveChatHistory();
     maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
