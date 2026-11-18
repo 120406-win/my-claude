@@ -945,7 +945,7 @@
     <div class="settings-topbar-title">Wishes</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">这里放你和 Zephyr 想一起实现的事。实现的愿望不会消失，它们会留下来，成为你们的共同经历。</div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">这里放你和 Zephyr 想一起实现的事。实现的愿望不会消失，它们会留下来，成为你们的共同经历。这些愿望 Zephyr 在聊天时都看得到。</div>
     <div class="s-section">
       <div class="s-section-title">许一个愿望</div>
       <div class="s-card" style="padding:14px 16px;">
@@ -1318,6 +1318,15 @@ function buildSystemPrompt(){
       return '--- 信（' + d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + '）标题：' + (l.title || '（无标题）') + ' ---\n' + l.body;
     }).join('\n\n');
     out += '\n\n【Lumi 写给你的信】\n以下是 Lumi 专门写给你的信，不是普通聊天，是她想特别留给你的话。请认真读并记在心里，聊天时可以自然地回应信里的内容：\n' + lt.slice(0, 6000);
+  }
+  // 愿望清单也一起给 Zephyr：他要知道我们想一起做什么，才能陪着一起实现
+  const allWishes = loadWishes();
+  const openWishes = allWishes.filter(w=>w.status!=='done');
+  const doneWishes = allWishes.filter(w=>w.status==='done').slice(-5);
+  if(openWishes.length || doneWishes.length){
+    let wt = openWishes.map(w=>'・[' + (w.status==='doing' ? '进行中' : '想实现') + '] ' + w.text).join('\n');
+    if(doneWishes.length) wt += (wt ? '\n' : '') + doneWishes.map(w=>'・[已实现] ' + w.text).join('\n');
+    out += '\n\n【我们的愿望】\n以下是 Lumi 和你共同的愿望清单。聊天时可以自然地聊起它们、为进行中的愿望加油，但不要像汇报任务一样逐条念：\n' + wt.slice(0, 3000);
   }
   return out;
 }
