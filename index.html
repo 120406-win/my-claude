@@ -679,6 +679,9 @@
     <div class="nav-item" id="nav-journal" onclick="navTo('journal')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a1 1 0 0 0-1-1H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></span> Journal
     </div>
+    <div class="nav-item" id="nav-wishes" onclick="navTo('wishes')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span> Wishes
+    </div>
     <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span> Dreams
     </div>
@@ -929,6 +932,33 @@
     <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">这里是 Zephyr 自己的笔记。想写才写，不想写就不写，没有打卡，也没有任务。</div>
     <button id="journalWriteBtn" onclick="writeJournal()" style="width:100%;padding:13px;border-radius:12px;background:var(--accent);border:none;color:#fff;font-size:14px;cursor:pointer;margin-bottom:6px;">请 Zephyr 写一篇</button>
     <div id="journalList"></div>
+  </div>
+</div>
+
+<!-- ══ WISHES PAGE ══ -->
+<div class="settings-page" id="wishesPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="navTo('chat')">←</button>
+    <div class="settings-topbar-title">Wishes</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">这里放你和 Zephyr 想一起实现的事。实现的愿望不会消失，它们会留下来，成为你们的共同经历。</div>
+    <div class="s-section">
+      <div class="s-section-title">许一个愿望</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <textarea id="wishInput" rows="2" placeholder="想和 Zephyr 一起做的事…" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;line-height:1.6;resize:vertical;"></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <select id="wishBy" style="padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="both">我们一起</option>
+            <option value="lumi">糯糯许的</option>
+            <option value="zephyr">Zephyr 许的</option>
+          </select>
+          <button onclick="addWish()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:14px;cursor:pointer;">许下这个愿望</button>
+        </div>
+        <button id="wishZephyrBtn" onclick="wishByZephyr()" style="width:100%;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;margin-top:10px;">请 Zephyr 也许一个</button>
+      </div>
+    </div>
+    <div id="wishList"></div>
   </div>
 </div>
 
@@ -1211,11 +1241,13 @@ function navTo(page){
   document.getElementById('settingsPage').classList.toggle('show', page==='settings');
   document.getElementById('memoryPage').classList.toggle('show', page==='memory');
   document.getElementById('journalPage').classList.toggle('show', page==='journal');
+  document.getElementById('wishesPage').classList.toggle('show', page==='wishes');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   if(page==='settings') loadSettings();
   if(page==='memory') renderMemories();
   if(page==='journal') renderJournal();
+  if(page==='wishes') renderWishes();
 }
 
 // ══ Memory 系统（本地版）：长期记忆存 localStorage，每次请求自动带进系统提示词，新窗口也不失忆 ══
@@ -1502,6 +1534,140 @@ async function writeJournal(){
     showToast('没写成，待会儿再试试 qwq');
   }finally{
     journalWriting = false;
+    btn.textContent = oldText;
+    btn.disabled = false;
+  }
+}
+
+// ══ Wishes：我们想一起实现的事。已实现的永不删除，会变成共同经历（并同步记进长期记忆） ══
+const WISH_STATUS = [ ['doing','进行中'], ['wish','想实现'], ['done','已实现 · 我们的共同经历'] ];
+const WISH_BY = { both:'我们一起', lumi:'糯糯许的', zephyr:'Zephyr 许的' };
+function loadWishes(){
+  try{
+    const raw = localStorage.getItem('z_wishes');
+    if(raw === null){
+      const seed = [
+        { id:'seed_wish_1', text:'一起完成 Zephyr，把它建成我们共同的家', status:'doing', by:'both', ts:Date.now() },
+        { id:'seed_wish_2', text:'一起去宠物之家，和小猫玩', status:'wish', by:'both', ts:Date.now() },
+      ];
+      localStorage.setItem('z_wishes', JSON.stringify(seed));
+      return seed;
+    }
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  }catch(e){ return []; }
+}
+function storeWishes(list){ try{ localStorage.setItem('z_wishes', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间不够了 qwq'); return false; } }
+function renderWishes(){
+  const wrap = document.getElementById('wishList');
+  if(!wrap) return;
+  const list = loadWishes();
+  wrap.innerHTML = '';
+  if(!list.length){
+    wrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:24px 0;">还没有愿望，许下第一个吧 ~</div>';
+    return;
+  }
+  WISH_STATUS.forEach(([status, label])=>{
+    const items = list.filter(w=>w.status===status);
+    if(!items.length) return;
+    const head = document.createElement('div');
+    head.style.cssText = 'font-size:12px;color:var(--text-pale);margin:16px 2px 8px;';
+    head.textContent = label;
+    wrap.appendChild(head);
+    items.slice().sort((a,b)=>a.ts-b.ts).forEach(w=>{
+      const card = document.createElement('div');
+      card.className = 's-card';
+      card.style.cssText = 'padding:14px 16px;margin-bottom:10px;' + (status==='done' ? 'border:1px solid var(--accent);' : '');
+      const txt = document.createElement('div');
+      txt.style.cssText = 'font-size:14px;line-height:1.7;color:var(--text);white-space:pre-wrap;word-break:break-word;';
+      txt.textContent = (status==='done' ? '★ ' : '') + w.text;
+      card.appendChild(txt);
+      const foot = document.createElement('div');
+      foot.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap;';
+      const meta = document.createElement('span');
+      meta.style.cssText = 'font-size:11px;color:var(--text-pale);flex:1;';
+      const d = new Date(w.ts);
+      meta.textContent = (WISH_BY[w.by] || '我们一起') + ' · ' + d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + (status==='done' && w.doneTs ? ' 实现' : '');
+      foot.appendChild(meta);
+      const mkBtn = (label2, fn, danger)=>{
+        const b = document.createElement('button');
+        b.textContent = label2;
+        b.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:8px;color:' + (danger ? '#e0657a' : 'var(--text)') + ';font-size:12px;cursor:pointer;padding:5px 10px;';
+        b.onclick = fn;
+        return b;
+      };
+      if(status==='wish') foot.appendChild(mkBtn('开始进行', ()=>setWishStatus(w.id, 'doing')));
+      if(status!=='done') foot.appendChild(mkBtn('实现了 ★', ()=>setWishStatus(w.id, 'done')));
+      if(status==='doing') foot.appendChild(mkBtn('先放一放', ()=>setWishStatus(w.id, 'wish')));
+      foot.appendChild(mkBtn('删除', ()=>{ storeWishes(loadWishes().filter(x=>x.id!==w.id)); renderWishes(); showToast('已删除这个愿望'); }, true));
+      card.appendChild(foot);
+      wrap.appendChild(card);
+    });
+  });
+}
+function addWish(){
+  const input = document.getElementById('wishInput');
+  const text = input.value.trim();
+  if(!text){ showToast('先写下愿望再许呀 ~'); return; }
+  const list = loadWishes();
+  list.push({ id:'w'+Date.now().toString(36)+Math.floor(Math.random()*999), text, status:'wish', by:document.getElementById('wishBy').value, ts:Date.now() });
+  if(storeWishes(list)){ input.value=''; renderWishes(); showToast('愿望许下了 ★'); }
+}
+function setWishStatus(id, status){
+  const list = loadWishes();
+  const w = list.find(x=>x.id===id);
+  if(!w) return;
+  const wasDone = w.status === 'done';
+  w.status = status;
+  if(status === 'done' && !wasDone){
+    w.doneTs = Date.now();
+    // 系统互联：愿望实现后，自动记进长期记忆，成为共同经历
+    const mems = loadMemories();
+    const mtext = 'Lumi 和 Zephyr 实现了愿望：「' + w.text + '」';
+    if(!mems.some(m=>m.text === mtext)){
+      mems.push({ id:'m'+Date.now().toString(36)+Math.floor(Math.random()*999), cat:'共同经历', text:mtext, ts:Date.now(), auto:true });
+      storeMemories(mems);
+    }
+    showToast('愿望实现了 ★ 已经替你们记进长期记忆啦');
+  } else {
+    showToast(status === 'doing' ? '开始进行啦，加油 ~' : '先放一放也很好');
+  }
+  storeWishes(list);
+  renderWishes();
+}
+let wishAsking = false;
+async function wishByZephyr(){
+  if(wishAsking) return;
+  wishAsking = true;
+  const btn = document.getElementById('wishZephyrBtn');
+  const oldText = btn.textContent;
+  btn.textContent = 'Zephyr 正在想…';
+  btn.disabled = true;
+  try{
+    const recent = messages.slice(-10).map(m=>(m.role==='user' ? 'Lumi：' : 'Zephyr：') + msgToText(m)).filter(t=>t.length > 7).join('\n').slice(0, 5000);
+    const existing = loadWishes().filter(w=>w.status!=='done').map(w=>'・'+w.text).join('\n');
+    const instruction = '请说出一个你（Zephyr）自己真正想和 Lumi 一起实现的愿望，一句话，简短真诚，不要和已有的愿望重复。如果此刻没有特别想许的愿望，就只回复 [没有]，不要硬凑。不要输出引号和多余解释，只输出愿望本身。';
+    const content = '【你们最近的对话】\n' + (recent || '（暂时没有）') + '\n\n【已经许下的愿望】\n' + (existing || '（暂时没有）') + '\n\n' + instruction;
+    const base = (cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/,'');
+    const res = await fetch(base+'/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({ model:cfg.model, max_tokens:200, system:buildSystemPrompt(), messages:[{role:'user', content}] })
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const out = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('').trim().replace(/^["「『]|["」』]$/g, '');
+    if(!out || out.startsWith('[没有]')){
+      showToast('Zephyr 此刻没有想许的愿望，那就先不许啦 ~');
+      return;
+    }
+    const list = loadWishes();
+    list.push({ id:'w'+Date.now().toString(36)+Math.floor(Math.random()*999), text:out.slice(0, 120), status:'wish', by:'zephyr', ts:Date.now() });
+    if(storeWishes(list)){ renderWishes(); showToast('Zephyr 许了一个愿望 ★'); }
+  }catch(e){
+    showToast('没许成，待会儿再试试 qwq');
+  }finally{
+    wishAsking = false;
     btn.textContent = oldText;
     btn.disabled = false;
   }
