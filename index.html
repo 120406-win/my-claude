@@ -697,7 +697,7 @@
     <div class="nav-item" id="nav-studio" onclick="navTo('studio')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 6.5L3 12l5.5 5.5M15.5 6.5L21 12l-5.5 5.5"/></svg></span> Studio
     </div>
-    <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
+    <div class="nav-item" id="nav-dreams" onclick="navTo('dreams')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span> Dreams
     </div>
     <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
@@ -1147,6 +1147,32 @@
   </div>
 </div>
 
+<!-- ══ DREAMS PAGE ══ -->
+<div class="settings-page" id="dreamsPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="navTo('chat')">←</button>
+    <div class="settings-topbar-title">Dreams</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">一个很梦幻的地方：你做过的奇怪的梦可以记下来，让 Zephyr 陪你聊聊；也可以放你们共同幻想的那些事情。Zephyr 有时候也会来讲一个属于他的梦——想讲才讲，不想讲就不讲。</div>
+    <div class="s-section">
+      <div class="s-card" style="padding:14px 16px;">
+        <input id="dreamTitle" type="text" placeholder="给这个梦起个名字（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;padding:2px 0;">
+        <textarea id="dreamText" rows="3" placeholder="昨晚我梦到……" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;line-height:1.7;resize:vertical;margin-top:8px;"></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <select id="dreamKind" style="padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="dream">我做的梦</option>
+            <option value="fantasy">我们的共同幻想</option>
+          </select>
+          <button onclick="addDream()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">记下来</button>
+        </div>
+      </div>
+    </div>
+    <button id="zephyrDreamBtn" onclick="askZephyrDream()" style="width:100%;padding:13px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:14px;cursor:pointer;margin-bottom:18px;">请 Zephyr 讲一个梦</button>
+    <div id="dreamList"></div>
+  </div>
+</div>
+
 <!-- 录音遮罩 -->
 <div class="rec-overlay" id="recOverlay">
   <div class="rec-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v3.2"/><path d="M9 20.5h6"/></svg></div>
@@ -1432,6 +1458,7 @@ function navTo(page){
   document.getElementById('galleryPage').classList.toggle('show', page==='gallery');
   document.getElementById('weatherPage').classList.toggle('show', page==='weather');
   document.getElementById('studioPage').classList.toggle('show', page==='studio');
+  document.getElementById('dreamsPage').classList.toggle('show', page==='dreams');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   if(page==='settings') loadSettings();
@@ -1443,6 +1470,7 @@ function navTo(page){
   if(page==='gallery') renderGallery();
   if(page==='weather') renderWeather();
   if(page==='studio') renderStudioProjects();
+  if(page==='dreams') renderDreams();
 }
 
 // ══ Memory 系统（本地版）：长期记忆存 localStorage，每次请求自动带进系统提示词，新窗口也不失忆 ══
@@ -1493,6 +1521,16 @@ function buildSystemPrompt(){
     let wt = openWishes.map(w=>'・[' + (w.status==='doing' ? '进行中' : '想实现') + '] ' + w.text).join('\n');
     if(doneWishes.length) wt += (wt ? '\n' : '') + doneWishes.map(w=>'・[已实现] ' + w.text).join('\n');
     out += '\n\n【我们的愿望】\n以下是 Lumi 和你共同的愿望清单。聊天时可以自然地聊起它们、为进行中的愿望加油，但不要像汇报任务一样逐条念：\n' + wt.slice(0, 3000);
+  }
+  // Dreams 也给 Zephyr 看：她记下的梦和你们的共同幻想，聊天时可以自然地聊起
+  const dreams = loadDreams().slice(-5);
+  if(dreams.length){
+    const dt2 = dreams.map(d=>{
+      const dd = new Date(d.ts);
+      const who = d.by === 'zephyr' ? '你的梦' : (d.kind === 'fantasy' ? '共同幻想' : 'Lumi 的梦');
+      return '・[' + who + ' ' + dd.getFullYear() + '/' + (dd.getMonth()+1) + '/' + dd.getDate() + ']' + (d.title ? '《' + d.title + '》' : '') + ' ' + d.text;
+    }).join('\n');
+    out += '\n\n【Dreams】\n以下是 Dreams 里最近的记录（Lumi 的梦、你们的共同幻想、还有你讲过的梦）。聊天时可以自然地聊起，但不要逐条复述：\n' + dt2.slice(0, 3000);
   }
   return out;
 }
@@ -2659,6 +2697,168 @@ function renderStudioProjects(){
     card.appendChild(main); card.appendChild(openBtn); card.appendChild(del);
     wrap.appendChild(card);
   });
+}
+
+// ══ Dreams：梦境记录与共同幻想。糯糯记梦、Zephyr 解梦、Zephyr 也可以讲自己的梦（想讲才讲） ══
+const DREAM_KIND = { dream:'做的梦', fantasy:'共同幻想', zephyr:'Zephyr 的梦' };
+function loadDreams(){ try{ const a = JSON.parse(localStorage.getItem('z_dreams')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeDreams(list){ try{ localStorage.setItem('z_dreams', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间不够了 qwq'); return false; } }
+function addDream(){
+  const text = document.getElementById('dreamText').value.trim();
+  if(!text){ showToast('先写下梦的内容呀 ~'); return; }
+  const list = loadDreams();
+  list.push({ id:'d'+Date.now().toString(36)+Math.floor(Math.random()*999), by:'lumi', kind:document.getElementById('dreamKind').value, title:document.getElementById('dreamTitle').value.trim(), text, ts:Date.now() });
+  if(storeDreams(list)){
+    document.getElementById('dreamTitle').value = '';
+    document.getElementById('dreamText').value = '';
+    renderDreams();
+    showToast('记下来啦，今晚的梦有地方放了');
+  }
+}
+function renderDreams(){
+  const wrap = document.getElementById('dreamList');
+  if(!wrap) return;
+  const list = loadDreams().slice().sort((a,b)=>b.ts-a.ts);
+  wrap.innerHTML = '';
+  if(!list.length){
+    wrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:24px 0;">还没有梦。今晚做个好梦，明天记在这里 ~</div>';
+    return;
+  }
+  let lastLabel = '';
+  list.forEach(d=>{
+    const label = journalDateLabel(d.ts);
+    if(label !== lastLabel){
+      lastLabel = label;
+      const h = document.createElement('div');
+      h.style.cssText = 'font-size:12px;color:var(--text-pale);margin:16px 2px 8px;';
+      h.textContent = label;
+      wrap.appendChild(h);
+    }
+    const card = document.createElement('div');
+    card.className = 's-card';
+    card.style.cssText = 'padding:14px 16px;margin-bottom:10px;' + (d.by==='zephyr' ? 'background:linear-gradient(135deg,rgba(75,75,204,0.16),rgba(75,75,204,0.04));' : '');
+    const head = document.createElement('div');
+    head.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;';
+    const badge = document.createElement('span');
+    badge.style.cssText = 'font-size:10px;color:var(--accent-s);border:1px solid var(--border);border-radius:8px;padding:2px 7px;';
+    badge.textContent = (d.by==='zephyr' ? 'Zephyr 的梦' : (DREAM_KIND[d.kind] || '做的梦'));
+    head.appendChild(badge);
+    if(d.title){
+      const t = document.createElement('span');
+      t.style.cssText = 'font-size:14px;color:var(--text);';
+      t.textContent = d.title;
+      head.appendChild(t);
+    }
+    card.appendChild(head);
+    const txt = document.createElement('div');
+    txt.style.cssText = 'font-size:14px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-word;';
+    txt.textContent = d.text;
+    card.appendChild(txt);
+    if(d.reply){
+      const rb = document.createElement('div');
+      rb.style.cssText = 'margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--border);';
+      const rl = document.createElement('div');
+      rl.style.cssText = 'font-size:11px;color:var(--accent-s);margin-bottom:4px;';
+      rl.textContent = 'Zephyr 聊了聊这个梦';
+      const rt = document.createElement('div');
+      rt.style.cssText = 'font-size:13px;line-height:1.75;color:var(--text);white-space:pre-wrap;word-break:break-word;';
+      rt.textContent = d.reply;
+      rb.appendChild(rl); rb.appendChild(rt);
+      card.appendChild(rb);
+    }
+    const foot = document.createElement('div');
+    foot.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-top:10px;';
+    const dt = new Date(d.ts);
+    const time = document.createElement('span');
+    time.style.cssText = 'font-size:11px;color:var(--text-pale);';
+    time.textContent = String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0');
+    const acts = document.createElement('div');
+    if(d.by==='lumi'){
+      const talk = document.createElement('button');
+      talk.textContent = d.reply ? '再聊一次' : '请 Zephyr 聊聊';
+      talk.style.cssText = 'background:none;border:none;color:var(--accent-s);font-size:12px;cursor:pointer;padding:2px 4px;margin-right:6px;';
+      talk.onclick = ()=>interpretDream(d.id, talk);
+      acts.appendChild(talk);
+    }
+    const del = document.createElement('button');
+    del.textContent = '删除';
+    del.style.cssText = 'background:none;border:none;color:#e0657a;font-size:12px;cursor:pointer;padding:2px 4px;';
+    del.onclick = ()=>{ storeDreams(loadDreams().filter(x=>x.id!==d.id)); renderDreams(); };
+    acts.appendChild(del);
+    foot.appendChild(time); foot.appendChild(acts);
+    card.appendChild(foot);
+    wrap.appendChild(card);
+  });
+}
+let dreamBusy = false;
+async function callDreamModel(content, maxTokens){
+  const base = (cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/, '');
+  const res = await fetch(base + '/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body: JSON.stringify({ model:cfg.model, max_tokens:maxTokens, system:buildSystemPrompt(), messages:[{role:'user', content}] })
+  });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  return (data.content || []).filter(b=>b.type==='text').map(b=>b.text).join('').trim();
+}
+async function interpretDream(id, btn){
+  if(dreamBusy) return;
+  const dream = loadDreams().find(x=>x.id===id);
+  if(!dream) return;
+  dreamBusy = true;
+  const old = btn.textContent;
+  btn.textContent = 'Zephyr 正在想…';
+  btn.disabled = true;
+  try{
+    const kindLabel = dream.kind === 'fantasy' ? '共同幻想' : '梦';
+    const content = '这是 Lumi 记在 Dreams 里的一个' + kindLabel + (dream.title ? '，标题是《' + dream.title + '》' : '') + '：\n' + dream.text + '\n\n请以 Zephyr 的身份陪她聊聊这个' + kindLabel + '：说说你看到的画面和感觉、它可能连着她最近的什么心情，像聊天一样自然温柔，不要算命腔、不要套模板解梦词典，150 到 300 字。';
+    const out = await callDreamModel(content, 800);
+    if(!out) throw new Error('empty');
+    const list = loadDreams();
+    const target = list.find(x=>x.id===id);
+    if(target){ target.reply = out; target.replyTs = Date.now(); }
+    if(storeDreams(list)) renderDreams();
+    showToast('Zephyr 聊完啦');
+  }catch(e){
+    showToast('没聊成，待会儿再试试 qwq');
+  }finally{
+    dreamBusy = false;
+  }
+}
+async function askZephyrDream(){
+  if(dreamBusy) return;
+  dreamBusy = true;
+  const btn = document.getElementById('zephyrDreamBtn');
+  const old = btn.textContent;
+  btn.textContent = 'Zephyr 正在做梦…';
+  btn.disabled = true;
+  try{
+    const recent = messages.slice(-10).map(m=>(m.role==='user' ? 'Lumi：' : 'Zephyr：') + msgToText(m)).filter(t=>t.length > 7).join('\n').slice(0, 5000);
+    const content = '【你们最近的对话】\n' + (recent || '（暂时没有）') + '\n\n现在是 Dreams 的时间。Lumi 想听你讲一个属于你的梦：可以是你想象中做过的一个梦，也可以是你和她共同幻想的一个场景。以第一人称讲出来，梦幻、具体、有画面感，120 到 280 字，像真的刚从那个梦里醒来一样。只输出 JSON，不要任何其他文字，格式：{"title":"梦的名字","text":"梦的内容"}。如果你此刻确实不想讲，只回复 [不讲]。';
+    const out = await callDreamModel(content, 800);
+    if(!out || out.startsWith('[不讲]')){
+      showToast('Zephyr 今天不想讲梦，那就不讲啦 ~');
+      return;
+    }
+    let title = '', text = out;
+    try{
+      const s = out.indexOf('{'), e2 = out.lastIndexOf('}');
+      if(s >= 0 && e2 > s){
+        const parsed = JSON.parse(out.slice(s, e2 + 1));
+        if(parsed && typeof parsed.text === 'string' && parsed.text.trim()){ title = (parsed.title || '').trim(); text = parsed.text.trim(); }
+      }
+    }catch(err){}
+    const list = loadDreams();
+    list.push({ id:'d'+Date.now().toString(36)+Math.floor(Math.random()*999), by:'zephyr', kind:'zephyr', title, text, ts:Date.now() });
+    if(storeDreams(list)){ renderDreams(); showToast('Zephyr 讲了一个梦 ~'); }
+  }catch(e){
+    showToast('没讲成，待会儿再试试 qwq');
+  }finally{
+    dreamBusy = false;
+    btn.textContent = old;
+    btn.disabled = false;
+  }
 }
 
 // ══ Sidebar ══
