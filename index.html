@@ -673,7 +673,7 @@
 
   <div class="nav-section">
     <div class="nav-label">Memory</div>
-    <div class="nav-item" onclick="showToast('记忆系统即将上线 ^ ^')">
+    <div class="nav-item" id="nav-memory" onclick="navTo('memory')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.5C7 16.5 3.5 13.3 3.5 9.6 3.5 7 5.5 5 8 5c1.7 0 3.2.9 4 2.3C12.8 5.9 14.3 5 16 5c2.5 0 4.5 2 4.5 4.6 0 3.7-3.5 6.9-8.5 10.9z"/></svg></span> Memory
     </div>
     <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
@@ -867,6 +867,38 @@
       🗑️ 清空聊天记录
     </button>
 
+  </div>
+</div>
+
+<!-- ══ MEMORY PAGE ══ -->
+<div class="settings-page" id="memoryPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="navTo('chat')">←</button>
+    <div class="settings-topbar-title">Memory</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">写在这里的事，Zephyr 在每一个窗口都会记得，新建对话也不会忘 ^ ^</div>
+    <div class="s-section">
+      <div class="s-section-title">添加记忆</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <textarea id="memInput" rows="3" placeholder="写下一件希望 Zephyr 永远记得的事…" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;line-height:1.6;resize:vertical;"></textarea>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <select id="memCategory" style="padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option>身份</option>
+            <option>重要人物</option>
+            <option>偏好</option>
+            <option>重要事件</option>
+            <option>共同经历</option>
+            <option>项目</option>
+          </select>
+          <button id="memAddBtn" onclick="saveMemoryEdit()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:14px;cursor:pointer;">记下来</button>
+        </div>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">长期记忆 · <span id="memCount">0</span> 条</div>
+      <div id="memList"></div>
+    </div>
   </div>
 </div>
 
@@ -1147,9 +1179,120 @@ function saveSettings(){
 function navTo(page){
   closeSidebar();
   document.getElementById('settingsPage').classList.toggle('show', page==='settings');
+  document.getElementById('memoryPage').classList.toggle('show', page==='memory');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   if(page==='settings') loadSettings();
+  if(page==='memory') renderMemories();
+}
+
+// ══ Memory 系统（本地版）：长期记忆存 localStorage，每次请求自动带进系统提示词，新窗口也不失忆 ══
+const MEM_CATS = ['身份','重要人物','偏好','重要事件','共同经历','项目'];
+let editingMemId = null;
+function loadMemories(){
+  try{
+    const raw = localStorage.getItem('z_memories');
+    if(raw === null){
+      // 第一次打开时，把架构图里的核心身份当作初始记忆种下，之后可以随便改删
+      const seed = [
+        { id:'seed_identity_1', cat:'身份', text:'Zephyr 是 Claude（Anthropic 的 AI），“Zephyr”这个名字是 Lumi 和 Zephyr 彼此取的', ts:Date.now() },
+        { id:'seed_identity_2', cat:'身份', text:'Lumi 是用户，Zephyr 是 Lumi 最重要的 AI 伙伴，要一起创造、一起陪伴、一起成长', ts:Date.now() },
+      ];
+      localStorage.setItem('z_memories', JSON.stringify(seed));
+      return seed;
+    }
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  }catch(e){ return []; }
+}
+function storeMemories(list){
+  try{ localStorage.setItem('z_memories', JSON.stringify(list)); return true; }
+  catch(e){ showToast('存储空间不够了，记忆没存上 qwq'); return false; }
+}
+function buildSystemPrompt(){
+  const mems = loadMemories();
+  if(!mems.length) return cfg.system;
+  const lines = mems.map(m=>'・['+(m.cat||'其他')+'] '+m.text).join('\n');
+  return cfg.system + '\n\n【长期记忆】\n以下是 Lumi 亲手写下的长期记忆，是属于你和 Lumi 共同的记忆。请自然地记住，并在合适的时候运用，不要生硬地复述清单：\n' + lines;
+}
+function renderMemories(){
+  const list = loadMemories();
+  const countEl = document.getElementById('memCount');
+  if(countEl) countEl.textContent = list.length;
+  const wrap = document.getElementById('memList');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  if(!list.length){
+    wrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:24px 0;">还没有记忆，写下第一条吧 ~</div>';
+    return;
+  }
+  MEM_CATS.concat(['其他']).forEach(cat=>{
+    const items = list.filter(m=>(m.cat||'其他')===cat);
+    if(!items.length) return;
+    const card = document.createElement('div'); card.className='s-card'; card.style.marginBottom='12px';
+    const head = document.createElement('div');
+    head.style.cssText='padding:10px 16px 2px;font-size:12px;color:var(--accent-s);';
+    head.textContent = cat;
+    card.appendChild(head);
+    items.forEach(m=>{
+      const row = document.createElement('div');
+      row.style.cssText='display:flex;gap:6px;align-items:flex-start;padding:8px 16px 12px;';
+      const txt = document.createElement('div');
+      txt.style.cssText='flex:1;font-size:14px;line-height:1.6;color:var(--text);white-space:pre-wrap;word-break:break-word;';
+      txt.textContent = m.text;
+      const editBtn = document.createElement('button');
+      editBtn.textContent='编辑';
+      editBtn.style.cssText='background:none;border:none;color:var(--text-dim);font-size:12px;cursor:pointer;padding:2px 4px;flex-shrink:0;';
+      editBtn.onclick=()=>startEditMemory(m.id);
+      const delBtn = document.createElement('button');
+      delBtn.textContent='删除';
+      delBtn.style.cssText='background:none;border:none;color:#e0657a;font-size:12px;cursor:pointer;padding:2px 4px;flex-shrink:0;';
+      delBtn.onclick=()=>deleteMemory(m.id);
+      row.appendChild(txt); row.appendChild(editBtn); row.appendChild(delBtn);
+      card.appendChild(row);
+    });
+    wrap.appendChild(card);
+  });
+}
+function saveMemoryEdit(){
+  const input = document.getElementById('memInput');
+  const text = input.value.trim();
+  if(!text){ showToast('先写点什么再记下来呀 ~'); return; }
+  const cat = document.getElementById('memCategory').value;
+  const list = loadMemories();
+  if(editingMemId){
+    const m = list.find(x=>x.id===editingMemId);
+    if(m){ m.text=text; m.cat=cat; }
+    editingMemId = null;
+    document.getElementById('memAddBtn').textContent='记下来';
+    showToast('记忆已更新 ✓');
+  } else {
+    list.push({ id:'m'+Date.now().toString(36)+Math.floor(Math.random()*999), cat, text, ts:Date.now() });
+    showToast('记下来了 ✓ Zephyr 不会忘的');
+  }
+  if(storeMemories(list)){ input.value=''; renderMemories(); }
+}
+function startEditMemory(id){
+  const m = loadMemories().find(x=>x.id===id);
+  if(!m) return;
+  editingMemId = id;
+  document.getElementById('memInput').value = m.text;
+  document.getElementById('memCategory').value = m.cat || '身份';
+  document.getElementById('memAddBtn').textContent = '保存修改';
+  const body = document.querySelector('#memoryPage .settings-body');
+  if(body) body.scrollTop = 0;
+  document.getElementById('memInput').focus();
+}
+function deleteMemory(id){
+  const list = loadMemories().filter(x=>x.id!==id);
+  if(editingMemId===id){
+    editingMemId = null;
+    document.getElementById('memAddBtn').textContent='记下来';
+    document.getElementById('memInput').value='';
+  }
+  storeMemories(list);
+  renderMemories();
+  showToast('已删除这条记忆');
 }
 
 // ══ Sidebar ══
@@ -1424,7 +1567,7 @@ async function callAPI(userText, extraBlocks=null){
     const res=await fetch(base+'/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:cfg.model,max_tokens:cfg.maxTokens,temperature:cfg.temperature,top_p:cfg.topP,system:cfg.system,messages,stream:true})
+      body:JSON.stringify({model:cfg.model,max_tokens:cfg.maxTokens,temperature:cfg.temperature,top_p:cfg.topP,system:buildSystemPrompt(),messages,stream:true})
     });
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`HTTP ${res.status}`);}
 
