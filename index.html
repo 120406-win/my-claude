@@ -85,6 +85,44 @@
       --sidebar-bg:  #101e14;
       --font-size:   15px;
     }
+    /* 奶糖小兔 */
+    [data-theme="bunny"] {
+      --bg:        #fdf2f5;
+      --bg2:       #fbe7ee;
+      --bg3:       #f6d3df;
+      --surface:   rgba(230,120,160,0.07);
+      --border:    rgba(230,120,160,0.14);
+      --text:      #5a3d4a;
+      --text-dim:  #a2768a;
+      --text-pale: #c4a0b2;
+      --accent:    #ef7fae;
+      --accent-s:  #e5639c;
+      --bubble-user: #f282b0;
+      --bubble-ai:   rgba(255,255,255,0.94);
+      --header-bg:   rgba(250,220,232,0.85);
+      --input-bg:    rgba(253,238,244,0.96);
+      --sidebar-bg:  #fbe9f0;
+      --font-size:   15px;
+    }
+    /* 布丁小猫 */
+    [data-theme="kitty"] {
+      --bg:        #fdf6ea;
+      --bg2:       #f9ecd7;
+      --bg3:       #f2ddba;
+      --surface:   rgba(220,150,70,0.07);
+      --border:    rgba(220,150,70,0.15);
+      --text:      #574233;
+      --text-dim:  #a07c5f;
+      --text-pale: #c2a586;
+      --accent:    #f09a4e;
+      --accent-s:  #e07f2e;
+      --bubble-user: #f29d4e;
+      --bubble-ai:   rgba(255,252,246,0.95);
+      --header-bg:   rgba(248,231,205,0.88);
+      --input-bg:    rgba(253,243,228,0.96);
+      --sidebar-bg:  #f9ecd9;
+      --font-size:   15px;
+    }
     /* 玫瑰暮光 */
     [data-theme="rose"] {
       --bg:        #1e0e14;
@@ -124,7 +162,7 @@
       font-size: var(--fs,14px);
       user-select:none;
     }
-    [data-theme="light"] .p { opacity: calc(var(--op,0.12) * 0.5); }
+    [data-theme="light"] .p, [data-theme="bunny"] .p, [data-theme="kitty"] .p { opacity: calc(var(--op,0.12) * 0.5); }
 
     /* ══ 自定义背景层（和主题解耦，单独控制）══ */
     .bg-layer {
@@ -360,11 +398,11 @@
     .voice-icon { font-size:18px; flex-shrink:0; }
     .voice-waves { display:flex; align-items:center; gap:2px; flex:1; }
     .voice-bar   { width:3px; border-radius:2px; background:rgba(255,255,255,0.6); }
-    [data-theme="light"] .voice-bar { background:rgba(0,0,0,0.35); }
+    [data-theme="light"] .voice-bar, [data-theme="bunny"] .voice-bar, [data-theme="kitty"] .voice-bar { background:rgba(0,0,0,0.35); }
     .voice-bubble.playing .voice-bar { animation:wavebar var(--s,.5s) ease-in-out infinite alternate; }
     @keyframes wavebar{ from{transform:scaleY(0.4);} to{transform:scaleY(1);} }
     .voice-dur { font-size:12px; color:rgba(255,255,255,0.7); flex-shrink:0; }
-    [data-theme="light"] .voice-dur { color:rgba(0,0,0,0.5); }
+    [data-theme="light"] .voice-dur, [data-theme="bunny"] .voice-dur, [data-theme="kitty"] .voice-dur { color:rgba(0,0,0,0.5); }
 
     /* 打字动画 */
     .typing-dots span {
@@ -743,6 +781,8 @@
           <button id="themePurple" onclick="setTheme('purple')" class="theme-btn" style="background:#e8e4f4;color:#6c7cff;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🌸 淡紫奶油</button>
           <button id="themeForest" onclick="setTheme('forest')" class="theme-btn" style="background:#0d1a14;color:#a8d8a8;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🌲 墨绿深林</button>
           <button id="themeRose"   onclick="setTheme('rose')"   class="theme-btn" style="background:#1e0e14;color:#f0a0b8;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🌹 玫瑰暮光</button>
+          <button id="themeBunny"  onclick="setTheme('bunny')"  class="theme-btn" style="background:#fdeef4;color:#e5639c;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🐰 奶糖小兔</button>
+          <button id="themeKitty"  onclick="setTheme('kitty')"  class="theme-btn" style="background:#fdf3e0;color:#e07f2e;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🐱 布丁小猫</button>
         </div>
         <div class="s-row">
           <div>
@@ -873,10 +913,21 @@
 </div>
 
 <script>
-// ══ 粒子 ══
-(function(){
+// ══ 粒子（每个主题有自己的小图案）══
+const PARTICLE_SETS = {
+  dark:   ['✨','☁️','🌙','✨','✨','☁️','🌙'],
+  light:  ['✨','☁️','🌼','✨','✨','☁️','🌼'],
+  purple: ['✨','🌸','☁️','✨','✨','🌸','☁️'],
+  forest: ['✨','🍃','☁️','✨','✨','🍃','🌿'],
+  rose:   ['✨','🌹','🌙','✨','✨','🌹','☁️'],
+  bunny:  ['🌸','🐰','🌸','✨','🥕','🌸','🐰'],
+  kitty:  ['🐾','🐱','🐾','✨','🧶','🐾','🐱'],
+};
+function buildParticles(theme){
   const layer=document.getElementById('particleLayer');
-  const emojis=['✨','☁️','🌙','✨','✨','☁️','🌙'];
+  if(!layer) return;
+  layer.innerHTML='';
+  const emojis=PARTICLE_SETS[theme]||PARTICLE_SETS.dark;
   for(let i=0;i<28;i++){
     const el=document.createElement('div'); el.className='p';
     el.textContent=emojis[Math.floor(Math.random()*emojis.length)];
@@ -884,7 +935,7 @@
     el.style.cssText=`left:${Math.random()*100}%;top:${Math.random()*100}%;--fs:${fs}px;--op:${op};--dur:${(Math.random()*6+6).toFixed(1)}s;--del:${(Math.random()*6).toFixed(1)}s`;
     layer.appendChild(el);
   }
-})();
+}
 
 // ══ Splash ══
 document.getElementById('splash').addEventListener('click',()=>{
@@ -922,13 +973,14 @@ let localStream=null;
 // ══ 主题 ══
 function applyTheme(t){
   // 主题名和按钮 id 不一致，用映射表对齐：dark→Night, light→Day
-  const btnIds = { dark:'themeNight', light:'themeDay', purple:'themePurple', forest:'themeForest', rose:'themeRose' };
+  const btnIds = { dark:'themeNight', light:'themeDay', purple:'themePurple', forest:'themeForest', rose:'themeRose', bunny:'themeBunny', kitty:'themeKitty' };
   document.documentElement.removeAttribute('data-theme');
   if(t !== 'dark') document.documentElement.setAttribute('data-theme', t);
   Object.entries(btnIds).forEach(([name, id]) => {
     const btn = document.getElementById(id);
     if(btn) btn.style.borderColor = t === name ? 'var(--accent)' : 'transparent';
   });
+  buildParticles(t);
 }
 applyTheme(cfg.theme);
 
