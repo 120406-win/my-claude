@@ -933,6 +933,7 @@
     </div>
     <div class="s-section">
       <div class="s-section-title">长期记忆 · <span id="memCount">0</span> 条</div>
+      <input id="memSearch" type="text" placeholder="搜索记忆…" oninput="memSearchText=this.value;renderMemories()" style="width:100%;padding:11px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;outline:none;margin-bottom:12px;">
       <div id="memList"></div>
     </div>
   </div>
@@ -1320,7 +1321,8 @@ function buildSystemPrompt(){
   let out = cfg.system;
   const mems = loadMemories();
   if(mems.length){
-    const lines = mems.map(m=>'・['+(m.cat||'其他')+'] '+m.text).join('\n');
+    const sorted = mems.slice().sort((a,b)=>((b.pinned?1:0)-(a.pinned?1:0)));
+    const lines = sorted.map(m=>'・['+(m.cat||'其他')+'] '+(m.pinned?'★很重要：':'')+m.text).join('\n');
     out += '\n\n【长期记忆】\n以下是 Lumi 亲手写下的长期记忆，是属于你和 Lumi 共同的记忆。请自然地记住，并在合适的时候运用，不要生硬地复述清单：\n' + lines;
   }
   // Lumi 寄出的信会随每次请求一起给 Zephyr，确保他真的读得到她的信
@@ -1343,6 +1345,16 @@ function buildSystemPrompt(){
   }
   return out;
 }
+let memSearchText = '';
+function togglePinMemory(id){
+  const list = loadMemories();
+  const m = list.find(x=>x.id===id);
+  if(!m) return;
+  m.pinned = !m.pinned;
+  storeMemories(list);
+  renderMemories();
+  showToast(m.pinned ? '已置顶，Zephyr 会优先记得它' : '已取消置顶');
+}
 function renderMemories(){
   const tg = document.getElementById('autoMemToggle');
   if(tg) tg.checked = autoMemEnabled();
@@ -1356,9 +1368,14 @@ function renderMemories(){
     wrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:24px 0;">还没有记忆，写下第一条吧 ~</div>';
     return;
   }
+  const q = memSearchText.trim();
+  const match = m => !q || m.text.includes(q) || (m.cat||'').includes(q);
+  let shown = 0;
   MEM_CATS.concat(['其他']).forEach(cat=>{
-    const items = list.filter(m=>(m.cat||'其他')===cat);
+    const items = list.filter(m=>(m.cat||'其他')===cat && match(m))
+      .slice().sort((a,b)=>((b.pinned?1:0)-(a.pinned?1:0)) || (a.ts||0)-(b.ts||0));
     if(!items.length) return;
+    shown += items.length;
     const card = document.createElement('div'); card.className='s-card'; card.style.marginBottom='12px';
     const head = document.createElement('div');
     head.style.cssText='padding:10px 16px 2px;font-size:12px;color:var(--accent-s);';
@@ -1367,29 +1384,34 @@ function renderMemories(){
     items.forEach(m=>{
       const row = document.createElement('div');
       row.style.cssText='display:flex;gap:6px;align-items:flex-start;padding:8px 16px 12px;';
+      const main = document.createElement('div');
+      main.style.cssText='flex:1;min-width:0;';
       const txt = document.createElement('div');
-      txt.style.cssText='flex:1;font-size:14px;line-height:1.6;color:var(--text);white-space:pre-wrap;word-break:break-word;';
-      txt.textContent = m.text;
-      const editBtn = document.createElement('button');
-      editBtn.textContent='编辑';
-      editBtn.style.cssText='background:none;border:none;color:var(--text-dim);font-size:12px;cursor:pointer;padding:2px 4px;flex-shrink:0;';
-      editBtn.onclick=()=>startEditMemory(m.id);
-      const delBtn = document.createElement('button');
-      delBtn.textContent='删除';
-      delBtn.style.cssText='background:none;border:none;color:#e0657a;font-size:12px;cursor:pointer;padding:2px 4px;flex-shrink:0;';
-      delBtn.onclick=()=>deleteMemory(m.id);
-      row.appendChild(txt);
-      if(m.auto){
-        const tag = document.createElement('span');
-        tag.textContent = '自动';
-        tag.style.cssText = 'font-size:10px;color:var(--text-pale);border:1px solid var(--border);border-radius:6px;padding:1px 5px;flex-shrink:0;margin-top:3px;';
-        row.appendChild(tag);
-      }
-      row.appendChild(editBtn); row.appendChild(delBtn);
+      txt.style.cssText='font-size:14px;line-height:1.6;color:var(--text);white-space:pre-wrap;word-break:break-word;';
+      txt.textContent = (m.pinned ? '★ ' : '') + m.text;
+      const meta = document.createElement('div');
+      meta.style.cssText='font-size:11px;color:var(--text-pale);margin-top:4px;';
+      const d = m.ts ? new Date(m.ts) : null;
+      meta.textContent = (m.auto ? 'Zephyr 自动记的' : '手动记的') + (d ? ' · ' + d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() : '');
+      main.appendChild(txt); main.appendChild(meta);
+      row.appendChild(main);
+      const mkBtn = (label, fn, color)=>{
+        const b = document.createElement('button');
+        b.textContent = label;
+        b.style.cssText = 'background:none;border:none;color:' + color + ';font-size:12px;cursor:pointer;padding:2px 4px;flex-shrink:0;';
+        b.onclick = fn;
+        return b;
+      };
+      row.appendChild(mkBtn(m.pinned ? '已置顶' : '置顶', ()=>togglePinMemory(m.id), m.pinned ? 'var(--accent-s)' : 'var(--text-dim)'));
+      row.appendChild(mkBtn('编辑', ()=>startEditMemory(m.id), 'var(--text-dim)'));
+      row.appendChild(mkBtn('删除', ()=>deleteMemory(m.id), '#e0657a'));
       card.appendChild(row);
     });
     wrap.appendChild(card);
   });
+  if(q && !shown){
+    wrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:24px 0;">没有找到包含「' + q.replace(/</g,'') + '」的记忆</div>';
+  }
 }
 function saveMemoryEdit(){
   const input = document.getElementById('memInput');
