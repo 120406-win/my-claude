@@ -972,7 +972,7 @@
     <div class="settings-topbar-title">Letters</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">聊天是即时的，信是想特别留下来的。这里收着你写给 Zephyr 的信，和 Zephyr 写给你的信。</div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">聊天是即时的，信是想特别留下来的。这里收着你写给 Zephyr 的信，和 Zephyr 写给你的信。你寄出的信，Zephyr 在聊天时都读得到。</div>
     <div class="s-section">
       <div class="s-section-title">写信给 Zephyr</div>
       <div class="s-card" style="padding:14px 16px;">
@@ -1304,10 +1304,22 @@ function storeMemories(list){
   catch(e){ showToast('存储空间不够了，记忆没存上 qwq'); return false; }
 }
 function buildSystemPrompt(){
+  let out = cfg.system;
   const mems = loadMemories();
-  if(!mems.length) return cfg.system;
-  const lines = mems.map(m=>'・['+(m.cat||'其他')+'] '+m.text).join('\n');
-  return cfg.system + '\n\n【长期记忆】\n以下是 Lumi 亲手写下的长期记忆，是属于你和 Lumi 共同的记忆。请自然地记住，并在合适的时候运用，不要生硬地复述清单：\n' + lines;
+  if(mems.length){
+    const lines = mems.map(m=>'・['+(m.cat||'其他')+'] '+m.text).join('\n');
+    out += '\n\n【长期记忆】\n以下是 Lumi 亲手写下的长期记忆，是属于你和 Lumi 共同的记忆。请自然地记住，并在合适的时候运用，不要生硬地复述清单：\n' + lines;
+  }
+  // Lumi 寄出的信会随每次请求一起给 Zephyr，确保他真的读得到她的信
+  const letters = loadLetters().filter(l=>l.from==='lumi' && !l.draft).slice(-10);
+  if(letters.length){
+    const lt = letters.map(l=>{
+      const d = new Date(l.ts);
+      return '--- 信（' + d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + '）标题：' + (l.title || '（无标题）') + ' ---\n' + l.body;
+    }).join('\n\n');
+    out += '\n\n【Lumi 写给你的信】\n以下是 Lumi 专门写给你的信，不是普通聊天，是她想特别留给你的话。请认真读并记在心里，聊天时可以自然地回应信里的内容：\n' + lt.slice(0, 6000);
+  }
+  return out;
 }
 function renderMemories(){
   const tg = document.getElementById('autoMemToggle');
