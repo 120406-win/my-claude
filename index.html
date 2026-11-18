@@ -295,7 +295,14 @@
       color:var(--text);
     }
     .nav-item.active { color:var(--accent-s); }
-    .nav-icon { font-size:17px; width:22px; text-align:center; flex-shrink:0; }
+    .nav-icon { font-size:17px; width:22px; text-align:center; flex-shrink:0; display:flex; align-items:center; justify-content:center; color:var(--text-dim); }
+    .nav-icon svg { width:19px; height:19px; display:block; }
+    .nav-item.active .nav-icon { color:var(--accent-s); }
+    .call-btn, .vcbtn { color:#fff; }
+    .call-btn svg, .vcbtn svg { width:27px; height:27px; display:block; }
+    .rec-circle svg { width:46px; height:46px; display:block; color:#fff; }
+    .call-avatar-big, .video-remote-avatar { overflow:hidden; }
+    .call-avatar-big img, .video-remote-avatar img { width:100%; height:100%; object-fit:cover; }
     .nav-divider { height:1px; background:var(--border); margin:8px 12px; }
     .conv-item {
       display:flex; align-items:center; gap:10px;
@@ -607,10 +614,10 @@
 
   <div class="nav-section">
     <div class="nav-item active" id="nav-chat" onclick="navTo('chat')">
-      <span class="nav-icon">💬</span> Chat
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></span> Chat
     </div>
     <div class="nav-item" id="nav-settings" onclick="navTo('settings')">
-      <span class="nav-icon">⚙️</span> Settings
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.24.6.86 1 1.51 1H21a2 2 0 1 1 0 4h-.09c-.65 0-1.27.4-1.51 1z"/></svg></span> Settings
     </div>
   </div>
 
@@ -629,13 +636,13 @@
   <div class="nav-section">
     <div class="nav-label">Memory</div>
     <div class="nav-item" onclick="showToast('记忆系统即将上线 ^ ^')">
-      <span class="nav-icon">🧠</span> Memory
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.5C7 16.5 3.5 13.3 3.5 9.6 3.5 7 5.5 5 8 5c1.7 0 3.2.9 4 2.3C12.8 5.9 14.3 5 16 5c2.5 0 4.5 2 4.5 4.6 0 3.7-3.5 6.9-8.5 10.9z"/></svg></span> Memory
     </div>
     <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
-      <span class="nav-icon">🌙</span> Dreams
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span> Dreams
     </div>
     <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
-      <span class="nav-icon">🖼️</span> Darkroom
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4.5 17.5l4.8-4.8 3 3 3.2-3.2 4 4"/></svg></span> Darkroom
     </div>
   </div>
 </div>
@@ -825,19 +832,19 @@
 
 <!-- 录音遮罩 -->
 <div class="rec-overlay" id="recOverlay">
-  <div class="rec-circle">🎤</div>
+  <div class="rec-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v3.2"/><path d="M9 20.5h6"/></svg></div>
   <div class="rec-tip" id="recTip">松开发送</div>
   <div style="color:#ff8888;font-size:13px">上滑取消</div>
 </div>
 
 <!-- 语音通话 -->
 <div class="call-modal" id="callModal">
-  <div class="call-avatar-big">🌙</div>
+  <div class="call-avatar-big" id="callAvatarBig"><svg viewBox="0 0 24 24" width="52" height="52"><path fill="#ffd97a" d="M20 13.5A8.5 8.5 0 1 1 10.5 4a7 7 0 0 0 9.5 9.5z"/></svg></div>
   <div class="call-name">Zephyr</div>
   <div class="call-timer" id="callTimer">00:00</div>
   <div class="call-btns">
-    <button class="call-btn btn-mic" id="callMicBtn">🎤</button>
-    <button class="call-btn btn-hang" id="callHangBtn">📵</button>
+    <button class="call-btn btn-mic" id="callMicBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v3.2"/><path d="M9 20.5h6"/></svg></button>
+    <button class="call-btn btn-hang" id="callHangBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(135 12 12)"><path d="M5.2 4h3l1.5 4-2 1.5a12 12 0 0 0 5.8 5.8l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A19.5 19.5 0 0 1 3.2 6.2 2 2 0 0 1 5.2 4z"/></g></svg></button>
   </div>
 </div>
 
@@ -845,14 +852,14 @@
 <div class="video-modal" id="videoModal">
   <div class="video-timer" id="videoTimer">00:00</div>
   <div class="video-remote">
-    <div class="video-remote-avatar">🌙</div>
+    <div class="video-remote-avatar" id="videoAvatarBig"><svg viewBox="0 0 24 24" width="54" height="54"><path fill="#ffd97a" d="M20 13.5A8.5 8.5 0 1 1 10.5 4a7 7 0 0 0 9.5 9.5z"/></svg></div>
     <div style="color:white;font-size:20px;font-weight:600">Zephyr</div>
   </div>
   <video id="localVideo" autoplay muted playsinline></video>
   <div class="video-controls">
-    <button class="vcbtn vcbtn-mic"  id="vMicBtn">🎤</button>
-    <button class="vcbtn vcbtn-cam"  id="vCamBtn">📷</button>
-    <button class="vcbtn vcbtn-hang" id="vHangBtn">📵</button>
+    <button class="vcbtn vcbtn-mic"  id="vMicBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v3.2"/><path d="M9 20.5h6"/></svg></button>
+    <button class="vcbtn vcbtn-cam"  id="vCamBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.5" width="12.5" height="9.5" rx="3"/><path d="M15.5 10.8l5-2.8v8.5l-5-2.8"/></svg></button>
+    <button class="vcbtn vcbtn-hang" id="vHangBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(135 12 12)"><path d="M5.2 4h3l1.5 4-2 1.5a12 12 0 0 0 5.8 5.8l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A19.5 19.5 0 0 1 3.2 6.2 2 2 0 0 1 5.2 4z"/></g></svg></button>
   </div>
 </div>
 
@@ -1295,6 +1302,7 @@ function setupAvatarUpload(inputId, previewId, cfgKey, storeKey){
       document.querySelectorAll(`.msg-row.${isUserAvatar ? 'user' : 'ai'} .msg-avatar`).forEach(oldAv=>{
         oldAv.replaceWith(getAvatarEl(isUserAvatar));
       });
+      if(storeKey==='z_avatarZephyr') syncCallAvatars();
       showToast('头像已更新 ✓');
     };
     reader.readAsDataURL(file);
@@ -1337,7 +1345,7 @@ function addVoiceMsg(blob,dur,isUser){
   const col=addRow(isUser);
   const url=URL.createObjectURL(blob);
   const wrap=document.createElement('div'); wrap.className='voice-bubble';
-  const icon=document.createElement('span'); icon.className='voice-icon'; icon.textContent='🔊';
+  const icon=document.createElement('span'); icon.className='voice-icon'; icon.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path fill="currentColor" stroke="none" d="M5 9.8v4.4h3.2L14 18.6V5.4L8.2 9.8H5z"/><path d="M16.8 9.2a4.2 4.2 0 0 1 0 5.6"/></svg>';
   const waves=document.createElement('div'); waves.className='voice-waves';
   [6,10,14,10,8,12,16,12,8,10,6].forEach((h,i)=>{ const bar=document.createElement('div'); bar.className='voice-bar'; bar.style.cssText=`height:${h}px;--s:${(0.3+i*0.05).toFixed(2)}s;animation-delay:${(i*0.06).toFixed(2)}s`; waves.appendChild(bar); });
   const durEl=document.createElement('span'); durEl.className='voice-dur'; durEl.textContent=`${Math.round(dur)}"`;
@@ -1435,6 +1443,23 @@ async function speakText(text){
 // ══ 语音朗读开关 ══
 const ICON_SPK_ON  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path fill="currentColor" stroke="none" d="M5 9.8v4.4h3.2L14 18.6V5.4L8.2 9.8H5z"/><path d="M16.8 9.2a4.2 4.2 0 0 1 0 5.6"/><path d="M19 6.8a7.4 7.4 0 0 1 0 10.4"/></svg>';
 const ICON_SPK_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path fill="currentColor" stroke="none" d="M5 9.8v4.4h3.2L14 18.6V5.4L8.2 9.8H5z"/><path d="M16.5 9.8l5 5M21.5 9.8l-5 5"/></svg>';
+const ICON_MIC     = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v3.2"/><path d="M9 20.5h6"/></svg>';
+const ICON_MIC_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v3.2"/><path d="M4.5 4.5l15 15"/></svg>';
+const ICON_CAM     = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.5" width="12.5" height="9.5" rx="3"/><path d="M15.5 10.8l5-2.8v8.5l-5-2.8"/></svg>';
+const ICON_CAM_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.5" width="12.5" height="9.5" rx="3"/><path d="M15.5 10.8l5-2.8v8.5l-5-2.8"/><path d="M3.5 3.5l17 17"/></svg>';
+const ICON_MOON_BIG = '<svg viewBox="0 0 24 24" width="52" height="52"><path fill="#ffd97a" d="M20 13.5A8.5 8.5 0 1 1 10.5 4a7 7 0 0 0 9.5 9.5z"/></svg>';
+
+// 通话/视频页的大头像：有自定义头像就用图片，没有就用小月亮，和聊天头像保持一致
+function syncCallAvatars(){
+  const src = localStorage.getItem('z_avatarZephyr');
+  ['callAvatarBig','videoAvatarBig'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.innerHTML = (src && src.startsWith('data:'))
+      ? '<img src="'+src+'" alt="">'
+      : ICON_MOON_BIG;
+  });
+}
 let voiceEnabled = localStorage.getItem('z_voiceEnabled') === 'true';
 const voiceToggleBtn = document.getElementById('voiceToggleBtn');
 function renderVoiceToggle(){
@@ -1596,8 +1621,8 @@ document.getElementById('callHangBtn').addEventListener('click',()=>{
 // 通话中麦克风按钮 - 切换静音
 document.getElementById('callMicBtn').addEventListener('click',()=>{
   callMicActive = !callMicActive;
-  if(callMicActive){ startCallSTT(); document.getElementById('callMicBtn').textContent='🎤'; }
-  else { callRecognition?.stop(); document.getElementById('callMicBtn').textContent='🔇'; }
+  if(callMicActive){ startCallSTT(); document.getElementById('callMicBtn').innerHTML=ICON_MIC; }
+  else { callRecognition?.stop(); document.getElementById('callMicBtn').innerHTML=ICON_MIC_OFF; }
 });
 
 // ══ 视频通话 ══
@@ -1615,8 +1640,8 @@ document.getElementById('vHangBtn').addEventListener('click',()=>{
   showToast(`视频通话结束 ${document.getElementById('videoTimer').textContent}`);
 });
 let camOn=true,vMicOn=true;
-document.getElementById('vCamBtn').addEventListener('click',()=>{ camOn=!camOn; localStream?.getVideoTracks().forEach(t=>t.enabled=camOn); document.getElementById('vCamBtn').textContent=camOn?'📷':'🚫'; });
-document.getElementById('vMicBtn').addEventListener('click',()=>{ vMicOn=!vMicOn; localStream?.getAudioTracks().forEach(t=>t.enabled=vMicOn); document.getElementById('vMicBtn').textContent=vMicOn?'🎤':'🔇'; });
+document.getElementById('vCamBtn').addEventListener('click',()=>{ camOn=!camOn; localStream?.getVideoTracks().forEach(t=>t.enabled=camOn); document.getElementById('vCamBtn').innerHTML=camOn?ICON_CAM:ICON_CAM_OFF; });
+document.getElementById('vMicBtn').addEventListener('click',()=>{ vMicOn=!vMicOn; localStream?.getAudioTracks().forEach(t=>t.enabled=vMicOn); document.getElementById('vMicBtn').innerHTML=vMicOn?ICON_MIC:ICON_MIC_OFF; });
 
 // ══ 初始化 ══
 loadSettings();
@@ -1625,6 +1650,7 @@ loadChatHistory();
 setupAvatarUpload('avatarZephyrInput', 'avatarZephyrPreview', 'avatarZephyr', 'z_avatarZephyr');
 setupAvatarUpload('avatarUserInput', 'avatarUserPreview', 'avatarUser', 'z_avatarUser');
 loadAvatarPreviews();
+syncCallAvatars();
 // 聊天背景：注册控件并应用已保存的背景（模式/颜色/图片都和主题独立）
 setupBgControls();
 applyBackground();
