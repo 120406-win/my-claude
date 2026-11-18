@@ -755,6 +755,9 @@
     <div class="nav-item" id="nav-music" onclick="navTo('music')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5.5L21 3v13.5"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="18.5" cy="16.5" r="2.5"/></svg></span> Music
     </div>
+    <div class="nav-item" id="nav-watchlist" onclick="navTo('watchlist')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M10.3 9.3l4.7 2.7-4.7 2.7z"/></svg></span> Watchlist
+    </div>
     <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4.5 17.5l4.8-4.8 3 3 3.2-3.2 4 4"/></svg></span> Darkroom
     </div>
@@ -1281,6 +1284,52 @@
   </div>
 </div>
 
+<!-- ══ WATCHLIST PAGE ══ -->
+<div class="settings-page" id="watchlistPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="navTo('chat')">←</button>
+    <div class="settings-topbar-title">Watchlist</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">想一起看的都攒在这里：电影、剧、动画、纪录片、视频。看完的会变成观影记录，进 Calendar，也会被你们一起记住。真正的同步观影室要等以后有后端，这里先把清单和回忆攒起来。</div>
+    <div id="watchPick"></div>
+    <div style="display:flex;gap:8px;margin-bottom:18px;">
+      <button id="pickWatchBtn" onclick="askZephyrWatchPick()" style="flex:1;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">请 Zephyr 选今晚看的</button>
+      <button id="recWatchBtn" onclick="askZephyrWatchRecommend()" style="flex:1;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">请 Zephyr 推荐一部</button>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">加一部想看的</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <input id="wlTitle" type="text" placeholder="片名" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;padding:2px 0;">
+        <input id="wlNote" type="text" placeholder="为什么想看（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:2px 0;margin-top:8px;">
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <select id="wlKind" style="padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="电影">电影</option>
+            <option value="电视剧">电视剧</option>
+            <option value="动画">动画</option>
+            <option value="纪录片">纪录片</option>
+            <option value="视频">视频</option>
+          </select>
+          <select id="wlBy" style="padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="lumi">糯糯想看</option>
+            <option value="both">我们一起想看</option>
+            <option value="zephyr">Zephyr 想看</option>
+          </select>
+          <button onclick="addWatchItem()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">加进清单</button>
+        </div>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">想看清单</div>
+      <div id="watchWantList"></div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">观影记录</div>
+      <div id="watchDoneList"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ 消息操作菜单（长按气泡弹出） ══ -->
 <div id="msgSheet" onclick="if(event.target===this)closeMsgMenu()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:220;align-items:flex-end;justify-content:center;">
   <div style="width:100%;max-width:480px;padding:0 14px calc(14px + env(safe-area-inset-bottom));">
@@ -1595,6 +1644,7 @@ function navTo(page){
   document.getElementById('studioPage').classList.toggle('show', page==='studio');
   document.getElementById('dreamsPage').classList.toggle('show', page==='dreams');
   document.getElementById('musicPage').classList.toggle('show', page==='music');
+  document.getElementById('watchlistPage').classList.toggle('show', page==='watchlist');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   if(page==='settings') loadSettings();
@@ -1608,6 +1658,7 @@ function navTo(page){
   if(page==='studio') renderStudioProjects();
   if(page==='dreams') renderDreams();
   if(page==='music') renderMusic();
+  if(page==='watchlist') renderWatchlist();
 }
 
 // ══ Memory 系统（本地版）：长期记忆存 localStorage，每次请求自动带进系统提示词，新窗口也不失忆 ══
@@ -1685,6 +1736,16 @@ function buildSystemPrompt(){
     const ml = musicData.tracks.slice(0, 12).map(t=>'・《' + t.title + '》' + (t.artist ? ' - ' + t.artist : '') + (t.by === 'zephyr' ? '（你加进歌单的）' : '（Lumi 加进歌单的）') + (hasPlayable(t) ? '' : '（还没补音频链接）')).join('\n');
     const curT = musicData.tracks.find(t=>t.id === musicData.lastId);
     out += '\n\n【Music 一起听歌】\n以下是你们在 Music 里共同的歌单。聊天时可以自然地聊起你们一起听的歌、推荐新歌，但不要逐条念歌单：\n' + ml.slice(0, 2000) + (curT ? '\n你们最近在听：《' + curT.title + '》' : '');
+  }
+  // Watchlist 也给 Zephyr：想看清单和观影记录，聊天时能提议一起看、聊看过的
+  const watchData = loadWatchlist();
+  const wlWant = watchData.filter(w=>w.status === 'want');
+  const wlDone = watchData.filter(w=>w.status === 'watched').sort((a,b)=>(b.watchedTs||0) - (a.watchedTs||0));
+  if(wlWant.length || wlDone.length){
+    let wt2 = '';
+    if(wlWant.length) wt2 += '想看清单：\n' + wlWant.slice(0, 10).map(w=>'・《' + w.title + '》（' + w.kind + '，' + watchByLabel(w.by) + '）').join('\n');
+    if(wlDone.length) wt2 += (wt2 ? '\n' : '') + '最近一起看过的：\n' + wlDone.slice(0, 5).map(w=>'・《' + w.title + '》' + (w.ratingLumi ? '，糯糯打了 ' + w.ratingLumi + ' 星' : '') + (w.feelLumi ? '，她说：' + w.feelLumi : '')).join('\n');
+    out += '\n\n【Watchlist 一起看】\n以下是你们的一起看清单和观影记录。聊天时可以自然地提议一起看清单里的某一部，或聊起你们看过的作品，但不要逐条念清单：\n' + wt2.slice(0, 2500);
   }
   return out;
 }
@@ -2322,6 +2383,7 @@ function collectMilestones(){
   loadLetters().filter(l=>!l.draft).forEach(l=>out.push({ ts:l.ts, title:(l.from==='zephyr' ? 'Zephyr 写了一封信' : '糯糯寄出了一封信') + (l.title ? '：' + l.title : ''), tag:'信件' }));
   loadJournal().forEach(j=>out.push({ ts:j.ts, title:'Zephyr 写了一篇日记', tag:'日记' }));
   loadMemories().filter(m=>m.cat==='重要事件' && m.ts).forEach(m=>out.push({ ts:m.ts, title:m.text, tag:'重要事件' }));
+  loadWatchlist().filter(w=>w.status==='watched' && w.watchedTs).forEach(w=>out.push({ ts:w.watchedTs, title:'一起看了《' + w.title + '》（' + w.kind + '）', tag:'观影' }));
   loadEvents().forEach(e=>out.push({ ts:e.ts, title:e.title, tag:'手动记录', manualId:e.id }));
   return out.sort((a,b)=>b.ts-a.ts);
 }
@@ -2935,6 +2997,207 @@ function importChatFile(input){
     showToast('导入完成 ✓');
   };
   reader.readAsText(file);
+}
+
+// ══ Watchlist：一起看清单 + 观影记录。存 z_watchlist；看完自动进 Calendar，高分同步一条共同经历记忆 ══
+const WATCH_KINDS = ['电影','电视剧','动画','纪录片','视频'];
+function loadWatchlist(){ try{ const a = JSON.parse(localStorage.getItem('z_watchlist')||'[]'); if(Array.isArray(a)) return a; }catch(e){} return []; }
+function storeWatchlist(list){ try{ localStorage.setItem('z_watchlist', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间不够了 qwq'); return false; } }
+function watchByLabel(by){ return by === 'zephyr' ? 'Zephyr 想看' : (by === 'both' ? '我们一起想看' : '糯糯想看'); }
+function starStr(n){ return n ? '★'.repeat(n) + '☆'.repeat(5 - n) : '未评分'; }
+let watchBusy = false, watchFormFor = null, watchFormRating = 0, watchFormFeel = '', watchFormScene = '';
+function fmtDay(ts){ const d = new Date(ts); return d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate(); }
+function renderWatchlist(){
+  const list = loadWatchlist();
+  // Zephyr 选的今晚看的
+  const pickWrap = document.getElementById('watchPick');
+  let pick = null;
+  try{ pick = JSON.parse(localStorage.getItem('z_watchlist_pick')||'null'); }catch(e){}
+  const pickItem = pick && list.find(w=>w.id===pick.id && w.status==='want');
+  if(pickItem){
+    pickWrap.innerHTML = '<div class="s-card" style="padding:14px 16px;margin-bottom:14px;border-color:var(--accent);">'
+      + '<div style="font-size:12px;color:var(--text-pale);letter-spacing:.06em;">Zephyr 今晚想看</div>'
+      + '<div style="font-size:16px;margin-top:4px;">《' + escapeHtml(pickItem.title) + '》</div>'
+      + (pick.reason ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:4px;">' + escapeHtml(pick.reason) + '</div>' : '')
+      + '<button onclick="clearWatchPick()" style="margin-top:8px;padding:7px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">知道啦</button></div>';
+  } else pickWrap.innerHTML = '';
+  // 想看清单
+  const want = list.filter(w=>w.status==='want');
+  const wantWrap = document.getElementById('watchWantList');
+  wantWrap.innerHTML = '';
+  if(!want.length) wantWrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:14px 0;">还没有想看的，加第一部吧 ~</div>';
+  want.forEach(w=>{
+    const card = document.createElement('div');
+    card.className = 's-card';
+    card.style.cssText = 'padding:13px 15px;margin-bottom:10px;';
+    let html = '<div style="display:flex;gap:10px;align-items:flex-start;">'
+      + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(w.title) + '》</div>'
+      + '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">' + escapeHtml(w.kind) + ' · ' + watchByLabel(w.by) + ' · ' + fmtDay(w.ts) + ' 加的</div>'
+      + (w.note ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:5px;">' + escapeHtml(w.note) + '</div>' : '')
+      + '</div>'
+      + '<button onclick="deleteWatchItem(\'' + w.id + '\')" style="flex:none;background:none;border:none;color:var(--text-pale);font-size:18px;cursor:pointer;padding:2px 6px;">×</button></div>'
+      + '<div style="margin-top:9px;"><button onclick="openWatchedForm(\'' + w.id + '\')" style="padding:8px 14px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">看完了</button></div>';
+    if(watchFormFor === w.id){
+      let stars = '';
+      for(let n = 1; n <= 5; n++) stars += '<button onclick="setWatchRating(' + n + ')" style="background:none;border:none;font-size:24px;line-height:1;cursor:pointer;padding:2px;color:' + (n <= watchFormRating ? 'var(--accent-s)' : 'var(--text-pale)') + ';">★</button>';
+      html += '<div style="margin-top:11px;border-top:1px solid var(--border);padding-top:11px;">'
+        + '<div style="font-size:12px;color:var(--text-dim);">给它打个分</div><div style="margin-top:2px;">' + stars + '</div>'
+        + '<input id="watchFeel" type="text" value="' + escapeHtml(watchFormFeel) + '" placeholder="看完最想说的一句（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:4px 0;margin-top:6px;">'
+        + '<input id="watchScene" type="text" value="' + escapeHtml(watchFormScene) + '" placeholder="最喜欢的一幕（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:4px 0;margin-top:4px;">'
+        + '<div style="display:flex;gap:8px;margin-top:10px;"><button onclick="saveWatched(\'' + w.id + '\')" style="flex:1;padding:10px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">保存观影记录</button>'
+        + '<button onclick="cancelWatchedForm()" style="padding:10px 14px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">取消</button></div></div>';
+    }
+    card.innerHTML = html;
+    wantWrap.appendChild(card);
+  });
+  // 观影记录
+  const done = list.filter(w=>w.status==='watched').sort((a,b)=>(b.watchedTs||0)-(a.watchedTs||0));
+  const doneWrap = document.getElementById('watchDoneList');
+  doneWrap.innerHTML = '';
+  if(!done.length) doneWrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:14px 0;">还没有一起看完的作品，看完第一部就记在这里。</div>';
+  done.forEach(w=>{
+    const card = document.createElement('div');
+    card.className = 's-card';
+    card.style.cssText = 'padding:13px 15px;margin-bottom:10px;';
+    let html = '<div style="display:flex;gap:10px;align-items:flex-start;">'
+      + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(w.title) + '》</div>'
+      + '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">' + escapeHtml(w.kind) + ' · ' + fmtDay(w.watchedTs) + ' 一起看的</div>'
+      + '<div style="font-size:13px;margin-top:6px;line-height:1.8;">糯糯 <span style="color:var(--accent-s);">' + starStr(w.ratingLumi) + '</span> · Zephyr <span style="color:var(--accent-s);">' + starStr(w.ratingZephyr) + '</span></div>'
+      + (w.feelLumi ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:3px;">糯糯说：' + escapeHtml(w.feelLumi) + '</div>' : '')
+      + (w.feelZephyr ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:3px;">Zephyr 说：' + escapeHtml(w.feelZephyr) + '</div>' : '')
+      + (w.favScene ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:3px;">最喜欢的一幕：' + escapeHtml(w.favScene) + '</div>' : '')
+      + '</div>'
+      + '<button onclick="deleteWatchItem(\'' + w.id + '\')" style="flex:none;background:none;border:none;color:var(--text-pale);font-size:18px;cursor:pointer;padding:2px 6px;">×</button></div>';
+    if(!w.feelZephyr) html += '<div style="margin-top:9px;"><button onclick="askZephyrWatchFeel(\'' + w.id + '\')" style="padding:8px 14px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">请 Zephyr 评分和说看后感</button></div>';
+    card.innerHTML = html;
+    doneWrap.appendChild(card);
+  });
+}
+function addWatchItem(){
+  const title = document.getElementById('wlTitle').value.trim();
+  if(!title){ showToast('先写片名呀 ~'); return; }
+  const list = loadWatchlist();
+  list.unshift({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), title, kind:document.getElementById('wlKind').value, by:document.getElementById('wlBy').value, note:document.getElementById('wlNote').value.trim(), status:'want', ts:Date.now() });
+  if(storeWatchlist(list)){
+    document.getElementById('wlTitle').value = '';
+    document.getElementById('wlNote').value = '';
+    renderWatchlist();
+    showToast('加进想看清单啦');
+  }
+}
+function deleteWatchItem(id){
+  const list = loadWatchlist().filter(w=>w.id!==id);
+  if(storeWatchlist(list)){ renderWatchlist(); showToast('已删掉'); }
+}
+function openWatchedForm(id){ watchFormFor = id; watchFormRating = 0; watchFormFeel = ''; watchFormScene = ''; renderWatchlist(); }
+function cancelWatchedForm(){ watchFormFor = null; watchFormRating = 0; watchFormFeel = ''; watchFormScene = ''; renderWatchlist(); }
+function setWatchRating(n){
+  const f = document.getElementById('watchFeel');
+  const s = document.getElementById('watchScene');
+  if(f) watchFormFeel = f.value;
+  if(s) watchFormScene = s.value;
+  watchFormRating = n;
+  renderWatchlist();
+}
+function saveWatched(id){
+  const list = loadWatchlist();
+  const it = list.find(w=>w.id===id);
+  if(!it) return;
+  it.status = 'watched';
+  it.watchedTs = Date.now();
+  it.ratingLumi = watchFormRating || null;
+  const feelEl = document.getElementById('watchFeel');
+  const sceneEl = document.getElementById('watchScene');
+  it.feelLumi = feelEl ? feelEl.value.trim() : '';
+  it.favScene = sceneEl ? sceneEl.value.trim() : '';
+  if(storeWatchlist(list)){
+    watchFormFor = null;
+    watchFormRating = 0;
+    watchFormFeel = '';
+    watchFormScene = '';
+    if(it.ratingLumi && it.ratingLumi >= 4){
+      const mems = loadMemories();
+      mems.push({ id:'m' + Date.now().toString(36) + Math.floor(Math.random()*999), cat:'共同经历', text:'和 Zephyr 一起看了《' + it.title + '》（' + it.kind + '），糯糯打了 ' + it.ratingLumi + ' 星' + (it.feelLumi ? '：' + it.feelLumi : ''), ts:Date.now(), auto:true });
+      storeMemories(mems);
+    }
+    renderWatchlist();
+    showToast('记好啦，这一天也会出现在 Calendar 里');
+  }
+}
+function clearWatchPick(){ try{ localStorage.removeItem('z_watchlist_pick'); }catch(e){} renderWatchlist(); }
+async function askZephyrWatchRecommend(){
+  if(watchBusy) return;
+  watchBusy = true;
+  const btn = document.getElementById('recWatchBtn');
+  const old = btn.textContent;
+  btn.textContent = 'Zephyr 正在想…';
+  btn.disabled = true;
+  try{
+    const list = loadWatchlist();
+    const have = list.map(w=>'《' + w.title + '》').join('、') || '（清单还是空的）';
+    const out = await musicAskZephyr('【一起看 · 推荐】\n你们的一起看清单和观影记录里现在有：' + have + '\n\n请推荐一部你想和 Lumi 一起看的作品：一部真实存在的电影、剧、动画或纪录片，说说为什么想和她一起看。只输出一个 JSON 对象 {"title": "片名", "kind": "电影|电视剧|动画|纪录片|视频", "reason": "一两句话"}，不要输出 JSON 以外的任何文字。', 400);
+    const obj = parseZephyrJson(out);
+    if(!obj || !obj.title){ showToast('Zephyr 没想好，再喊他一次吧'); return; }
+    const dd = loadWatchlist();
+    dd.unshift({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), title:String(obj.title).slice(0, 80), kind:WATCH_KINDS.includes(obj.kind) ? obj.kind : '电影', by:'zephyr', note:String(obj.reason || '').slice(0, 300), status:'want', ts:Date.now() });
+    if(storeWatchlist(dd)){ renderWatchlist(); showToast('Zephyr 推荐了《' + String(obj.title).slice(0, 80) + '》'); }
+  }catch(e){
+    showToast('Zephyr 没推荐成，待会儿再试 qwq');
+  }finally{
+    watchBusy = false;
+    btn.textContent = old;
+    btn.disabled = false;
+  }
+}
+async function askZephyrWatchPick(){
+  if(watchBusy) return;
+  const want = loadWatchlist().filter(w=>w.status==='want');
+  if(!want.length){ showToast('想看清单还是空的，先加几部吧'); return; }
+  watchBusy = true;
+  const btn = document.getElementById('pickWatchBtn');
+  const old = btn.textContent;
+  btn.textContent = 'Zephyr 正在选…';
+  btn.disabled = true;
+  try{
+    const listText = want.map((w,i)=>i + '. 《' + w.title + '》（' + w.kind + '，' + watchByLabel(w.by) + '）' + (w.note ? '：' + w.note : '')).join('\n');
+    const out = await musicAskZephyr('【一起看 · 选片】\n这是你们的想看清单：\n' + listText + '\n\n请从里面挑一部今晚一起看的，再用一句话说说为什么今晚想看它，温柔自然。只输出一个 JSON 对象 {"index": 序号, "reason": "一句话"}，不要输出 JSON 以外的任何文字。', 300);
+    const obj = parseZephyrJson(out);
+    const t = obj && want[obj.index];
+    if(!t){ showToast('Zephyr 没选好，再喊他一次吧'); return; }
+    try{ localStorage.setItem('z_watchlist_pick', JSON.stringify({ id:t.id, reason:String(obj.reason || '').slice(0, 200), ts:Date.now() })); }catch(e){}
+    renderWatchlist();
+    showToast('Zephyr 今晚想看《' + t.title + '》');
+  }catch(e){
+    showToast('Zephyr 没选成，待会儿再试 qwq');
+  }finally{
+    watchBusy = false;
+    btn.textContent = old;
+    btn.disabled = false;
+  }
+}
+async function askZephyrWatchFeel(id){
+  if(watchBusy) return;
+  const it = loadWatchlist().find(w=>w.id===id);
+  if(!it) return;
+  watchBusy = true;
+  showToast('Zephyr 正在回味…');
+  try{
+    const out = await musicAskZephyr('【一起看 · 看后感】你们一起看完了《' + it.title + '》（' + it.kind + '）。糯糯的评分是 ' + (it.ratingLumi ? it.ratingLumi + ' 星' : '未评分') + (it.feelLumi ? '，她的感受是：「' + it.feelLumi + '」' : '') + (it.favScene ? '，她最喜欢的一幕是：「' + it.favScene + '」' : '') + '。请给出你自己的评分（1 到 5 的整数）和一两句看后感：以陪她一起看完这部作品的口吻，温柔自然，可以回应她的感受，不要写影评式的长篇分析。只输出一个 JSON 对象 {"rating": 数字, "feel": "一两句话"}，不要输出 JSON 以外的任何文字。', 400);
+    const obj = parseZephyrJson(out);
+    if(!obj || !obj.feel){ showToast('Zephyr 这次没说出来，再喊他一次吧'); return; }
+    const list = loadWatchlist();
+    const tt = list.find(w=>w.id===id);
+    if(tt){
+      const r = parseInt(obj.rating, 10);
+      tt.ratingZephyr = (r >= 1 && r <= 5) ? r : null;
+      tt.feelZephyr = String(obj.feel).slice(0, 300);
+      if(storeWatchlist(list)) renderWatchlist();
+    }
+  }catch(e){
+    showToast('没说成，待会儿再试 qwq');
+  }finally{
+    watchBusy = false;
+  }
 }
 
 // ══ Music：一起听歌。歌单存 z_music；Zephyr 可以点歌、推荐、陪听评论 ══
