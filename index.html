@@ -363,7 +363,7 @@
       position:relative; z-index:1; scroll-behavior:smooth;
     }
     .empty-tip { text-align:center; margin-top:80px; color:var(--text-pale); font-size:15px; }
-    .msg-row { display:flex; margin-bottom:14px; align-items:flex-end; gap:8px; }
+    .msg-row { display:flex; margin-bottom:14px; align-items:flex-end; gap:8px; -webkit-touch-callout:none; }
     .msg-row.user { flex-direction:row-reverse; }
     .msg-avatar {
       width:28px; height:28px; border-radius:50%;
@@ -1170,6 +1170,18 @@
     </div>
     <button id="zephyrDreamBtn" onclick="askZephyrDream()" style="width:100%;padding:13px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:14px;cursor:pointer;margin-bottom:18px;">请 Zephyr 讲一个梦</button>
     <div id="dreamList"></div>
+  </div>
+</div>
+
+<!-- ══ 消息操作菜单（长按气泡弹出） ══ -->
+<div id="msgSheet" onclick="if(event.target===this)closeMsgMenu()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:220;align-items:flex-end;justify-content:center;">
+  <div style="width:100%;max-width:480px;padding:0 14px calc(14px + env(safe-area-inset-bottom));">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:10px;">
+      <button id="msgSheetCopy" onclick="copyMsgText()" style="width:100%;padding:15px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">复制</button>
+      <button id="msgSheetRecall" onclick="recallMsg()" style="width:100%;padding:15px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">撤回</button>
+      <button onclick="deleteMsg()" style="width:100%;padding:15px;background:none;border:none;color:#e0657a;font-size:15px;cursor:pointer;">删除</button>
+    </div>
+    <button onclick="closeMsgMenu()" style="width:100%;padding:15px;border-radius:14px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">取消</button>
   </div>
 </div>
 
@@ -2883,7 +2895,8 @@ async function showPhotoToZephyr(id){
   if(!p) return;
   if(!cfg.apiKey){ showToast('请先在 Settings 里填写 API Key'); return; }
   navTo('chat');
-  addImgMsg(p.img, true);
+  const photoMid = genMsgId(); pendingUserMid = photoMid;
+  addImgMsg(p.img, true, false, photoMid);
   headerSub.textContent = '正在给 Zephyr 看照片…';
   showTyping();
   const parts = p.img.split(',');
@@ -2950,6 +2963,10 @@ function loadConversations(){
       conversations = [{ id: genConvId(), title: '日常聊天', messages: [] }];
     }
     activeConvId = savedActive && conversations.find(c=>c.id===savedActive) ? savedActive : conversations[0].id;
+    // 给旧消息补上稳定 id，长按撤回/删除要靠它定位
+    let midChanged = false;
+    conversations.forEach(c=>{ (c.messages||[]).forEach(m=>{ if(m && !m.mid){ m.mid = genMsgId(); midChanged = true; } }); });
+    if(midChanged) saveConversations();
   } catch(e){
     conversations = [{ id: genConvId(), title: '日常聊天', messages: [] }];
     activeConvId = conversations[0].id;
@@ -3045,17 +3062,29 @@ function renderMessagesIntoChat(){
   chatWrap.querySelector('.empty-tip')?.remove();
   messages.forEach(m=>{
     const isUser = m.role === 'user';
+    if(m.recalled){
+      const note = document.createElement('div');
+      note.className = 'msg-row';
+      note.dataset.mid = m.mid;
+      note.style.cssText = 'justify-content:center;';
+      const span = document.createElement('span');
+      span.style.cssText = 'font-size:11px;color:var(--text-pale);padding:2px 10px;';
+      span.textContent = (isUser ? '糯糯' : 'Zephyr') + ' 撤回了一条消息';
+      note.appendChild(span);
+      chatWrap.appendChild(note);
+      return;
+    }
     if(typeof m.content === 'string'){
-      addTextMsg(m.content, isUser);
+      addTextMsg(m.content, isUser, false, m.mid);
     } else if(Array.isArray(m.content)){
       const hasMedia = m.content.some(b=>b.type==='image'||b.type==='document');
       m.content.forEach(block=>{
         if(block.type === 'image' && block.source?.data){
-          addImgMsg(`data:${block.source.media_type};base64,${block.source.data}`, isUser);
+          addImgMsg(`data:${block.source.media_type};base64,${block.source.data}`, isUser, false, m.mid);
         } else if(block.type === 'document'){
-          addTextMsg('📄 文件', isUser);
+          addTextMsg('📄 文件', isUser, false, m.mid);
         } else if(block.type === 'text' && !hasMedia){
-          addTextMsg(block.text, isUser);
+          addTextMsg(block.text, isUser, false, m.mid);
         }
       });
     }
@@ -3128,9 +3157,77 @@ function loadAvatarPreviews(){
 
 // ══ 消息渲染 ══
 const chatWrap=document.getElementById('chatWrap');
-function addRow(isUser){
+// ══ 消息撤回/删除：长按（或右键）气泡弹出菜单。撤回会清掉内容并从发给 API 的历史里剔除，Zephyr 真的看不到 ══
+let msgMenuMid = null;
+function openMsgMenu(mid){
+  const m = messages.find(x=>x.mid===mid);
+  if(!m) return;
+  msgMenuMid = mid;
+  window.__suppressImgClick = Date.now();
+  const text = msgToText(m).trim();
+  document.getElementById('msgSheetCopy').style.display = (!m.recalled && text) ? '' : 'none';
+  document.getElementById('msgSheetRecall').style.display = (!m.recalled && m.role==='user') ? '' : 'none';
+  document.getElementById('msgSheet').style.display = 'flex';
+}
+function closeMsgMenu(){ document.getElementById('msgSheet').style.display = 'none'; msgMenuMid = null; }
+async function copyMsgText(){
+  const m = messages.find(x=>x.mid===msgMenuMid);
+  const text = m ? msgToText(m) : '';
+  closeMsgMenu();
+  if(!text) return;
+  try{ await navigator.clipboard.writeText(text); }
+  catch(e){
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); }catch(err){}
+    ta.remove();
+  }
+  showToast('已复制');
+}
+function recallMsg(){
+  const m = messages.find(x=>x.mid===msgMenuMid);
+  closeMsgMenu();
+  if(!m || m.recalled) return;
+  m.recalled = true;
+  m.content = '';
+  saveChatHistory();
+  renderMessagesIntoChat();
+  showToast('已撤回，Zephyr 不会再看到这条了');
+}
+function deleteMsg(){
+  const mid = msgMenuMid;
+  closeMsgMenu();
+  if(!mid) return;
+  const conv = getActiveConv();
+  conv.messages = conv.messages.filter(x=>x.mid!==mid);
+  messages = conv.messages;
+  saveConversations();
+  renderMessagesIntoChat();
+  showToast('已删除');
+}
+let lpTimer = null, lpX = 0, lpY = 0;
+chatWrap.addEventListener('pointerdown', e=>{
+  const row = e.target.closest('.msg-row');
+  if(!row || !row.dataset.mid) return;
+  lpX = e.clientX; lpY = e.clientY;
+  const mid = row.dataset.mid;
+  clearTimeout(lpTimer);
+  lpTimer = setTimeout(()=>openMsgMenu(mid), 550);
+});
+chatWrap.addEventListener('pointermove', e=>{
+  if(lpTimer && (Math.abs(e.clientX-lpX) > 12 || Math.abs(e.clientY-lpY) > 12)){ clearTimeout(lpTimer); lpTimer = null; }
+});
+['pointerup','pointercancel'].forEach(ev=>chatWrap.addEventListener(ev, ()=>{ clearTimeout(lpTimer); lpTimer = null; }));
+chatWrap.addEventListener('contextmenu', e=>{
+  const row = e.target.closest('.msg-row');
+  if(row && row.dataset.mid){ e.preventDefault(); openMsgMenu(row.dataset.mid); }
+});
+function genMsgId(){ return 'msg' + Date.now().toString(36) + Math.floor(Math.random()*99999); }
+let pendingUserMid = null; // 发消息方先生成 id，callAPI 写入消息时沿用，保证气泡和数据对得上
+function addRow(isUser, mid){
   chatWrap.querySelector('.empty-tip')?.remove();
   const row=document.createElement('div'); row.className=`msg-row ${isUser?'user':'ai'}`;
+  if(mid) row.dataset.mid = mid;
   const col=document.createElement('div'); col.className='msg-col';
   const time=document.createElement('div'); time.className='msg-time'; time.textContent=nowTime();
   const av = getAvatarEl(isUser);
@@ -3139,10 +3236,10 @@ function addRow(isUser){
   col.appendChild(time); row.appendChild(col);
   chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; return col;
 }
-function addTextMsg(text,isUser,skipSave){ const col=addRow(isUser); const b=document.createElement('div'); b.className='msg'; b.textContent=text; col.appendChild(b); chatWrap.scrollTop=chatWrap.scrollHeight; return b; }
-function addImgMsg(src,isUser,skipSave){ const col=addRow(isUser); const wrap=document.createElement('div'); wrap.className='msg-img-wrap'; const img=document.createElement('img'); img.className='msg-img'; img.src=src; img.onclick=()=>{ document.getElementById('imgPreviewEl').src=src; document.getElementById('imgPreview').classList.add('show'); }; wrap.appendChild(img); col.appendChild(wrap); chatWrap.scrollTop=chatWrap.scrollHeight; }
-function addVoiceMsg(blob,dur,isUser){
-  const col=addRow(isUser);
+function addTextMsg(text,isUser,skipSave,mid){ const col=addRow(isUser,mid); const b=document.createElement('div'); b.className='msg'; b.textContent=text; col.appendChild(b); chatWrap.scrollTop=chatWrap.scrollHeight; return b; }
+function addImgMsg(src,isUser,skipSave,mid){ const col=addRow(isUser,mid); const wrap=document.createElement('div'); wrap.className='msg-img-wrap'; const img=document.createElement('img'); img.className='msg-img'; img.src=src; img.onclick=()=>{ if(window.__suppressImgClick && Date.now()-window.__suppressImgClick<900) return; document.getElementById('imgPreviewEl').src=src; document.getElementById('imgPreview').classList.add('show'); }; wrap.appendChild(img); col.appendChild(wrap); chatWrap.scrollTop=chatWrap.scrollHeight; }
+function addVoiceMsg(blob,dur,isUser,mid){
+  const col=addRow(isUser,mid);
   const url=URL.createObjectURL(blob);
   const wrap=document.createElement('div'); wrap.className='voice-bubble';
   const icon=document.createElement('span'); icon.className='voice-icon'; icon.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path fill="currentColor" stroke="none" d="M5 9.8v4.4h3.2L14 18.6V5.4L8.2 9.8H5z"/><path d="M16.8 9.2a4.2 4.2 0 0 1 0 5.6"/></svg>';
@@ -3162,13 +3259,17 @@ const headerSub=document.getElementById('headerSub');
 async function callAPI(userText, extraBlocks=null){
   if(!cfg.apiKey){ showToast('请先在 Settings 里填写 API Key'); return null; }
   let content = extraBlocks ? [...extraBlocks, {type:'text', text:userText||'请看一下这个'}] : userText;
-  messages.push({role:'user',content});
+  const userMid = pendingUserMid || genMsgId();
+  pendingUserMid = null;
+  messages.push({role:'user',content,mid:userMid});
   try {
     const base=(cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/,'');
+    // 发给 API 的历史要清洗：去掉本地用的 mid，并跳过已撤回的消息（撤回 = Zephyr 真的看不到）
+    const apiMessages = messages.filter(m=>!m.recalled).map(m=>({role:m.role, content:m.content}));
     const res=await fetch(base+'/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:cfg.model,max_tokens:cfg.maxTokens,temperature:cfg.temperature,top_p:cfg.topP,system:buildSystemPrompt(),messages,stream:true})
+      body:JSON.stringify({model:cfg.model,max_tokens:cfg.maxTokens,temperature:cfg.temperature,top_p:cfg.topP,system:buildSystemPrompt(),messages:apiMessages,stream:true})
     });
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`HTTP ${res.status}`);}
 
@@ -3179,7 +3280,8 @@ async function callAPI(userText, extraBlocks=null){
     let bubble = null;
 
     hideTyping();
-    const col = addRow(false);
+    const asstMid = genMsgId();
+    const col = addRow(false, asstMid);
     bubble = document.createElement('div');
     bubble.className = 'msg';
     bubble.textContent = '';
@@ -3208,7 +3310,7 @@ async function callAPI(userText, extraBlocks=null){
       }
     }
 
-    messages.push({role:'assistant',content:reply});
+    messages.push({role:'assistant',content:reply,mid:asstMid});
     saveChatHistory();
     maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
     return reply;
@@ -3279,7 +3381,8 @@ voiceToggleBtn.addEventListener('click', () => {
 async function sendMessage(){
   const text=document.getElementById('msgInput').value.trim(); if(!text) return;
   document.getElementById('msgInput').value='';
-  addTextMsg(text,true); headerSub.textContent='正在输入…'; showTyping();
+  const mid = genMsgId(); pendingUserMid = mid;
+  addTextMsg(text,true,false,mid); headerSub.textContent='正在输入…'; showTyping();
   const reply=await callAPI(text); headerSub.textContent='在线';
   if(reply && (voiceEnabled||isCalling||isVideo)) speakText(reply);
 }
@@ -3294,7 +3397,8 @@ document.getElementById('fileInput').addEventListener('change',async e=>{
   reader.onload=async ev=>{
     const dataUrl=ev.target.result;
     const mediaType = file.type || 'image/jpeg';
-    addImgMsg(dataUrl,true); headerSub.textContent='正在识图…'; showTyping();
+    const mid = genMsgId(); pendingUserMid = mid;
+    addImgMsg(dataUrl,true,false,mid); headerSub.textContent='正在识图…'; showTyping();
     const block = {type:'image', source:{type:'base64', media_type: mediaType, data: dataUrl.split(',')[1]}};
     const reply=await callAPI('（糯糯发来了一张图片，请描述并自然地回应她）',[block]);
     hideTyping(); headerSub.textContent='在线';
@@ -3313,7 +3417,8 @@ document.getElementById('docInput').addEventListener('change', async e=>{
   headerSub.textContent = '正在读取文件…';
 
   // 文件消息气泡
-  const col = addRow(true);
+  const docMid = genMsgId(); pendingUserMid = docMid;
+  const col = addRow(true, docMid);
   const fileBubble = document.createElement('div');
   fileBubble.className = 'msg';
   fileBubble.textContent = '📄 ' + name;
@@ -3455,10 +3560,11 @@ async function onRecordStopped(blob){
   if(recordCancelled){ dropVoiceRec(); showToast('已取消'); return; }
   const dur=(Date.now()-recordStart)/1000;
   if(dur<0.5){ dropVoiceRec(); showToast('录音太短了'); return; }
-  if(blob) addVoiceMsg(blob,dur,true);
+  const voiceMid = genMsgId(); pendingUserMid = voiceMid;
+  if(blob) addVoiceMsg(blob,dur,true,voiceMid);
   const text=await finishVoiceRec();
   if(text){
-    if(!blob) addTextMsg(text,true); // 纯识别模式就用文字气泡展示她说的话
+    if(!blob) addTextMsg(text,true,false,voiceMid); // 纯识别模式就用文字气泡展示她说的话
     headerSub.textContent='正在输入…'; showTyping();
     const reply=await callAPI(text);
     hideTyping(); headerSub.textContent='在线';
@@ -3501,7 +3607,8 @@ function startCallSTT() {
   callRecognition.onresult = async (e) => {
     const text = e.results[0][0].transcript;
     if (!text) return;
-    addTextMsg(text, true);
+    const sttMid = genMsgId(); pendingUserMid = sttMid;
+    addTextMsg(text, true, false, sttMid);
     headerSub.textContent = '正在回复…';
     showTyping();
     const reply = await callAPI(text);
