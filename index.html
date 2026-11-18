@@ -869,6 +869,19 @@
       </div>
     </div>
 
+    <!-- 数据备份 -->
+    <div class="s-section">
+      <div class="s-section-title">数据备份</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-bottom:12px;">把对话、记忆、日记、愿望、信件和设置导出成一个文件收好，换设备或浏览器出意外时可以恢复。出于安全，API Key 不会写进备份文件，恢复后重新填一次就好。</div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="exportData()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">导出全部数据</button>
+          <button onclick="document.getElementById('importFileInput').click()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">导入恢复</button>
+        </div>
+        <input type="file" id="importFileInput" accept=".json,application/json" style="display:none" onchange="importDataFile(this)">
+      </div>
+    </div>
+
     <button onclick="saveSettings()" style="width:100%;padding:14px;border-radius:12px;background:var(--accent);border:none;color:#fff;font-size:15px;cursor:pointer;margin-bottom:12px;">
       保存设置
     </button>
@@ -1895,6 +1908,45 @@ async function letterByZephyr(){
   }
 }
 updateLettersBadge();
+
+// ══ 数据备份：所有数据属于用户，可导出、可迁移、可恢复 ══
+function exportData(){
+  const data = {};
+  for(let i = 0; i < localStorage.length; i++){
+    const k = localStorage.key(i);
+    if(k && k.startsWith('z_') && k !== 'z_apiKey') data[k] = localStorage.getItem(k);
+  }
+  const payload = JSON.stringify({ app:'zephyr', version:1, exportedAt:new Date().toISOString(), data }, null, 2);
+  const blob = new Blob([payload], { type:'application/json' });
+  const a = document.createElement('a');
+  const d = new Date();
+  a.href = URL.createObjectURL(blob);
+  a.download = 'zephyr-backup-' + d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0') + '.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
+  showToast('备份已导出，收好它 ~');
+}
+function importDataFile(input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const obj = JSON.parse(reader.result);
+      if(!obj || obj.app !== 'zephyr' || !obj.data || typeof obj.data !== 'object') throw new Error('bad file');
+      if(!confirm('导入会用备份覆盖当前全部数据（对话、记忆、日记、愿望、信件、设置），确定继续吗？')) return;
+      Object.keys(obj.data).forEach(k=>{ if(k.startsWith('z_') && k !== 'z_apiKey') localStorage.setItem(k, obj.data[k]); });
+      showToast('恢复完成，正在刷新 ~');
+      setTimeout(()=>location.reload(), 600);
+    }catch(e){
+      showToast('这个文件不是 Zephyr 的备份 qwq');
+    }
+  };
+  reader.readAsText(file);
+}
 
 // ══ Sidebar ══
 document.getElementById('menuBtn').addEventListener('click', openSidebar);
