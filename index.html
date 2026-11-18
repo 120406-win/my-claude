@@ -1554,18 +1554,28 @@ document.getElementById('docInput').addEventListener('change', async e=>{
 let mediaRecorder=null,recordChunks=[],recordStart=0,recordCancelled=false,touchStartY=0;
 // 语音条修复：以前只用 MediaRecorder 录下来自己播放，从没把内容发给 AI，所以永远等不到回复。
 // 现在录音的同时用语音识别转文字，松手后把文字像普通消息一样发给 AI。
-let voiceRec=null, recordTranscript='', voiceRecActive=false, voiceRecSupported=true, recTimerInt=null;
+let voiceRec=null, recordFinals='', recordInterim='', voiceRecActive=false, voiceRecSupported=true, voiceRecError='', recTimerInt=null, recWanted=false, recFinished=true, recHasAudio=true;
+function recText(){ return (recordFinals+recordInterim).trim(); }
 function startVoiceRec(){
-  recordTranscript=''; voiceRecActive=true;
+  recordFinals=''; recordInterim=''; voiceRecError=''; voiceRecActive=true;
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
   if(!SR){ voiceRec=null; voiceRecSupported=false; return; }
   voiceRecSupported=true;
   try{
     voiceRec=new SR();
-    voiceRec.lang='zh-CN'; voiceRec.continuous=true; voiceRec.interimResults=false;
-    voiceRec.onresult=e=>{ for(let i=e.resultIndex;i<e.results.length;i++){ if(e.results[i].isFinal) recordTranscript+=e.results[i][0].transcript; } };
-    voiceRec.onend=()=>{ // 识别会自己断开，录音还没结束就续上
-      if(voiceRecActive && mediaRecorder && mediaRecorder.state==='recording' && !recordCancelled){ try{voiceRec.start();}catch(err){} }
+    voiceRec.lang='zh-CN'; voiceRec.continuous=true; voiceRec.interimResults=true; // 临时结果也收：iOS 经常不给最终结果，只等 final 会全丢
+    voiceRec.onresult=e=>{
+      let interim='';
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        if(e.results[i].isFinal) recordFinals+=e.results[i][0].transcript;
+        else interim+=e.results[i][0].transcript;
+      }
+      recordInterim=interim;
+    };
+    voiceRec.onerror=e=>{ if(e.error && e.error!=='aborted' && e.error!=='no-speech') voiceRecError=e.error; };
+    voiceRec.onend=()=>{ // 一段识别结束先把临时结果收下，还在录就续开一段
+      recordFinals+=recordInterim; recordInterim='';
+      if(voiceRecActive && recWanted && !recordCancelled){ try{voiceRec.start();}catch(err){} }
     };
     voiceRec.start();
   }catch(err){ voiceRec=null; }
@@ -1573,12 +1583,19 @@ function startVoiceRec(){
 function finishVoiceRec(){
   return new Promise(resolve=>{
     voiceRecActive=false;
-    if(!voiceRec){ resolve(recordTranscript.trim()); return; }
+    if(!voiceRec){ recordFinals+=recordInterim; recordInterim=''; resolve(recText()); return; }
     const rec=voiceRec; voiceRec=null;
     let done=false;
-    const finish=()=>{ if(!done){ done=true; resolve(recordTranscript.trim()); } };
+    const finish=()=>{ if(!done){ done=true; recordFinals+=recordInterim; recordInterim=''; resolve(recText()); } };
     rec.onend=finish;
-    rec.onresult=e=>{ for(let i=e.resultIndex;i<e.results.length;i++){ if(e.results[i].isFinal) recordTranscript+=e.results[i][0].transcript; } };
+    rec.onresult=e=>{
+      let interim='';
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        if(e.results[i].isFinal) recordFinals+=e.results[i][0].transcript;
+        else interim+=e.results[i][0].transcript;
+      }
+      recordInterim=interim;
+    };
     try{ rec.stop(); }catch(e){ finish(); }
     setTimeout(finish,1500);
   });
@@ -1588,49 +1605,74 @@ function dropVoiceRec(){
   if(voiceRec){ try{voiceRec.abort();}catch(e){} voiceRec=null; }
 }
 async function startRecording(){
-  try {
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-    recordChunks=[]; recordCancelled=false; recordStart=Date.now();
-    mediaRecorder=new MediaRecorder(stream);
-    mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recordChunks.push(e.data);};
-    mediaRecorder.onstop=async()=>{
-      stream.getTracks().forEach(t=>t.stop());
-      if(recordCancelled){ dropVoiceRec(); showToast('已取消'); return; }
-      const dur=(Date.now()-recordStart)/1000;
-      if(dur<0.5){ dropVoiceRec(); showToast('录音太短了'); return; }
-      addVoiceMsg(new Blob(recordChunks,{type:'audio/webm'}),dur,true);
-      const text=await finishVoiceRec();
-      if(text){
-        headerSub.textContent='正在输入…'; showTyping();
-        const reply=await callAPI(text);
-        hideTyping(); headerSub.textContent='在线';
-        if(reply && voiceEnabled) speakText(reply);
-      } else if(!voiceRecSupported){
-        showToast('这个浏览器不支持语音识别，语音条暂时传不到 AI 那里 qwq');
-      } else {
-        showToast('没听清，可以再说一次或打字给我 ~');
-      }
-    };
-    mediaRecorder.start();
-    startVoiceRec();
-    const recTimeEl=document.getElementById('recTime');
-    if(recTimeEl){
-      recTimeEl.textContent='0:00';
-      clearInterval(recTimerInt);
-      recTimerInt=setInterval(()=>{ const s=Math.floor((Date.now()-recordStart)/1000); recTimeEl.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); },500);
+  recordCancelled=false; recordStart=Date.now(); recFinished=false; recWanted=true; recHasAudio=true;
+  startVoiceRec(); // 先开识别：iOS 上识别和录音同时抢麦克风时，后开的那个经常直接哑火
+  let stream=null;
+  try{
+    stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  }catch(e){
+    if(e && (e.name==='NotAllowedError'||e.name==='SecurityError')){
+      recWanted=false; recFinished=true; dropVoiceRec();
+      showToast('无法访问麦克风');
+      return false;
     }
-    document.getElementById('recOverlay').classList.add('show');
-    document.getElementById('voiceBtn').classList.add('recording');
-  } catch(e){ showToast('无法访问麦克风'); }
+    recHasAudio=false; // 麦克风被识别占用等情况：退化成纯识别模式，话照样能发出去
+  }
+  if(recHasAudio){
+    try{
+      recordChunks=[];
+      mediaRecorder=new MediaRecorder(stream);
+      mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recordChunks.push(e.data);};
+      mediaRecorder.onstop=()=>{ stream.getTracks().forEach(t=>t.stop()); onRecordStopped(new Blob(recordChunks,{type:'audio/webm'})); };
+      mediaRecorder.start();
+    }catch(e){
+      recHasAudio=false;
+      if(stream) stream.getTracks().forEach(t=>t.stop());
+    }
+  }
+  const recTimeEl=document.getElementById('recTime');
+  if(recTimeEl){
+    recTimeEl.textContent='0:00';
+    clearInterval(recTimerInt);
+    recTimerInt=setInterval(()=>{ const s=Math.floor((Date.now()-recordStart)/1000); recTimeEl.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); },500);
+  }
+  document.getElementById('recOverlay').classList.add('show');
+  document.getElementById('voiceBtn').classList.add('recording');
+  return true;
 }
 function stopRecording(cancel=false){
-  recordCancelled=cancel;
+  recordCancelled=cancel; recWanted=false;
   clearInterval(recTimerInt);
-  if(mediaRecorder&&mediaRecorder.state!=='inactive') mediaRecorder.stop();
   document.getElementById('recOverlay').classList.remove('show');
   document.getElementById('voiceBtn').classList.remove('recording');
   document.getElementById('recTip').textContent='录音中，慢慢说 ~';
   document.getElementById('recTip').style.color='white';
+  if(mediaRecorder && mediaRecorder.state!=='inactive'){
+    try{ mediaRecorder.stop(); }catch(e){ onRecordStopped(null); } // onstop 里会走 onRecordStopped
+  } else if(!recFinished){
+    onRecordStopped(null); // 纯识别模式没有录音器，直接收尾
+  }
+}
+async function onRecordStopped(blob){
+  if(recFinished) return; recFinished=true;
+  if(recordCancelled){ dropVoiceRec(); showToast('已取消'); return; }
+  const dur=(Date.now()-recordStart)/1000;
+  if(dur<0.5){ dropVoiceRec(); showToast('录音太短了'); return; }
+  if(blob) addVoiceMsg(blob,dur,true);
+  const text=await finishVoiceRec();
+  if(text){
+    if(!blob) addTextMsg(text,true); // 纯识别模式就用文字气泡展示她说的话
+    headerSub.textContent='正在输入…'; showTyping();
+    const reply=await callAPI(text);
+    hideTyping(); headerSub.textContent='在线';
+    if(reply && voiceEnabled) speakText(reply);
+  } else if(!voiceRecSupported){
+    showToast('这个浏览器不支持语音识别，语音条暂时传不到 AI 那里 qwq');
+  } else if(voiceRecError){
+    showToast('识别出错了（'+voiceRecError+'），把这句截图给宝宝看看 ~');
+  } else {
+    showToast('没听清，可以再说一次或打字给我 ~');
+  }
 }
 // 改成点按式：点一下开始录，不用一直按着；录音层里点「发送」或「取消」，手滑也不会误触取消
 const voiceBtn=document.getElementById('voiceBtn');
@@ -1638,8 +1680,8 @@ let recUiState='idle'; // idle | starting | recording
 voiceBtn.addEventListener('click',async()=>{
   if(recUiState!=='idle') return;
   recUiState='starting';
-  await startRecording();
-  recUiState=(mediaRecorder&&mediaRecorder.state==='recording')?'recording':'idle';
+  const ok=await startRecording();
+  recUiState=ok?'recording':'idle';
 });
 document.getElementById('recSendBtn').addEventListener('click',()=>{
   if(recUiState==='recording'){ stopRecording(false); recUiState='idle'; }
