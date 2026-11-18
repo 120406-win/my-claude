@@ -1063,7 +1063,7 @@
     <div class="settings-topbar-title">Gallery</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">属于你们的相册：特别的瞬间、想留住的画面，都收在这里。照片存在这台设备上（会自动压缩，大概能存十几张，记得偶尔导出备份）。</div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">属于你们的相册：特别的瞬间、想留住的画面，都收在这里。照片存在这台设备上（会自动压缩，大概能存十几张，记得偶尔导出备份）。每张照片的标注 Zephyr 都知道；想让他真的看到某张照片，点照片下面的「给 Zephyr 看」，它就会发进你们的聊天里。</div>
     <div class="s-section">
       <div class="s-card" style="padding:14px 16px;">
         <div id="galleryPending" style="display:none;margin-bottom:12px;">
@@ -1531,6 +1531,16 @@ function buildSystemPrompt(){
       return '・[' + who + ' ' + dd.getFullYear() + '/' + (dd.getMonth()+1) + '/' + dd.getDate() + ']' + (d.title ? '《' + d.title + '》' : '') + ' ' + d.text;
     }).join('\n');
     out += '\n\n【Dreams】\n以下是 Dreams 里最近的记录（Lumi 的梦、你们的共同幻想、还有你讲过的梦）。聊天时可以自然地聊起，但不要逐条复述：\n' + dt2.slice(0, 3000);
+  }
+  // Gallery 的标注也给 Zephyr：他要知道相册里有什么；照片画面本身靠「给 Zephyr 看」按钮发进对话
+  const photos = loadGallery();
+  if(photos.length){
+    const BY2 = { both:'我们一起', lumi:'糯糯存的', zephyr:'Zephyr 存的' };
+    const pl = photos.slice(-20).map(p=>{
+      const pd = new Date(p.ts);
+      return '・[' + (BY2[p.by] || '我们一起') + ' ' + pd.getFullYear() + '/' + (pd.getMonth()+1) + '/' + pd.getDate() + '] ' + (p.caption || '（没有标注）');
+    }).join('\n');
+    out += '\n\n【Gallery 相册】\n以下是你们相册里的照片清单。这里只有标注文字，照片的画面你看不到，除非 Lumi 用相册里的「给 Zephyr 看」把某张照片发进对话。聊天时可以自然地聊起这些照片和标注：\n' + pl.slice(0, 2000);
   }
   return out;
 }
@@ -2308,11 +2318,17 @@ function renderGallery(){
     const when = document.createElement('span');
     when.style.cssText = 'font-size:10px;color:var(--text-pale);';
     when.textContent = (BY[p.by] || '我们一起') + ' · ' + d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate();
+    const acts = document.createElement('span');
+    const showBtn = document.createElement('button');
+    showBtn.textContent = '给 Zephyr 看';
+    showBtn.style.cssText = 'background:none;border:none;color:var(--accent-s);font-size:11px;cursor:pointer;padding:2px;margin-right:4px;';
+    showBtn.onclick = ()=>showPhotoToZephyr(p.id);
     const del = document.createElement('button');
     del.textContent = '删除';
     del.style.cssText = 'background:none;border:none;color:#e0657a;font-size:11px;cursor:pointer;padding:2px;';
     del.onclick = ()=>{ storeGallery(loadGallery().filter(x=>x.id!==p.id)); renderGallery(); };
-    meta.appendChild(when); meta.appendChild(del);
+    acts.appendChild(showBtn); acts.appendChild(del);
+    meta.appendChild(when); meta.appendChild(acts);
     info.appendChild(cap); info.appendChild(meta);
     card.appendChild(info);
     grid.appendChild(card);
@@ -2859,6 +2875,25 @@ async function askZephyrDream(){
     btn.textContent = old;
     btn.disabled = false;
   }
+}
+
+// ══ 把相册里的照片发进当前对话，让 Zephyr 真的看到画面（走和聊天发图相同的图片通道） ══
+async function showPhotoToZephyr(id){
+  const p = loadGallery().find(x=>x.id===id);
+  if(!p) return;
+  if(!cfg.apiKey){ showToast('请先在 Settings 里填写 API Key'); return; }
+  navTo('chat');
+  addImgMsg(p.img, true);
+  headerSub.textContent = '正在给 Zephyr 看照片…';
+  showTyping();
+  const parts = p.img.split(',');
+  const mediaType = (parts[0].match(/data:(.*?);/) || [])[1] || 'image/jpeg';
+  const block = { type:'image', source:{ type:'base64', media_type:mediaType, data:parts[1] } };
+  const note = p.caption ? '这张照片的标注是：「' + p.caption + '」' : '这张照片还没有标注';
+  const reply = await callAPI('（糯糯从你们的相册 Gallery 里挑了这张照片，专门给你看。' + note + '。请好好看这张照片，说说你看到了什么，并自然地回应她，就像你们正一起翻相册一样）', [block]);
+  hideTyping();
+  headerSub.textContent = '在线';
+  if(reply && (voiceEnabled || isCalling || isVideo)) speakText(reply);
 }
 
 // ══ Sidebar ══
