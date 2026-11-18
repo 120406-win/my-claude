@@ -854,18 +854,14 @@ let localStream=null;
 
 // ══ 主题 ══
 function applyTheme(t){
-  const themes = ['dark','light','purple','forest','rose'];
-  // remove all theme attrs
+  // 主题名和按钮 id 不一致，用映射表对齐：dark→Night, light→Day
+  const btnIds = { dark:'themeNight', light:'themeDay', purple:'themePurple', forest:'themeForest', rose:'themeRose' };
   document.documentElement.removeAttribute('data-theme');
   if(t !== 'dark') document.documentElement.setAttribute('data-theme', t);
-  // update active state on buttons
-  themes.forEach(name => {
-    const btn = document.getElementById('theme' + name.charAt(0).toUpperCase() + name.slice(1));
+  Object.entries(btnIds).forEach(([name, id]) => {
+    const btn = document.getElementById(id);
     if(btn) btn.style.borderColor = t === name ? 'var(--accent)' : 'transparent';
   });
-  // fix dark button id
-  const nightBtn = document.getElementById('themeNight');
-  if(nightBtn) nightBtn.style.borderColor = t === 'dark' ? '#5254d4' : 'transparent';
 }
 applyTheme(cfg.theme);
 
@@ -1035,10 +1031,14 @@ function deleteConversation(id, event){
   renderConvList();
 }
 
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+
 function renderConvList(){
   const list = document.getElementById('convList');
   list.innerHTML = conversations.map(c=>{
-    const title = c.title || '新对话';
+    const title = escapeHtml(c.title || '新对话');
     return `<div class="conv-item ${c.id===activeConvId?'active':''}" onclick="switchConversation('${c.id}')">
       <span class="conv-title">${title}</span>
       <button class="conv-del" onclick="deleteConversation('${c.id}', event)">✕</button>
@@ -1215,11 +1215,14 @@ async function callAPI(userText, extraBlocks=null){
     bubble.textContent = '';
     col.appendChild(bubble);
 
+    let buffer = '';
     while(true){
       const {done, value} = await reader.read();
       if(done) break;
-      const chunk = decoder.decode(value, {stream:true});
-      const lines = chunk.split('\n');
+      // SSE 一行可能被切成多个 chunk，必须缓存未完整的最后一行，下次拼起来再解析，否则会丢字
+      buffer += decoder.decode(value, {stream:true});
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
       for(const line of lines){
         if(!line.startsWith('data:')) continue;
         const data = line.slice(5).trim();
@@ -1301,7 +1304,7 @@ document.getElementById('fileInput').addEventListener('change',async e=>{
     const block = {type:'image', source:{type:'base64', media_type: mediaType, data: dataUrl.split(',')[1]}};
     const reply=await callAPI('（糯糯发来了一张图片，请描述并自然地回应她）',[block]);
     hideTyping(); headerSub.textContent='在线';
-    if(reply) addTextMsg(reply,false);
+    // callAPI 内部已经创建气泡并流式渲染了回复，这里不要再 addTextMsg，否则回复会重复显示
   };
   reader.readAsDataURL(file);
 });
@@ -1337,14 +1340,12 @@ document.getElementById('docInput').addEventListener('change', async e=>{
       const block = {type:'document', source:{type:'base64', media_type:'application/pdf', data: b64}};
       const reply = await callAPI(`（糯糯发来了一个PDF文件"${name}"，请阅读并回应她）`, [block]);
       hideTyping(); headerSub.textContent='在线';
-      if (reply) addTextMsg(reply, false);
     } else {
       // 文本类文件，直接读文字内容拼进消息
       const text = await file.text();
       showTyping();
       const reply = await callAPI(`（糯糯发来了一个文件"${name}"，内容如下，请阅读并回应她）\n\n${text}`);
       hideTyping(); headerSub.textContent='在线';
-      if (reply) addTextMsg(reply, false);
     }
   } catch(err) {
     hideTyping(); headerSub.textContent='在线';
@@ -1400,7 +1401,7 @@ function startCallSTT() {
     showTyping();
     const reply = await callAPI(text);
     hideTyping(); headerSub.textContent = '通话中';
-    if (reply) { addTextMsg(reply, false); speakText(reply); }
+    if (reply) { speakText(reply); }
     // 自动继续监听
     if (isCalling && callMicActive) startCallSTT();
   };
@@ -1412,7 +1413,7 @@ document.getElementById('callBtn').addEventListener('click',async()=>{
   isCalling=true; document.getElementById('callModal').classList.add('show');
   callSeconds=0; callInterval=setInterval(()=>{callSeconds++;const m=String(Math.floor(callSeconds/60)).padStart(2,'0'),s=String(callSeconds%60).padStart(2,'0');document.getElementById('callTimer').textContent=`${m}:${s}`;},1000);
   showTyping(); const reply=await callAPI('（糯糯拨打了语音通话，温柔打个招呼，简短一点）'); hideTyping();
-  if(reply){addTextMsg(reply,false);speakText(reply);}
+  if(reply){speakText(reply);}
   // 自动开启 STT
   callMicActive = true;
   startCallSTT();
@@ -1437,7 +1438,7 @@ document.getElementById('videoBtn').addEventListener('click',async()=>{
   isVideo=true; document.getElementById('videoModal').classList.add('show');
   videoSeconds=0; videoInterval=setInterval(()=>{videoSeconds++;const m=String(Math.floor(videoSeconds/60)).padStart(2,'0'),s=String(videoSeconds%60).padStart(2,'0');document.getElementById('videoTimer').textContent=`${m}:${s}`;},1000);
   showTyping(); const reply=await callAPI('（糯糯拨打了视频通话，温柔打个招呼，简短）'); hideTyping();
-  if(reply){addTextMsg(reply,false);speakText(reply);}
+  if(reply){speakText(reply);}
 });
 document.getElementById('vHangBtn').addEventListener('click',()=>{
   isVideo=false; clearInterval(videoInterval); speechSynthesis?.cancel();
