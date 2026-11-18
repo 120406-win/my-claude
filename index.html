@@ -879,6 +879,20 @@
   <div class="settings-body">
     <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">写在这里的事，Zephyr 在每一个窗口都会记得，新建对话也不会忘 ^ ^</div>
     <div class="s-section">
+      <div class="s-section-title">自动记忆</div>
+      <div class="s-card">
+        <div class="s-row">
+          <div class="s-row-label">聊天时自动记下重要的事
+            <div class="s-row-sub">每聊 10 条，Zephyr 会自己总结一遍，把重要的写进长期记忆（会多用一点点 API 额度）</div>
+          </div>
+          <input type="checkbox" id="autoMemToggle" onchange="toggleAutoMem(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
+        </div>
+        <div style="padding:12px 16px 14px;">
+          <button onclick="summarizeNow()" style="width:100%;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">立即总结当前对话</button>
+        </div>
+      </div>
+    </div>
+    <div class="s-section">
       <div class="s-section-title">添加记忆</div>
       <div class="s-card" style="padding:14px 16px;">
         <textarea id="memInput" rows="3" placeholder="写下一件希望 Zephyr 永远记得的事…" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;line-height:1.6;resize:vertical;"></textarea>
@@ -1216,6 +1230,8 @@ function buildSystemPrompt(){
   return cfg.system + '\n\n【长期记忆】\n以下是 Lumi 亲手写下的长期记忆，是属于你和 Lumi 共同的记忆。请自然地记住，并在合适的时候运用，不要生硬地复述清单：\n' + lines;
 }
 function renderMemories(){
+  const tg = document.getElementById('autoMemToggle');
+  if(tg) tg.checked = autoMemEnabled();
   const list = loadMemories();
   const countEl = document.getElementById('memCount');
   if(countEl) countEl.textContent = list.length;
@@ -1248,7 +1264,14 @@ function renderMemories(){
       delBtn.textContent='删除';
       delBtn.style.cssText='background:none;border:none;color:#e0657a;font-size:12px;cursor:pointer;padding:2px 4px;flex-shrink:0;';
       delBtn.onclick=()=>deleteMemory(m.id);
-      row.appendChild(txt); row.appendChild(editBtn); row.appendChild(delBtn);
+      row.appendChild(txt);
+      if(m.auto){
+        const tag = document.createElement('span');
+        tag.textContent = '自动';
+        tag.style.cssText = 'font-size:10px;color:var(--text-pale);border:1px solid var(--border);border-radius:6px;padding:1px 5px;flex-shrink:0;margin-top:3px;';
+        row.appendChild(tag);
+      }
+      row.appendChild(editBtn); row.appendChild(delBtn);
       card.appendChild(row);
     });
     wrap.appendChild(card);
@@ -1293,6 +1316,89 @@ function deleteMemory(id){
   storeMemories(list);
   renderMemories();
   showToast('已删除这条记忆');
+}
+
+// ══ 自动记忆：每聊满 10 条，自动把这段对话总结成长期记忆 ══
+const AUTO_MEM_EVERY = 10;
+const AUTO_MEM_PROMPT = '你是一个记忆整理助手。下面是 Lumi（用户）和 Zephyr（AI 伙伴）的一段对话。请提炼值得长期记住的重要信息：Lumi 的身份与近况、重要人物、偏好习惯、重要事件、两人的共同经历、项目进展与决定。只输出一个 JSON 数组，每个元素是 {"cat":"分类","text":"记忆内容"}。分类只能是：身份、重要人物、偏好、重要事件、共同经历、项目。text 用简洁的第三人称陈述，主语用 Lumi 或 Zephyr，一条只记一件事。不要记录寒暄、玩笑和一次性的小事。如果没有值得长期记住的内容，输出 []。不要输出 JSON 以外的任何文字。';
+let autoMemRunning = false;
+function autoMemEnabled(){ return localStorage.getItem('z_autoMem') !== '0'; }
+function toggleAutoMem(on){ localStorage.setItem('z_autoMem', on ? '1' : '0'); showToast(on ? '自动记忆已开启' : '自动记忆已关闭'); }
+function getAutoMemState(){ try{ return JSON.parse(localStorage.getItem('z_autoMemState')||'{}'); }catch(e){ return {}; } }
+function setAutoMemState(s){ try{ localStorage.setItem('z_autoMemState', JSON.stringify(s)); }catch(e){} }
+function msgToText(m){
+  if(typeof m.content === 'string') return m.content;
+  if(Array.isArray(m.content)) return m.content.filter(b=>b.type==='text').map(b=>b.text).join('\n');
+  return '';
+}
+function maybeAutoSummarize(){
+  if(!autoMemEnabled() || autoMemRunning || !activeConvId) return;
+  const userCount = messages.filter(m=>m.role==='user').length;
+  const last = getAutoMemState()[activeConvId] || 0;
+  if(userCount - last >= AUTO_MEM_EVERY) runAutoSummarize(false);
+}
+async function summarizeNow(){
+  if(autoMemRunning){ showToast('正在总结中，稍等一下 ~'); return; }
+  if(!messages.length){ showToast('当前对话还没有内容可以总结'); return; }
+  await runAutoSummarize(true);
+}
+async function runAutoSummarize(manual){
+  if(autoMemRunning) return;
+  autoMemRunning = true;
+  const convId = activeConvId;
+  try{
+    const state = getAutoMemState();
+    const last = state[convId] || 0;
+    const userIdx = [];
+    messages.forEach((m,i)=>{ if(m.role==='user') userIdx.push(i); });
+    let slice;
+    if(userIdx.length > last) slice = messages.slice(userIdx[last]);
+    else if(manual) slice = messages.slice(-20);
+    else slice = [];
+    if(slice.length < 2){ if(manual) showToast('没有新内容需要总结 ~'); return; }
+    const transcript = slice.map(m=>(m.role==='user' ? 'Lumi：' : 'Zephyr：') + msgToText(m)).filter(t=>t.length > 7).join('\n').slice(0, 12000);
+    if(!transcript) return;
+    const base = (cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/,'');
+    const res = await fetch(base+'/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body: JSON.stringify({ model:cfg.model, max_tokens:700, system:AUTO_MEM_PROMPT, messages:[{role:'user', content:'请整理这段对话：\n'+transcript}] })
+    });
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    const data = await res.json();
+    const out = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('');
+    const s = out.indexOf('['), e2 = out.lastIndexOf(']');
+    if(s < 0 || e2 <= s) throw new Error('parse');
+    const items = JSON.parse(out.slice(s, e2+1));
+    const existing = loadMemories();
+    const seen = new Set(existing.map(m=>m.text.replace(/\s+/g,'')));
+    const added = [];
+    for(const it of (Array.isArray(items) ? items : [])){
+      const text = (it && typeof it.text === 'string') ? it.text.trim() : '';
+      if(!text || text.length > 220) continue;
+      const key = text.replace(/\s+/g,'');
+      if(seen.has(key)) continue;
+      seen.add(key);
+      added.push({ id:'m'+Date.now().toString(36)+Math.floor(Math.random()*9999), cat: MEM_CATS.includes(it.cat) ? it.cat : '共同经历', text, ts:Date.now(), auto:true });
+      if(added.length >= 8) break;
+    }
+    // 不管有没有新增，都推进进度，避免反复总结同一段
+    state[convId] = userIdx.length;
+    setAutoMemState(state);
+    if(added.length){
+      if(storeMemories(existing.concat(added))){
+        showToast('Zephyr 悄悄记下了 '+added.length+' 条新记忆 ~');
+        const mp = document.getElementById('memoryPage');
+        if(mp && mp.classList.contains('show')) renderMemories();
+      }
+    } else if(manual){
+      showToast('这段聊天没有需要长期记住的新内容 ~');
+    }
+  }catch(e){
+    if(manual) showToast('总结失败了，待会儿再试试 qwq');
+  }finally{
+    autoMemRunning = false;
+  }
 }
 
 // ══ Sidebar ══
@@ -1609,6 +1715,7 @@ async function callAPI(userText, extraBlocks=null){
 
     messages.push({role:'assistant',content:reply});
     saveChatHistory();
+    maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
     return reply;
   } catch(e){ messages.pop(); showToast('发送失败：'+e.message); return null; }
 }
