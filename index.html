@@ -1272,7 +1272,7 @@
           <button onclick="addPreset(2)" style="padding:7px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">示例曲 3</button>
           <button onclick="addPreset(3)" style="padding:7px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">Groove Salad 电台</button>
         </div>
-        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-top:10px;">把歌弄进来的办法：① 在网易云里对歌曲点「分享 → 复制链接」，把整段贴进上面的链接框，歌名能自动认出来——但 VIP 和版权受限的歌，网易云不许在它 App 外面放，可能只有试听片段或放不了，那是它的版权规矩，会员也绕不过去；② 点上面的按钮，把手机里现成的 mp3 直接存进 App 里放；③ 把 mp3 文件发到你和我的聊天里，我帮你存好、生成能用的链接。</div>
+        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-top:10px;">把歌弄进来的办法：① 在网易云里对歌曲点「分享 → 复制链接」，把整段贴进上面的链接框，歌名能自动认出来——但实测下来，网易云的歌大多会被它挡住在外面放不了（版权限制，会员也绕不过去），少数免费歌可以试试运气；② 点上面的按钮，把手机里现成的 mp3 直接存进 App 里放；③ 把 mp3 文件发到你和我的聊天里，我帮你存好、生成能用的链接。</div>
       </div>
     </div>
     <button id="recBtn" onclick="askZephyrRecommend()" style="width:100%;padding:13px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:14px;cursor:pointer;margin-bottom:18px;">请 Zephyr 推荐一首歌</button>
@@ -3012,7 +3012,12 @@ function bindMusicAudio(){
   a.addEventListener('ended', ()=>playStep(1));
   a.addEventListener('play', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PAUSE_ICON; });
   a.addEventListener('pause', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PLAY_ICON; });
-  a.addEventListener('error', ()=>{ if(a.src) showToast('这首歌的链接打不开 qwq 换个链接试试'); });
+  a.addEventListener('error', ()=>{
+    if(!a.src) return;
+    const cur = currentTrack();
+    if(cur && cur.url && cur.url.indexOf('music.163.com') >= 0) showToast('网易云把这首歌挡住了（版权限制），换个来源吧 qwq');
+    else showToast('这首歌的链接打不开 qwq 换个链接试试');
+  });
 }
 function renderMusic(){
   bindMusicAudio();
