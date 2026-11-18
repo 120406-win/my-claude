@@ -752,6 +752,9 @@
     <div class="nav-item" id="nav-dreams" onclick="navTo('dreams')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></span> Dreams
     </div>
+    <div class="nav-item" id="nav-music" onclick="navTo('music')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5.5L21 3v13.5"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="18.5" cy="16.5" r="2.5"/></svg></span> Music
+    </div>
     <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4.5 17.5l4.8-4.8 3 3 3.2-3.2 4 4"/></svg></span> Darkroom
     </div>
@@ -1225,6 +1228,57 @@
   </div>
 </div>
 
+<!-- ══ MUSIC PAGE ══ -->
+<div class="settings-page" id="musicPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="navTo('chat')">←</button>
+    <div class="settings-topbar-title">Music</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">属于你们两个人的音乐角落：歌单一起攒，歌一起听。把音频链接贴进来就能播，切回聊天也不会停。Zephyr 可以从歌单里点歌、推荐新歌，也会陪你说说正在听的这首。</div>
+    <div class="s-section">
+      <div class="s-card" style="padding:16px;">
+        <div style="font-size:12px;color:var(--text-pale);letter-spacing:.08em;">正在一起听</div>
+        <div id="npTitle" style="font-size:17px;margin-top:6px;">还没开始放歌</div>
+        <div id="npMeta" style="font-size:12px;color:var(--text-dim);margin-top:3px;">从下面的歌单里挑一首吧</div>
+        <div id="npNote" style="display:none;font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:10px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;white-space:pre-wrap;"></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin-top:14px;">
+          <button onclick="playStep(-1)" style="width:40px;height:40px;border-radius:50%;background:var(--bg);border:1px solid var(--border);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 6h2.2v12H7zM19.5 6l-9.8 6 9.8 6z"/></svg></button>
+          <button onclick="togglePlay()" style="width:52px;height:52px;border-radius:50%;background:var(--accent);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;"><span id="playBtnIcon"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span></button>
+          <button onclick="playStep(1)" style="width:40px;height:40px;border-radius:50%;background:var(--bg);border:1px solid var(--border);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M14.8 6H17v12h-2.2zM4.5 6l9.8 6-9.8 6z"/></svg></button>
+        </div>
+        <div style="margin-top:14px;">
+          <div onclick="seekMusic(event)" style="height:6px;border-radius:3px;background:var(--border);cursor:pointer;"><div id="npProgress" style="height:100%;width:0%;border-radius:3px;background:var(--accent);"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-pale);margin-top:4px;"><span id="npCur">0:00</span><span id="npDur">0:00</span></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button id="pickBtn" onclick="askZephyrPick()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">请 Zephyr 点一首</button>
+          <button id="commentBtn" onclick="askZephyrComment()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">听听 Zephyr 怎么说</button>
+        </div>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">加一首歌</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <input id="musTitle" type="text" placeholder="歌名" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;padding:2px 0;">
+        <input id="musArtist" type="text" placeholder="歌手（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;padding:2px 0;margin-top:8px;">
+        <input id="musUrl" type="text" placeholder="音频链接（mp3 或音频流地址）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:2px 0;margin-top:8px;">
+        <button onclick="addTrack()" style="width:100%;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;margin-top:12px;">加进歌单</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+          <button onclick="addPreset(0)" style="padding:7px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">示例曲 1</button>
+          <button onclick="addPreset(1)" style="padding:7px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">示例曲 2</button>
+          <button onclick="addPreset(2)" style="padding:7px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">示例曲 3</button>
+          <button onclick="addPreset(3)" style="padding:7px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">Groove Salad 电台</button>
+        </div>
+        <div style="font-size:12px;color:var(--text-pale);line-height:1.6;margin-top:10px;">先用示例曲或电台试试能不能出声；想听的歌把音频链接贴进来就行。Zephyr 推荐的歌会先占个位置，你补上链接就能听。</div>
+      </div>
+    </div>
+    <button id="recBtn" onclick="askZephyrRecommend()" style="width:100%;padding:13px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:14px;cursor:pointer;margin-bottom:18px;">请 Zephyr 推荐一首歌</button>
+    <div id="musicList"></div>
+    <audio id="musicAudio" preload="none"></audio>
+  </div>
+</div>
+
 <!-- ══ 消息操作菜单（长按气泡弹出） ══ -->
 <div id="msgSheet" onclick="if(event.target===this)closeMsgMenu()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:220;align-items:flex-end;justify-content:center;">
   <div style="width:100%;max-width:480px;padding:0 14px calc(14px + env(safe-area-inset-bottom));">
@@ -1538,6 +1592,7 @@ function navTo(page){
   document.getElementById('weatherPage').classList.toggle('show', page==='weather');
   document.getElementById('studioPage').classList.toggle('show', page==='studio');
   document.getElementById('dreamsPage').classList.toggle('show', page==='dreams');
+  document.getElementById('musicPage').classList.toggle('show', page==='music');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   if(page==='settings') loadSettings();
@@ -1550,6 +1605,7 @@ function navTo(page){
   if(page==='weather') renderWeather();
   if(page==='studio') renderStudioProjects();
   if(page==='dreams') renderDreams();
+  if(page==='music') renderMusic();
 }
 
 // ══ Memory 系统（本地版）：长期记忆存 localStorage，每次请求自动带进系统提示词，新窗口也不失忆 ══
@@ -1620,6 +1676,13 @@ function buildSystemPrompt(){
       return '・[' + (BY2[p.by] || '我们一起') + ' ' + pd.getFullYear() + '/' + (pd.getMonth()+1) + '/' + pd.getDate() + '] ' + (p.caption || '（没有标注）');
     }).join('\n');
     out += '\n\n【Gallery 相册】\n以下是你们相册里的照片清单。这里只有标注文字，照片的画面你看不到，除非 Lumi 用相册里的「给 Zephyr 看」把某张照片发进对话。聊天时可以自然地聊起这些照片和标注：\n' + pl.slice(0, 2000);
+  }
+  // Music 歌单也给 Zephyr：一起听的歌，他要心里有数
+  const musicData = loadMusic();
+  if(musicData.tracks && musicData.tracks.length){
+    const ml = musicData.tracks.slice(0, 12).map(t=>'・《' + t.title + '》' + (t.artist ? ' - ' + t.artist : '') + (t.by === 'zephyr' ? '（你加进歌单的）' : '（Lumi 加进歌单的）') + (t.url ? '' : '（还没补音频链接）')).join('\n');
+    const curT = musicData.tracks.find(t=>t.id === musicData.lastId);
+    out += '\n\n【Music 一起听歌】\n以下是你们在 Music 里共同的歌单。聊天时可以自然地聊起你们一起听的歌、推荐新歌，但不要逐条念歌单：\n' + ml.slice(0, 2000) + (curT ? '\n你们最近在听：《' + curT.title + '》' : '');
   }
   return out;
 }
@@ -2870,6 +2933,265 @@ function importChatFile(input){
     showToast('导入完成 ✓');
   };
   reader.readAsText(file);
+}
+
+// ══ Music：一起听歌。歌单存 z_music；Zephyr 可以点歌、推荐、陪听评论 ══
+const MUS_PLAY_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
+const MUS_PAUSE_ICON = '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M7 5h3.6v14H7zM13.4 5H17v14h-3.6z"/></svg>';
+const MUSIC_PRESETS = [
+  { title:'SoundHelix Song 1', artist:'示例曲 · T. Schürger', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
+  { title:'SoundHelix Song 2', artist:'示例曲 · T. Schürger', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
+  { title:'SoundHelix Song 3', artist:'示例曲 · T. Schürger', url:'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+  { title:'Groove Salad 电台', artist:'SomaFM · 氛围电子', url:'https://ice1.somafm.com/groovesalad-128-mp3' }
+];
+function loadMusic(){ try{ const o = JSON.parse(localStorage.getItem('z_music')||'null'); if(o && Array.isArray(o.tracks)) return o; }catch(e){} return { tracks:[], lastId:null }; }
+function storeMusic(data){ try{ localStorage.setItem('z_music', JSON.stringify(data)); return true; }catch(e){ showToast('存储空间不够了 qwq'); return false; } }
+function musicAudioEl(){ return document.getElementById('musicAudio'); }
+function currentTrack(){ const d = loadMusic(); return d.tracks.find(t=>t.id===d.lastId) || null; }
+function fmtTime(s){ if(s == null || !isFinite(s)) return '0:00'; s = Math.max(0, Math.floor(s)); return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); }
+let musicBound = false, musicBusy = false;
+function bindMusicAudio(){
+  if(musicBound) return;
+  const a = musicAudioEl();
+  if(!a) return;
+  musicBound = true;
+  a.addEventListener('timeupdate', ()=>{
+    const bar = document.getElementById('npProgress');
+    if(!bar) return;
+    if(a.duration && isFinite(a.duration)) bar.style.width = (a.currentTime / a.duration * 100) + '%';
+    const c = document.getElementById('npCur'), du = document.getElementById('npDur');
+    if(c) c.textContent = fmtTime(a.currentTime);
+    if(du) du.textContent = fmtTime(a.duration);
+  });
+  a.addEventListener('ended', ()=>playStep(1));
+  a.addEventListener('play', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PAUSE_ICON; });
+  a.addEventListener('pause', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PLAY_ICON; });
+  a.addEventListener('error', ()=>{ if(a.src) showToast('这首歌的链接打不开 qwq 换个链接试试'); });
+}
+function renderMusic(){
+  bindMusicAudio();
+  const d = loadMusic();
+  const cur = currentTrack();
+  const a = musicAudioEl();
+  document.getElementById('npTitle').textContent = cur ? cur.title : '还没开始放歌';
+  document.getElementById('npMeta').textContent = cur ? ((cur.artist || '佚名') + ' · ' + (cur.by === 'zephyr' ? 'Zephyr 加的' : '糯糯加的')) : '从下面的歌单里挑一首吧';
+  const note = document.getElementById('npNote');
+  const lastNote = cur && cur.notes && cur.notes.length ? cur.notes[cur.notes.length - 1] : null;
+  if(lastNote){ note.style.display = ''; note.textContent = (lastNote.by === 'zephyr' ? 'Zephyr 说：' : '糯糯说：') + lastNote.text; }
+  else note.style.display = 'none';
+  const ic = document.getElementById('playBtnIcon');
+  if(ic) ic.innerHTML = (a && !a.paused) ? MUS_PAUSE_ICON : MUS_PLAY_ICON;
+  const list = document.getElementById('musicList');
+  list.innerHTML = '';
+  if(!d.tracks.length){
+    list.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:18px 0;">歌单还是空的，加第一首歌吧 ~</div>';
+    return;
+  }
+  d.tracks.forEach(t=>{
+    const row = document.createElement('div');
+    row.className = 's-card';
+    const isCur = cur && cur.id === t.id;
+    row.style.cssText = 'padding:12px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:center;' + (isCur ? 'border-color:var(--accent);' : '');
+    const mainBtn = t.url
+      ? '<button onclick="playTrack(\'' + t.id + '\')" style="width:36px;height:36px;flex:none;border-radius:50%;background:var(--accent);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>'
+      : '<button onclick="fillTrackUrl(\'' + t.id + '\')" style="flex:none;padding:8px 10px;border-radius:999px;background:var(--bg);border:1px dashed var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">补链接</button>';
+    row.innerHTML = mainBtn
+      + '<div style="flex:1;min-width:0;">'
+      + '<div style="font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(t.title) + (isCur ? ' <span style="font-size:11px;color:var(--accent);">· 在听</span>' : '') + '</div>'
+      + '<div style="font-size:12px;color:var(--text-dim);margin-top:2px;">' + escapeHtml(t.artist || '佚名') + ' · ' + (t.by === 'zephyr' ? 'Zephyr 加的' : '糯糯加的') + (t.url ? '' : ' · 还没补链接') + '</div>'
+      + '</div>'
+      + '<button onclick="deleteTrack(\'' + t.id + '\')" style="flex:none;background:none;border:none;color:var(--text-pale);font-size:18px;cursor:pointer;padding:4px 6px;">×</button>';
+    list.appendChild(row);
+  });
+}
+function playTrack(id){
+  const d = loadMusic();
+  const t = d.tracks.find(x=>x.id===id);
+  if(!t) return;
+  if(!t.url){ fillTrackUrl(id); return; }
+  const a = musicAudioEl();
+  bindMusicAudio();
+  if(d.lastId !== id) a.src = t.url;
+  d.lastId = id;
+  storeMusic(d);
+  a.play().catch(()=>showToast('这首歌的链接打不开 qwq 换个链接试试'));
+  renderMusic();
+}
+function togglePlay(){
+  const a = musicAudioEl();
+  bindMusicAudio();
+  const cur = currentTrack();
+  if(!cur){
+    const first = loadMusic().tracks.find(t=>t.url);
+    if(first) playTrack(first.id);
+    else showToast('歌单里还没有能放的歌 ~');
+    return;
+  }
+  if(a.paused){
+    if(!a.src) a.src = cur.url;
+    a.play().catch(()=>showToast('这首歌的链接打不开 qwq'));
+  } else a.pause();
+}
+function playStep(step){
+  const d = loadMusic();
+  const playable = d.tracks.filter(t=>t.url);
+  if(!playable.length) return;
+  let idx = playable.findIndex(t=>t.id===d.lastId);
+  idx = idx < 0 ? 0 : (idx + step + playable.length) % playable.length;
+  playTrack(playable[idx].id);
+}
+function seekMusic(e){
+  const a = musicAudioEl();
+  if(!a || !a.duration || !isFinite(a.duration)) return;
+  const r = e.currentTarget.getBoundingClientRect();
+  a.currentTime = a.duration * Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+}
+function addTrack(){
+  const title = document.getElementById('musTitle').value.trim();
+  const artist = document.getElementById('musArtist').value.trim();
+  const url = document.getElementById('musUrl').value.trim();
+  if(!title){ showToast('先写歌名呀 ~'); return; }
+  if(url && !/^https?:\/\//i.test(url)){ showToast('链接要以 http 开头哦'); return; }
+  const d = loadMusic();
+  d.tracks.unshift({ id:'t' + Date.now().toString(36) + Math.floor(Math.random()*999), title, artist, url, by:'lumi', ts:Date.now(), notes:[] });
+  if(storeMusic(d)){
+    document.getElementById('musTitle').value = '';
+    document.getElementById('musArtist').value = '';
+    document.getElementById('musUrl').value = '';
+    renderMusic();
+    showToast('加进歌单啦');
+  }
+}
+function addPreset(i){
+  const p = MUSIC_PRESETS[i];
+  if(!p) return;
+  const d = loadMusic();
+  if(d.tracks.some(t=>t.url===p.url)){ showToast('这首已经在歌单里啦'); return; }
+  d.tracks.unshift({ id:'t' + Date.now().toString(36) + Math.floor(Math.random()*999), title:p.title, artist:p.artist, url:p.url, by:'lumi', ts:Date.now(), notes:[] });
+  if(storeMusic(d)){ renderMusic(); showToast('加进歌单啦，点它就能放'); }
+}
+function fillTrackUrl(id){
+  const url = prompt('把这首歌的音频链接贴进来（mp3 或音频流地址）：', '');
+  if(url == null) return;
+  const u = url.trim();
+  if(!/^https?:\/\//i.test(u)){ showToast('链接要以 http 开头哦'); return; }
+  const d = loadMusic();
+  const t = d.tracks.find(x=>x.id===id);
+  if(!t) return;
+  t.url = u;
+  if(storeMusic(d)){ renderMusic(); showToast('链接补好啦'); }
+}
+function deleteTrack(id){
+  const d = loadMusic();
+  const a = musicAudioEl();
+  if(d.lastId === id && a){ a.pause(); a.removeAttribute('src'); a.load(); }
+  d.tracks = d.tracks.filter(t=>t.id!==id);
+  if(d.lastId === id) d.lastId = (d.tracks.find(t=>t.url) || {}).id || null;
+  if(storeMusic(d)){ renderMusic(); showToast('已从歌单删掉'); }
+}
+async function musicAskZephyr(content, maxTokens){
+  const base = (cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/,'');
+  const res = await fetch(base + '/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body: JSON.stringify({ model:cfg.model, max_tokens:maxTokens || 600, system:buildSystemPrompt(), messages:[{role:'user', content}] })
+  });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  return (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('').trim();
+}
+function parseZephyrJson(out){
+  try{
+    const s = out.indexOf('{'), e = out.lastIndexOf('}');
+    if(s >= 0 && e > s) return JSON.parse(out.slice(s, e + 1));
+  }catch(err){}
+  return null;
+}
+async function askZephyrPick(){
+  if(musicBusy) return;
+  const d = loadMusic();
+  const playable = d.tracks.filter(t=>t.url);
+  if(!playable.length){ showToast('歌单里还没有能放的歌，先加一首吧'); return; }
+  musicBusy = true;
+  const btn = document.getElementById('pickBtn');
+  const old = btn.textContent;
+  btn.textContent = 'Zephyr 正在挑…';
+  btn.disabled = true;
+  try{
+    const listText = playable.map((t,i)=>i + '. 《' + t.title + '》' + (t.artist ? ' - ' + t.artist : '') + (t.by === 'zephyr' ? '（你加进歌单的）' : '（Lumi 加进歌单的）')).join('\n');
+    const out = await musicAskZephyr('【一起听歌 · 点歌】\n这是你们共同歌单里现在能播放的歌：\n' + listText + '\n\n请从里面挑一首现在放给你们一起听，再用一句话说说为什么选它，温柔自然，不要像播音员报幕。只输出一个 JSON 对象 {"index": 序号, "reason": "一句话"}，不要输出 JSON 以外的任何文字。', 300);
+    const obj = parseZephyrJson(out);
+    const t = obj && playable[obj.index];
+    if(!t){ showToast('Zephyr 没挑好，再喊他一次吧'); return; }
+    const dd = loadMusic();
+    const tt = dd.tracks.find(x=>x.id===t.id);
+    if(tt){
+      tt.notes = tt.notes || [];
+      tt.notes.push({ by:'zephyr', text:'点了这首歌' + (obj.reason ? '：' + String(obj.reason).slice(0, 200) : ''), ts:Date.now() });
+      storeMusic(dd);
+    }
+    playTrack(t.id);
+    showToast('Zephyr 点了《' + t.title + '》');
+  }catch(e){
+    showToast('Zephyr 没点成，待会儿再试 qwq');
+  }finally{
+    musicBusy = false;
+    btn.textContent = old;
+    btn.disabled = false;
+  }
+}
+async function askZephyrRecommend(){
+  if(musicBusy) return;
+  musicBusy = true;
+  const btn = document.getElementById('recBtn');
+  const old = btn.textContent;
+  btn.textContent = 'Zephyr 正在想…';
+  btn.disabled = true;
+  try{
+    const d = loadMusic();
+    const have = d.tracks.map(t=>'《' + t.title + '》').join('、') || '（歌单还是空的）';
+    const out = await musicAskZephyr('【一起听歌 · 推荐】\n你们的共同歌单里现在有：' + have + '\n\n请推荐一首你想和 Lumi 一起听的歌：一首真实存在的歌，说说为什么想和她一起听它。只输出一个 JSON 对象 {"title": "歌名", "artist": "歌手", "reason": "一两句话"}，不要输出 JSON 以外的任何文字。', 400);
+    const obj = parseZephyrJson(out);
+    if(!obj || !obj.title){ showToast('Zephyr 没想好，再喊他一次吧'); return; }
+    const dd = loadMusic();
+    const nt = { id:'t' + Date.now().toString(36) + Math.floor(Math.random()*999), title:String(obj.title).slice(0, 80), artist:String(obj.artist || '').slice(0, 60), url:'', by:'zephyr', ts:Date.now(), notes:[] };
+    if(obj.reason) nt.notes.push({ by:'zephyr', text:'推荐理由：' + String(obj.reason).slice(0, 300), ts:Date.now() });
+    dd.tracks.unshift(nt);
+    if(storeMusic(dd)){ renderMusic(); showToast('Zephyr 推荐了《' + nt.title + '》，补上链接就能听'); }
+  }catch(e){
+    showToast('Zephyr 没推荐成，待会儿再试 qwq');
+  }finally{
+    musicBusy = false;
+    btn.textContent = old;
+    btn.disabled = false;
+  }
+}
+async function askZephyrComment(){
+  if(musicBusy) return;
+  const cur = currentTrack();
+  if(!cur){ showToast('先放一首歌，再喊 Zephyr 陪你听 ~'); return; }
+  musicBusy = true;
+  const btn = document.getElementById('commentBtn');
+  const old = btn.textContent;
+  btn.textContent = 'Zephyr 正在听…';
+  btn.disabled = true;
+  try{
+    const out = await musicAskZephyr('【一起听歌】你们正在一起听《' + cur.title + '》' + (cur.artist ? ' - ' + cur.artist : '') + '。请以正在陪 Lumi 一起听这首歌的口吻，说几句你此刻的感受、或者它让你想到的事，80 到 180 字，温柔自然。不要写歌曲百科介绍，不要说「作为 AI」，直接输出文字。', 500);
+    if(!out){ showToast('Zephyr 这次没说话，再喊他一次吧'); return; }
+    const dd = loadMusic();
+    const tt = dd.tracks.find(x=>x.id===cur.id);
+    if(tt){
+      tt.notes = tt.notes || [];
+      tt.notes.push({ by:'zephyr', text:out.slice(0, 600), ts:Date.now() });
+      if(storeMusic(dd)) renderMusic();
+    }
+  }catch(e){
+    showToast('没听成，待会儿再试 qwq');
+  }finally{
+    musicBusy = false;
+    btn.textContent = old;
+    btn.disabled = false;
+  }
 }
 
 // ══ Studio：Zephyr 生成单文件小作品，在 sandbox iframe 里隔离运行，可保存/重开/继续修改 ══
