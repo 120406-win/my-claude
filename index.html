@@ -825,6 +825,10 @@
           </div>
           <input type="range" id="maxTokSlider" min="100" max="2000" step="100" value="800">
         </div>
+        <div class="s-row">
+          <div class="s-row-label">思考过程（Thinking）<div class="s-row-sub">让 Zephyr 回复前先深度思考，并把思考过程显示在回复上方（可折叠）。会更慢、更费 token；开启时 Temperature / Top P 不生效。需要模型和接口支持，不支持时会发送失败，关掉即可。</div></div>
+          <input type="checkbox" id="thinkingToggle" onchange="toggleThinking(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
+        </div>
       </div>
     </div>
 
@@ -1599,6 +1603,8 @@ function loadSettings(){
   ms.value=cfg.maxTokens; document.getElementById('maxTokVal').textContent=cfg.maxTokens;
   const fs=document.getElementById('fontSlider');
   fs.value=cfg.fontSize; document.getElementById('fontVal').textContent=cfg.fontSize+'px';
+  const tt=document.getElementById('thinkingToggle');
+  if(tt) tt.checked = thinkingEnabled();
 
   applyTheme(cfg.theme);
 }
@@ -4001,7 +4007,11 @@ function renderMessagesIntoChat(){
       return;
     }
     if(typeof m.content === 'string'){
-      addTextMsg(m.content, isUser, false, m.mid);
+      const b = addTextMsg(m.content, isUser, false, m.mid);
+      if(!isUser && m.thinking && b && b.parentElement){
+        const tb = makeThinkingBlock(b.parentElement, b, true);
+        tb.body.textContent = m.thinking;
+      }
     } else if(Array.isArray(m.content)){
       const hasMedia = m.content.some(b=>b.type==='image'||b.type==='document');
       m.content.forEach(block=>{
@@ -4250,6 +4260,31 @@ function processZephyrActions(reply, bubble){
   if(saved) setTimeout(()=>showToast('Zephyr 悄悄许了一个愿望，去 Wishes 看看 ★'), 350);
   return cleaned;
 }
+// ══ 思考过程（Extended Thinking）：开关在设置页；思考内容显示在回复上方的小块里，可折叠 ══
+function thinkingEnabled(){ return localStorage.getItem('z_thinking') === 'true'; }
+function toggleThinking(on){ localStorage.setItem('z_thinking', on ? 'true' : 'false'); showToast(on ? '思考过程已开启，Zephyr 回复会变慢一点' : '思考过程已关闭'); }
+function makeThinkingBlock(col, beforeEl, startCollapsed){
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'margin:2px 0 6px;max-width:100%;';
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-pale);cursor:pointer;padding:2px 0;user-select:none;';
+  const label = document.createElement('span');
+  label.textContent = '思考过程';
+  const arrow = document.createElement('span');
+  arrow.textContent = startCollapsed ? '▸' : '▾';
+  head.appendChild(label);
+  head.appendChild(arrow);
+  const body = document.createElement('div');
+  body.style.cssText = 'background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 11px;font-size:12.5px;line-height:1.65;color:var(--text-dim);white-space:pre-wrap;word-break:break-word;max-height:240px;overflow-y:auto;' + (startCollapsed ? 'display:none;' : '');
+  let collapsed = !!startCollapsed;
+  function setCollapsed(c){ collapsed = c; body.style.display = c ? 'none' : ''; arrow.textContent = c ? '▸' : '▾'; }
+  head.addEventListener('click', ()=>setCollapsed(!collapsed));
+  wrap.appendChild(head);
+  wrap.appendChild(body);
+  if(beforeEl && beforeEl.parentElement === col) col.insertBefore(wrap, beforeEl);
+  else col.appendChild(wrap);
+  return { wrap, body, label, setCollapsed };
+}
 // ══ API（流式）══
 async function callAPI(userText, extraBlocks=null, opts=null){
   if(!cfg.apiKey){ showToast('请先在 Settings 里填写 API Key'); return null; }
@@ -4265,10 +4300,19 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     const base=(cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/,'');
     // 发给 API 的历史要清洗：去掉本地用的 mid，并跳过已撤回的消息（撤回 = Zephyr 真的看不到）
     const apiMessages = messages.filter(m=>!m.recalled).map(m=>({role:m.role, content:m.content}));
+    const reqBody = { model:cfg.model, max_tokens:cfg.maxTokens, temperature:cfg.temperature, top_p:cfg.topP, system:buildSystemPrompt(), messages:apiMessages, stream:true };
+    const thinkOn = thinkingEnabled();
+    if(thinkOn){
+      // 思考模式：给思考留 2048 token 预算，总上限至少 3548；开启时 temperature / top_p 必须撤掉，否则 API 会报错
+      reqBody.thinking = { type:'enabled', budget_tokens:2048 };
+      reqBody.max_tokens = Math.max(parseInt(cfg.maxTokens, 10) || 0, 3548);
+      delete reqBody.temperature;
+      delete reqBody.top_p;
+    }
     const res=await fetch(base+'/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:cfg.model,max_tokens:cfg.maxTokens,temperature:cfg.temperature,top_p:cfg.topP,system:buildSystemPrompt(),messages:apiMessages,stream:true})
+      body:JSON.stringify(reqBody)
     });
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`HTTP ${res.status}`);}
 
@@ -4277,6 +4321,9 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     const decoder = new TextDecoder();
     let reply = '';
     let bubble = null;
+    let thinking = '';
+    let thinkBox = null;
+    let thinkDone = false;
 
     hideTyping();
     const asstMid = genMsgId();
@@ -4300,7 +4347,15 @@ async function callAPI(userText, extraBlocks=null, opts=null){
         if(data === '[DONE]') break;
         try {
           const parsed = JSON.parse(data);
-          if(parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta'){
+          if(parsed.type === 'content_block_delta' && parsed.delta?.type === 'thinking_delta'){
+            thinking += parsed.delta.thinking || '';
+            if(!thinkBox) thinkBox = makeThinkingBlock(col, bubble, false);
+            thinkBox.label.textContent = '思考中…';
+            thinkBox.body.textContent = thinking;
+            thinkBox.body.scrollTop = thinkBox.body.scrollHeight;
+            chatWrap.scrollTop = chatWrap.scrollHeight;
+          } else if(parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta'){
+            if(thinkBox && !thinkDone){ thinkDone = true; thinkBox.label.textContent = '思考过程'; thinkBox.setCollapsed(true); }
             reply += parsed.delta.text;
             bubble.textContent = reply;
             chatWrap.scrollTop = chatWrap.scrollHeight;
@@ -4309,13 +4364,14 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       }
     }
 
+    if(!reply && thinking) reply = '（想了很多，但没组织好语言……再问我一次好吗）';
     reply = processZephyrActions(reply, bubble); // 他悄悄许的愿望在这里被 App 执行并抹掉标记
-    messages.push({role:'assistant',content:reply,mid:asstMid});
+    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {})});
     saveChatHistory();
     maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
     updateRegenButton();
     return reply;
-  } catch(e){ if(!regen) messages.pop(); showToast('发送失败：'+e.message); return null; }
+  } catch(e){ if(!regen) messages.pop(); showToast('发送失败：'+e.message + (thinkingEnabled() ? '（开着思考模式时若反复失败，可能是模型或接口不支持，去设置里关掉它）' : '')); return null; }
 }
 
 async function speakText(text){
