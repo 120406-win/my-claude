@@ -833,8 +833,12 @@
 <!-- 录音遮罩 -->
 <div class="rec-overlay" id="recOverlay">
   <div class="rec-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v3.2"/><path d="M9 20.5h6"/></svg></div>
-  <div class="rec-tip" id="recTip">松开发送</div>
-  <div style="color:#ff8888;font-size:13px">上滑取消</div>
+  <div class="rec-tip" id="recTip">录音中，慢慢说 ~</div>
+  <div id="recTime" style="color:rgba(255,255,255,0.85);font-size:15px;font-variant-numeric:tabular-nums;">0:00</div>
+  <div style="display:flex;gap:14px;margin-top:6px;">
+    <button id="recCancelBtn" style="padding:11px 28px;border-radius:22px;border:1px solid rgba(255,255,255,0.5);background:rgba(255,255,255,0.12);color:#fff;font-size:15px;cursor:pointer;">取消</button>
+    <button id="recSendBtn" style="padding:11px 28px;border-radius:22px;border:none;background:#ef4444;color:#fff;font-size:15px;cursor:pointer;">发送</button>
+  </div>
 </div>
 
 <!-- 语音通话 -->
@@ -1550,7 +1554,7 @@ document.getElementById('docInput').addEventListener('change', async e=>{
 let mediaRecorder=null,recordChunks=[],recordStart=0,recordCancelled=false,touchStartY=0;
 // 语音条修复：以前只用 MediaRecorder 录下来自己播放，从没把内容发给 AI，所以永远等不到回复。
 // 现在录音的同时用语音识别转文字，松手后把文字像普通消息一样发给 AI。
-let voiceRec=null, recordTranscript='', voiceRecActive=false, voiceRecSupported=true;
+let voiceRec=null, recordTranscript='', voiceRecActive=false, voiceRecSupported=true, recTimerInt=null;
 function startVoiceRec(){
   recordTranscript=''; voiceRecActive=true;
   const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -1609,24 +1613,40 @@ async function startRecording(){
     };
     mediaRecorder.start();
     startVoiceRec();
+    const recTimeEl=document.getElementById('recTime');
+    if(recTimeEl){
+      recTimeEl.textContent='0:00';
+      clearInterval(recTimerInt);
+      recTimerInt=setInterval(()=>{ const s=Math.floor((Date.now()-recordStart)/1000); recTimeEl.textContent=Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); },500);
+    }
     document.getElementById('recOverlay').classList.add('show');
     document.getElementById('voiceBtn').classList.add('recording');
   } catch(e){ showToast('无法访问麦克风'); }
 }
 function stopRecording(cancel=false){
   recordCancelled=cancel;
+  clearInterval(recTimerInt);
   if(mediaRecorder&&mediaRecorder.state!=='inactive') mediaRecorder.stop();
   document.getElementById('recOverlay').classList.remove('show');
   document.getElementById('voiceBtn').classList.remove('recording');
-  document.getElementById('recTip').textContent='松开发送';
+  document.getElementById('recTip').textContent='录音中，慢慢说 ~';
   document.getElementById('recTip').style.color='white';
 }
+// 改成点按式：点一下开始录，不用一直按着；录音层里点「发送」或「取消」，手滑也不会误触取消
 const voiceBtn=document.getElementById('voiceBtn');
-voiceBtn.addEventListener('touchstart',e=>{e.preventDefault();touchStartY=e.touches[0].clientY;startRecording();},{passive:false});
-voiceBtn.addEventListener('touchmove',e=>{e.preventDefault();const dy=touchStartY-e.touches[0].clientY;const tip=document.getElementById('recTip');if(dy>60){tip.textContent='松开取消';tip.style.color='#ff8888';}else{tip.textContent='松开发送';tip.style.color='white';}},{passive:false});
-voiceBtn.addEventListener('touchend',e=>{e.preventDefault();stopRecording(touchStartY-e.changedTouches[0].clientY>60);},{passive:false});
-voiceBtn.addEventListener('mousedown',e=>{touchStartY=e.clientY;startRecording();});
-document.addEventListener('mouseup',e=>{if(mediaRecorder&&mediaRecorder.state==='recording')stopRecording(touchStartY-e.clientY>60);});
+let recUiState='idle'; // idle | starting | recording
+voiceBtn.addEventListener('click',async()=>{
+  if(recUiState!=='idle') return;
+  recUiState='starting';
+  await startRecording();
+  recUiState=(mediaRecorder&&mediaRecorder.state==='recording')?'recording':'idle';
+});
+document.getElementById('recSendBtn').addEventListener('click',()=>{
+  if(recUiState==='recording'){ stopRecording(false); recUiState='idle'; }
+});
+document.getElementById('recCancelBtn').addEventListener('click',()=>{
+  if(recUiState==='recording'){ stopRecording(true); recUiState='idle'; }
+});
 
 // ══ 语音通话 ══
 let callRecognition = null;
