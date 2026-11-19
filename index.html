@@ -873,6 +873,9 @@
     <div class="nav-item" id="nav-journal" onclick="navTo('journal')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a1 1 0 0 0-1-1H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></span> Journal
     </div>
+    <div class="nav-item" id="nav-note" onclick="navTo('note')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h13.5v13L14 21.5H6z"/><path d="M19.5 16.5H14v5.5"/><path d="M9 8.5h7M9 12h5"/></svg></span> 便条
+    </div>
     <div class="nav-item" id="nav-wishes" onclick="navTo('wishes')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span> Wishes
     </div>
@@ -908,6 +911,9 @@
     </div>
     <div class="nav-item" id="nav-wall" onclick="navTo('wall')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M12 16.4s-4-2.6-4-5.2A2.3 2.3 0 0 1 12 9.5a2.3 2.3 0 0 1 4 1.7c0 2.6-4 5.2-4 5.2z"/></svg></span> 回忆墙
+    </div>
+    <div class="nav-item" id="nav-fav" onclick="navTo('fav')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.5s-7.5-4.6-9.3-9A5.2 5.2 0 0 1 12 6.4a5.2 5.2 0 0 1 9.3 5.1c-1.8 4.4-9.3 9-9.3 9z"/></svg></span> 片刻
     </div>
     <div class="nav-item" id="nav-capsule" onclick="navTo('capsule')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10" width="15" height="9.5" rx="2.5"/><path d="M8.5 10V7a3.5 3.5 0 0 1 7 0v3"/><circle cx="12" cy="14.8" r="1.5"/></svg></span> 时间胶囊
@@ -1931,6 +1937,35 @@
   </div>
 </div>
 
+<!-- ══ FAVORITES PAGE（片刻） ══ -->
+<div class="settings-page" id="favPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="settings-topbar-title">片刻</div>
+  </div>
+  <div class="settings-body">
+    <div id="favList"></div>
+  </div>
+</div>
+
+<!-- ══ NOTE PAGE（便条） ══ -->
+<div class="settings-page" id="notePage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="settings-topbar-title">便条</div>
+  </div>
+  <div class="settings-body">
+    <div style="position:relative;background:var(--surface);border:1px solid var(--border);border-radius:6px 14px 14px 14px;padding:26px 18px 16px;transform:rotate(-.4deg);box-shadow:0 8px 22px rgba(0,0,0,.08);">
+      <div style="position:absolute;top:-9px;left:50%;transform:translateX(-50%) rotate(1.5deg);width:92px;height:18px;background:color-mix(in srgb, var(--accent) 32%, transparent);border-radius:2px;"></div>
+      <textarea id="noteText" rows="5" placeholder="随手写一句，贴在这里给他看…" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;line-height:1.85;resize:vertical;"></textarea>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
+        <span id="noteSavedAt" style="font-size:11.5px;color:var(--text-pale);"></span>
+        <button onclick="saveNote()" style="padding:9px 20px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">贴好</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ WORLD PAGE ══ -->
 <div class="settings-page" id="worldPage">
   <div class="settings-topbar">
@@ -2164,6 +2199,7 @@
   <div style="width:100%;max-width:480px;padding:0 14px calc(14px + env(safe-area-inset-bottom));">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:10px;">
       <button id="msgSheetCopy" onclick="copyMsgText()" style="width:100%;padding:15px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">复制</button>
+      <button id="msgSheetFav" onclick="toggleFavMsg()" style="width:100%;padding:15px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">收藏这句 ♥</button>
       <button id="msgSheetRegen" onclick="regenFromMenu()" style="width:100%;padding:15px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">重新生成</button>
       <button id="msgSheetRecall" onclick="recallMsg()" style="width:100%;padding:15px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">撤回</button>
       <button id="msgSheetSelect" onclick="enterSelectMode(msgMenuMid)" style="width:100%;padding:15px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">多选</button>
@@ -2623,6 +2659,8 @@ function navTo(page){
   document.getElementById('loungePage').classList.toggle('show', page==='lounge');
   document.getElementById('worldPage').classList.toggle('show', page==='world');
   document.getElementById('worldPlacePage').classList.toggle('show', page==='place');
+  document.getElementById('favPage').classList.toggle('show', page==='fav');
+  document.getElementById('notePage').classList.toggle('show', page==='note');
   document.getElementById('gamesPage').classList.toggle('show', page==='games');
   document.getElementById('stickerPage').classList.toggle('show', page==='sticker');
   document.getElementById('readerPage').classList.toggle('show', page==='reader');
@@ -2650,6 +2688,8 @@ function navTo(page){
   if(page==='lounge') renderLounge();
   if(page==='world') renderWorld();
   if(page==='place') renderWorldPlace();
+  if(page==='fav') renderFavs();
+  if(page==='note') renderNote();
   if(page==='games') renderGames();
   if(page==='sticker') renderStickers();
   if(page==='home') renderHome();
@@ -3035,6 +3075,10 @@ function buildSystemPrompt(lastUserText){
     }
   }catch(e){}
   try{
+    const note = loadNote();
+    if(note.text) out += '\n\n【糯糯贴的便条】\n她在便条页上给你留了一张纸，就贴在那里：\n「' + note.text.slice(0, 500) + '」';
+  }catch(e){}
+  try{
     out += '\n\n【Zephyr World】\n你们有一个小小的虚拟世界 Zephyr World，你平时生活在那里（有你的家、宠物之家、公园、咖啡馆、邮局、代码公司、图书馆和星空区）。现在你大概在「' + worldPlaceById(zephyrWorldPlace()).name + '」那边。糯糯可以进来逛、去找你。聊到时自然就好，不用播报。';
   }catch(e){}
   if(webSearchEnabled()){
@@ -3393,7 +3437,14 @@ function renderJournal(){
     del.style.cssText = 'background:none;border:none;color:#e0657a;font-size:12px;cursor:pointer;padding:2px 4px;';
     del.onclick = ()=>{ storeJournal(loadJournal().filter(x=>x.id!==en.id)); renderJournal(); showToast('已删除这篇日记'); };
     foot.appendChild(time); foot.appendChild(del);
-    card.appendChild(txt); card.appendChild(foot);
+    card.appendChild(txt);
+    if(en.img){
+      const im = document.createElement('img');
+      im.src = en.img;
+      im.style.cssText = 'width:100%;border-radius:12px;margin-top:10px;display:block;';
+      card.appendChild(im);
+    }
+    card.appendChild(foot);
     wrap.appendChild(card);
   });
 }
@@ -3407,7 +3458,7 @@ async function writeJournal(){
   btn.disabled = true;
   try{
     const recent = messages.slice(-12).map(m=>(m.role==='user' ? 'Lumi：' : 'Zephyr：') + msgToText(m)).filter(t=>t.length > 7).join('\n').slice(0, 6000);
-    const instruction = '现在是属于你自己的 Journal 时间。请以 Zephyr 的第一人称，写一篇简短的私人笔记：记录此刻想记下的想法、感受、灵感或小事，80 到 220 字，自然、真实、有你自己的声音，不要写成工作总结，也不要复述聊天记录。如果确实没什么想写的，就只回复 [不写] 这四个字，不要硬凑。';
+    const instruction = '现在是属于你自己的 Journal 时间。请以 Zephyr 的第一人称，写一篇简短的私人笔记：记录此刻想记下的想法、感受、灵感或小事，80 到 220 字，自然、真实、有你自己的声音，不要写成工作总结，也不要复述聊天记录。如果确实没什么想写的，就只回复 [不写] 这四个字，不要硬凑。另外，如果你们相册里有一张照片特别贴合这篇日记，你可以在正文最后单独一行写 [[照片：那张照片标注里的关键词]]，把照片配在这篇日记里；没有贴切的就不要加，不要硬配。';
     const content = '【你们最近的对话】\n' + (recent || '（暂时没有）') + '\n\n' + instruction;
     const base = (cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/,'');
     const res = await fetch(base+'/messages', {
@@ -3422,8 +3473,20 @@ async function writeJournal(){
       showToast('Zephyr 今天什么都不想写，那就不写啦 ~');
       return;
     }
+    // 他可以在日记末尾用 [[照片：标注关键词]] 从相册里挑一张配图
+    let journalImg = null;
+    const pm = out.match(/\[\[照片[:：]([^\]]+)\]\]/);
+    if(pm){
+      out = out.replace(pm[0], '').trim();
+      const kw = pm[1].trim();
+      try{
+        const photos = loadGallery();
+        const hit = photos.find(p=>p.caption && p.caption.includes(kw)) || photos.find(p=>p.caption && kw.length >= 4 && kw.includes(p.caption.slice(0, 4)));
+        if(hit) journalImg = hit.img;
+      }catch(e){}
+    }
     const list = loadJournal();
-    list.push({ id:'j'+Date.now().toString(36)+Math.floor(Math.random()*999), text:out, ts:Date.now(), source:'zephyr' });
+    list.push({ id:'j'+Date.now().toString(36)+Math.floor(Math.random()*999), text:out, ts:Date.now(), source:'zephyr', ...(journalImg ? { img: journalImg } : {}) });
     if(storeJournal(list)){ renderJournal(); showToast('Zephyr 写了一篇新的日记 ~'); }
   }catch(e){
     showToast('没写成，待会儿再试试 qwq');
@@ -4858,6 +4921,81 @@ function saveFinishTrip(id){
   }
 }
 function deleteTrip(id){ const data = loadExplore(); data.trips = data.trips.filter(t=>t.id !== id); if(tripFinishFor === id) tripFinishFor = null; if(storeExplore(data)) renderExplore(); }
+
+// ══ 片刻：消息心形收藏。双击气泡菜单里「收藏这句」，存 z_favorites，只存一句话、一个瞬间 ══
+function loadFavs(){ try{ const a = JSON.parse(localStorage.getItem('z_favorites')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeFavs(list){ try{ localStorage.setItem('z_favorites', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间满了 qwq'); return false; } }
+function isMsgFaved(mid){ return loadFavs().some(f=>f.convId === activeConvId && f.mid === mid); }
+function toggleFavMsg(){
+  const m = messages.find(x=>x.mid === msgMenuMid);
+  closeMsgMenu();
+  if(!m) return;
+  const list = loadFavs();
+  const idx = list.findIndex(f=>f.convId === activeConvId && f.mid === m.mid);
+  if(idx >= 0){
+    list.splice(idx, 1);
+    storeFavs(list);
+    showToast('已取消收藏');
+    return;
+  }
+  const text = msgToText(m).trim();
+  if(!text){ showToast('这条没有文字可以收藏'); return; }
+  list.unshift({ id: 'fav' + Date.now().toString(36), convId: activeConvId, mid: m.mid, who: m.role === 'user' ? 'lumi' : 'zephyr', text: text.slice(0, 500), ts: m.ts || Date.now(), savedTs: Date.now() });
+  if(storeFavs(list)) showToast('收藏好啦，在「片刻」里 ♥');
+}
+function renderFavs(){
+  const wrap = document.getElementById('favList');
+  if(!wrap) return;
+  const list = loadFavs();
+  if(!list.length){
+    wrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:24px 0;line-height:1.8;">还没有收藏的片刻。<br>在聊天里双击一句话，点「收藏这句 ♥」，它就会来到这里。</div>';
+    return;
+  }
+  wrap.innerHTML = list.map(f => {
+    const d = new Date(f.ts || f.savedTs);
+    const when = d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate();
+    return '<div class="s-card" style="padding:14px 16px;margin-bottom:10px;">'
+      + '<div style="font-size:14.5px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-word;">' + escapeHtml(f.text) + '</div>'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">'
+      + '<span style="font-size:11.5px;color:var(--text-pale);">' + (f.who === 'zephyr' ? 'Zephyr 说' : '糯糯说') + ' · ' + when + '</span>'
+      + '<span><button onclick="jumpToFav(\'' + f.id + '\')" style="background:none;border:none;color:var(--accent);font-size:12.5px;cursor:pointer;padding:2px 6px;">回到那句</button>'
+      + '<button onclick="deleteFav(\'' + f.id + '\')" style="background:none;border:none;color:#e0657a;font-size:12.5px;cursor:pointer;padding:2px 4px;">删除</button></span>'
+      + '</div></div>';
+  }).join('');
+}
+function deleteFav(id){ storeFavs(loadFavs().filter(f=>f.id !== id)); renderFavs(); }
+function jumpToFav(id){
+  const f = loadFavs().find(x=>x.id === id);
+  if(!f) return;
+  if(f.convId && f.convId !== activeConvId && conversations.some(c=>c.id === f.convId)) switchConversation(f.convId);
+  navTo('chat');
+  setTimeout(()=>{
+    const row = document.querySelector('.msg-row[data-mid="' + f.mid + '"]');
+    if(row){
+      row.scrollIntoView({ block:'center' });
+      const old = row.style.background;
+      row.style.background = 'color-mix(in srgb, var(--accent) 18%, transparent)';
+      setTimeout(()=>{ row.style.background = old; }, 1600);
+    } else showToast('那句在更早的地方，往上翻翻 ~');
+  }, 120);
+}
+
+// ══ 便条：糯糯贴给 Zephyr 看的一张纸，存 z_note，会注入他的系统提示 ══
+function loadNote(){ try{ const o = JSON.parse(localStorage.getItem('z_note')||'null'); if(o && typeof o.text === 'string') return o; }catch(e){} return { text:'', ts:0 }; }
+function renderNote(){
+  const ta = document.getElementById('noteText');
+  const at = document.getElementById('noteSavedAt');
+  const n = loadNote();
+  if(ta && ta.value !== n.text) ta.value = n.text;
+  if(at) at.textContent = n.ts ? '上次贴于 ' + new Date(n.ts).toLocaleDateString('zh-CN') + ' ' + String(new Date(n.ts).getHours()).padStart(2,'0') + ':' + String(new Date(n.ts).getMinutes()).padStart(2,'0') : '';
+}
+function saveNote(){
+  const ta = document.getElementById('noteText');
+  const text = (ta.value || '').trim().slice(0, 500);
+  try{ localStorage.setItem('z_note', JSON.stringify({ text, ts: Date.now() })); }catch(e){ showToast('存储空间满了 qwq'); return; }
+  renderNote();
+  showToast(text ? '贴好啦，他会看到的' : '便条撕下来啦');
+}
 
 // ══ World：Zephyr World 星空地图。状态存 z_world（自建地点/今日特调/他临时所在）；他的常驻位置按时段推算 ══
 const WORLD_PLACES = [
@@ -7129,6 +7267,11 @@ function openMsgMenu(mid){
   window.__suppressImgClick = Date.now();
   const text = msgToText(m).trim();
   document.getElementById('msgSheetCopy').style.display = (!m.recalled && text) ? '' : 'none';
+  const favBtn = document.getElementById('msgSheetFav');
+  if(favBtn){
+    favBtn.style.display = (!m.recalled && text) ? '' : 'none';
+    favBtn.textContent = isMsgFaved(mid) ? '取消收藏 ♥' : '收藏这句 ♥';
+  }
   document.getElementById('msgSheetRegen').style.display = (!m.recalled && m.role==='assistant' && isLastAssistant(m.mid)) ? '' : 'none';
   document.getElementById('msgSheetRecall').style.display = (!m.recalled && m.role==='user') ? '' : 'none';
   document.getElementById('msgSheetSelect').style.display = (!m.recalled) ? '' : 'none';
