@@ -1175,10 +1175,6 @@
           <input class="s-input" type="password" id="ttsKey" placeholder="待填">
         </div>
         <div class="s-row">
-          <div class="s-row-label">音色 ID</div>
-          <input class="s-input" type="text" id="ttsVoiceId" placeholder="voice_xxx">
-        </div>
-        <div class="s-row">
           <div class="s-row-label">通话心跳</div>
           <select class="s-input" id="callHeartbeatSel" onchange="setCallHeartbeat(this.value)">
             <option value="0">关</option>
@@ -2393,7 +2389,6 @@ function loadSettings(){
   document.getElementById('systemPrompt').value = cfg.system;
   document.getElementById('ttsUrl').value    = cfg.ttsUrl||'';
   document.getElementById('ttsKey').value    = cfg.ttsKey;
-  document.getElementById('ttsVoiceId').value= cfg.ttsVoiceId;
 
   const ts=document.getElementById('tempSlider');
   ts.value=cfg.temperature; document.getElementById('tempVal').textContent=cfg.temperature;
@@ -2433,7 +2428,6 @@ function saveSettings(){
   cfg.maxTokens  = parseInt(document.getElementById('maxTokSlider').value);
   cfg.fontSize   = parseInt(document.getElementById('fontSlider').value);
   cfg.ttsKey     = document.getElementById('ttsKey').value.trim();
-  cfg.ttsVoiceId = document.getElementById('ttsVoiceId').value.trim();
   cfg.ttsUrl = document.getElementById('ttsUrl').value.trim();
   Object.entries({z_apiUrl:cfg.apiUrl,z_apiKey:cfg.apiKey,z_model:cfg.model,z_system:cfg.system,
     z_temperature:cfg.temperature,z_topP:cfg.topP,z_maxTokens:cfg.maxTokens,
