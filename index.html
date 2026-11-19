@@ -3837,7 +3837,7 @@ async function letterByZephyr(){
 updateLettersBadge();
 
 // ══ 数据备份：所有数据属于用户，可导出、可迁移、可恢复 ══
-function exportData(){
+async function exportData(){
   const data = {};
   for(let i = 0; i < localStorage.length; i++){
     const k = localStorage.key(i);
@@ -3849,7 +3849,24 @@ function exportData(){
   try{ data['z_gallery'] = JSON.stringify(loadGallery()); }catch(e){}
   try{ data['z_stickers'] = JSON.stringify(loadStickers()); }catch(e){}
   try{ data['z_capsules'] = JSON.stringify(loadCapsules()); }catch(e){}
-  const payload = JSON.stringify({ app:'zephyr', version:1, exportedAt:new Date().toISOString(), data }, null, 2);
+  // 本地书籍与本地歌曲的文件本体在各自的 IndexedDB 里，也一起带上，换设备恢复才不是空壳
+  const files = { books:{}, music:{} };
+  let skippedFiles = 0;
+  try{
+    for(const r of loadReading().filter(r=>r.local)){
+      const d = await bookGet(r.id).catch(()=>null);
+      if(d) files.books[r.id] = d;
+    }
+  }catch(e){}
+  try{
+    for(const t of (loadMusic().tracks || []).filter(t=>t.local)){
+      const blob = await musGetFile(t.id).catch(()=>null);
+      if(!blob) continue;
+      if(blob.size > 20 * 1024 * 1024){ skippedFiles++; continue; }
+      files.music[t.id] = { type: blob.type || 'audio/mpeg', b64: bytesToB64(new Uint8Array(await blob.arrayBuffer())) };
+    }
+  }catch(e){}
+  const payload = JSON.stringify({ app:'zephyr', version:2, exportedAt:new Date().toISOString(), data, files }, null, 2);
   const blob = new Blob([payload], { type:'application/json' });
   const a = document.createElement('a');
   const d = new Date();
@@ -3859,19 +3876,37 @@ function exportData(){
   a.click();
   a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
-  showToast('备份已导出，收好它 ~');
+  showToast(skippedFiles ? ('备份已导出，有 ' + skippedFiles + ' 首太大的本地歌没放进去') : '备份已导出，收好它 ~');
 }
 function importDataFile(input){
   const file = input.files && input.files[0];
   input.value = '';
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = ()=>{
+  reader.onload = async ()=>{
     try{
       const obj = JSON.parse(reader.result);
       if(!obj || obj.app !== 'zephyr' || !obj.data || typeof obj.data !== 'object') throw new Error('bad file');
       if(!confirm('导入会用备份覆盖当前全部数据（对话、记忆、日记、愿望、信件、设置），确定继续吗？')) return;
       Object.keys(obj.data).forEach(k=>{ if(k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey' && k !== 'z_bochaKey') localStorage.setItem(k, obj.data[k]); });
+      // 备份里带了本地书籍/歌曲文件的话，一并恢复进各自的 IndexedDB（旧备份没有这部分，跳过即可）
+      if(obj.files){
+        try{
+          const books = obj.files.books || {};
+          for(const id of Object.keys(books)) await bookPut(id, books[id]).catch(()=>{});
+        }catch(e){}
+        try{
+          const mus = obj.files.music || {};
+          for(const id of Object.keys(mus)){
+            const f = mus[id];
+            if(!f || !f.b64) continue;
+            const bin = atob(f.b64);
+            const bytes = new Uint8Array(bin.length);
+            for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            await musPutFile(id, new Blob([bytes], { type: f.type || 'audio/mpeg' })).catch(()=>{});
+          }
+        }catch(e){}
+      }
       showToast('恢复完成，正在刷新 ~');
       setTimeout(()=>location.reload(), 600);
     }catch(e){
