@@ -2084,7 +2084,7 @@
     <div class="settings-topbar-title">观影室</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">挑本地视频、配字幕（.srt / .vtt）和他一起看；视频和字幕不存进 App。</div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">本地视频或在线找的片都能看；视频和字幕不存进 App。</div>
     <div id="cinemaStage" style="position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:16/9;margin-bottom:12px;">
       <video id="cinemaVideo" style="width:100%;height:100%;display:block;" controls playsinline></video>
       <div id="cinemaDanmaku" style="position:absolute;inset:0;overflow:hidden;pointer-events:none;"></div>
@@ -2092,6 +2092,7 @@
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
       <button onclick="document.getElementById('cinemaVideoFile').click()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">选视频</button>
+      <button onclick="toggleCinemaOnline()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">在线片</button>
       <button onclick="document.getElementById('cinemaSubFile').click()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">选字幕</button>
       <button onclick="cinemaSendFrame()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">留影给他看</button>
       <button onclick="cinemaFullscreen()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">全屏</button>
@@ -2099,6 +2100,13 @@
     </div>
     <input type="file" id="cinemaVideoFile" accept="video/*" style="display:none" onchange="onCinemaVideoChosen(this)">
     <input type="file" id="cinemaSubFile" accept=".srt,.vtt" style="display:none" onchange="onCinemaSubChosen(this)">
+    <div id="cinemaOnlinePanel" style="display:none;margin-bottom:12px;">
+      <div id="cinemaOnlineList"></div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <input id="cinemaUrlInput" type="text" placeholder="或者把视频链接贴进来（http 开头）" style="flex:1;min-width:0;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;outline:none;font-family:inherit;">
+        <button onclick="openCinemaUrlInput()" style="flex:none;padding:10px 16px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">打开</button>
+      </div>
+    </div>
     <div id="cinemaInfo" style="font-size:12px;color:var(--text-pale);margin-bottom:14px;">还没有在播的片子。</div>
     <div class="s-section">
       <div class="s-section-title">一起聊聊</div>
@@ -4823,7 +4831,7 @@ function renderWatchlist(){
       + (w.note ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:5px;">' + escapeHtml(w.note) + '</div>' : '')
       + '</div>'
       + '<button onclick="deleteWatchItem(\'' + w.id + '\')" style="flex:none;background:none;border:none;color:var(--text-pale);font-size:18px;cursor:pointer;padding:2px 6px;">×</button></div>'
-      + '<div style="margin-top:9px;"><button onclick="openWatchedForm(\'' + w.id + '\')" style="padding:8px 14px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">看完了</button></div>';
+      + '<div style="margin-top:9px;display:flex;gap:8px;">' + (w.url ? '<button onclick="watchInCinema(\'' + w.id + '\')" style="padding:8px 14px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">去观影室看</button>' : '') + '<button onclick="openWatchedForm(\'' + w.id + '\')" style="padding:8px 14px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">看完了</button></div>';
     if(watchFormFor === w.id){
       let stars = '';
       for(let n = 1; n <= 5; n++) stars += '<button onclick="setWatchRating(' + n + ')" style="background:none;border:none;font-size:24px;line-height:1;cursor:pointer;padding:2px;color:' + (n <= watchFormRating ? 'var(--accent-s)' : 'var(--text-pale)') + ';">★</button>';
@@ -10196,6 +10204,69 @@ function onCinemaVideoChosen(input){
   renderCinema();
   showToast('开播啦，配一份字幕会更好聊');
 }
+// ══ 观影室在线播放：想看清单里的在线片、或直接贴链接；自带字幕的自动挂上 ══
+function toggleCinemaOnline(){
+  const p = document.getElementById('cinemaOnlinePanel');
+  if(!p) return;
+  const show = p.style.display === 'none';
+  p.style.display = show ? '' : 'none';
+  if(show) renderCinemaOnlineList();
+}
+function renderCinemaOnlineList(){
+  const box = document.getElementById('cinemaOnlineList');
+  if(!box) return;
+  const list = loadWatchlist().filter(w=>w.url && w.status === 'want');
+  if(!list.length){ box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:4px 0;">想看清单里还没有在线的片，去 Watchlist 的「在线找片」加几部</div>'; return; }
+  box.innerHTML = list.map(w=>'<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--border);">'
+    + '<div style="flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">《' + escapeHtml(w.title) + '》' + (w.subUrl ? ' <span style="font-size:11px;color:var(--text-pale);">带字幕</span>' : '') + '</div>'
+    + '<button onclick="watchInCinema(\'' + w.id + '\')" style="flex:none;padding:7px 13px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">放这部</button></div>').join('');
+}
+function watchInCinema(id){
+  const w = loadWatchlist().find(x=>x.id === id);
+  if(!w || !w.url){ showToast('这部没有在线链接'); return; }
+  navTo('cinema');
+  openCinemaUrl(w.url, w.title, w.subUrl || '');
+}
+function openCinemaUrlInput(){
+  const v = document.getElementById('cinemaUrlInput').value.trim();
+  if(!/^https?:\/\//i.test(v)){ showToast('链接要以 http 开头哦'); return; }
+  openCinemaUrl(v, '在线影片', '');
+}
+async function openCinemaUrl(url, title, subUrl){
+  const video = document.getElementById('cinemaVideo');
+  if(cinemaState.url){ try{ URL.revokeObjectURL(cinemaState.url); }catch(e){} }
+  cinemaState.url = url;
+  video.src = url;
+  cinemaState.title = title || '在线影片';
+  cinemaState.cues = [];
+  cinemaState.synopsis = '';
+  cinemaState.frame = null;
+  const recs = loadCinemaRecords();
+  const rec = { id:'f' + Date.now().toString(36) + Math.floor(Math.random()*999), title: cinemaState.title, fileName:'', url, ts: Date.now() };
+  recs.push(rec);
+  storeCinemaRecords(recs);
+  cinemaState.recordId = rec.id;
+  cinemaState.log = [];
+  document.getElementById('cinemaEmpty').style.display = 'none';
+  renderCinema();
+  if(subUrl) attachOnlineSub(subUrl, rec.id);
+  else showToast('开播啦，配一份字幕会更好聊');
+}
+async function attachOnlineSub(subUrl, recId){
+  try{
+    const r = await fetch(subUrl);
+    if(!r.ok) return;
+    const text = await readTextFileSmart(await r.blob());
+    const cues = parseSubtitles(text);
+    if(!cues.length) return;
+    cinemaState.cues = cues;
+    const recs = loadCinemaRecords();
+    const rec = recs.find(x=>x.id === recId);
+    if(rec){ rec.subName = decodeURIComponent(subUrl.split('/').pop() || ''); storeCinemaRecords(recs); }
+    renderCinemaInfo();
+    showToast('字幕自动挂上啦，共 ' + cues.length + ' 句');
+  }catch(e){}
+}
 async function onCinemaSubChosen(input){
   const f = input.files && input.files[0];
   input.value = '';
@@ -10236,7 +10307,7 @@ function renderCinema(){
       + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">'
       + '<div style="font-size:14px;color:var(--text);flex:1;">《' + escapeHtml(r.title) + '》</div>'
       + '<button onclick="deleteCinemaRecord(\'' + r.id + '\')" style="background:none;border:none;color:var(--text-pale);font-size:12px;cursor:pointer;flex-shrink:0;">删除</button></div>'
-      + '<div style="font-size:11px;color:var(--text-pale);margin-top:4px;">' + d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + (r.subName ? ' · 字幕 ' + escapeHtml(r.subName) : '') + '</div>'
+      + '<div style="font-size:11px;color:var(--text-pale);margin-top:4px;">' + d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + (r.url ? ' · 在线' : '') + (r.subName ? ' · 字幕 ' + escapeHtml(r.subName) : '') + '</div>'
       + '<button onclick="resumeCinemaLog(\'' + r.id + '\')" style="margin-top:8px;background:none;border:1px solid var(--border);border-radius:999px;color:var(--text-dim);font-size:12px;padding:5px 12px;cursor:pointer;">看看那次聊了什么</button>'
       + '</div>';
   }).join('');
