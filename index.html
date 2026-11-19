@@ -847,7 +847,7 @@
 <!-- ══ SETTINGS PAGE ══ -->
 <div class="settings-page" id="settingsPage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Settings</div>
   </div>
   <div class="settings-body">
@@ -1067,7 +1067,7 @@
 <!-- ══ MEMORY PAGE ══ -->
 <div class="settings-page" id="memoryPage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Memory</div>
   </div>
   <div class="settings-body">
@@ -1114,7 +1114,7 @@
 <!-- ══ JOURNAL PAGE ══ -->
 <div class="settings-page" id="journalPage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Journal</div>
   </div>
   <div class="settings-body">
@@ -1127,7 +1127,7 @@
 <!-- ══ WISHES PAGE ══ -->
 <div class="settings-page" id="wishesPage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Wishes</div>
   </div>
   <div class="settings-body">
@@ -1154,7 +1154,7 @@
 <!-- ══ LETTERS PAGE ══ -->
 <div class="settings-page" id="lettersPage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Letters</div>
   </div>
   <div class="settings-body">
@@ -1179,7 +1179,7 @@
 <!-- ══ CALENDAR PAGE ══ -->
 <div class="settings-page" id="calendarPage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Calendar</div>
   </div>
   <div class="settings-body">
@@ -1201,7 +1201,7 @@
 <!-- ══ GALLERY PAGE ══ -->
 <div class="settings-page" id="galleryPage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Gallery</div>
   </div>
   <div class="settings-body">
@@ -1234,7 +1234,7 @@
 <!-- ══ WEATHER PAGE ══ -->
 <div class="settings-page" id="weatherPage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Weather</div>
   </div>
   <div class="settings-body">
@@ -1260,7 +1260,7 @@
 <!-- ══ STUDIO PAGE ══ -->
 <div class="settings-page" id="studioPage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Studio</div>
   </div>
   <div class="settings-body">
@@ -1292,7 +1292,7 @@
 <!-- ══ DREAMS PAGE ══ -->
 <div class="settings-page" id="dreamsPage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Dreams</div>
   </div>
   <div class="settings-body">
@@ -1318,7 +1318,7 @@
 <!-- ══ MUSIC PAGE ══ -->
 <div class="settings-page" id="musicPage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Music</div>
   </div>
   <div class="settings-body">
@@ -1371,7 +1371,7 @@
 <!-- ══ WATCHLIST PAGE ══ -->
 <div class="settings-page" id="watchlistPage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Watchlist</div>
   </div>
   <div class="settings-body">
@@ -1417,7 +1417,7 @@
 <!-- ══ 回忆墙 Memory Wall ══ -->
 <div class="settings-page" id="wallPage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Memory Wall</div>
   </div>
   <div class="settings-body">
@@ -1446,7 +1446,7 @@
 <!-- ══ 时间胶囊 Time Capsule ══ -->
 <div class="settings-page" id="capsulePage">
   <div class="settings-topbar">
-    <button class="back-btn" onclick="navTo('home')">←</button>
+    <button class="back-btn" onclick="goBack()">←</button>
     <div class="settings-topbar-title">Time Capsule</div>
   </div>
   <div class="settings-body">
@@ -1794,7 +1794,12 @@ function saveSettings(){
 }
 
 // ══ 导航 ══
+// 返回要「从哪来回哪去」：记住当前的大本营是 Home 还是 Chat，模块页的返回键回到大本营
+let pageBase = 'home';
+function goBack(){ navTo(pageBase); }
+
 function navTo(page){
+  if(page === 'home' || page === 'chat') pageBase = page;
   closeSidebar();
   document.getElementById('homePage').classList.toggle('show', page==='home');
   document.getElementById('settingsPage').classList.toggle('show', page==='settings');
