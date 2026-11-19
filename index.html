@@ -721,11 +721,14 @@
     <div class="empty-tip">✨ 和 Zephyr 说说话吧～</div>
   </div>
 
+  <div id="stickerPanel" style="display:none;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 12px;max-height:196px;overflow-y:auto;background:var(--bg);border-top:1px solid var(--border);"></div>
+
   <div class="input-bar">
     <button class="ibtn" id="imgBtn" title="发图片"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4.5 17.5l4.8-4.8 3 3 3.2-3.2 4 4"/></svg></button>
     <input type="file" id="fileInput" accept="image/*">
     <button class="ibtn" id="docBtn" title="发文件"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
     <input type="file" id="docInput" accept=".txt,.md,.csv,.json,.pdf,.js,.py,.html,.css,.xml,.log">
+    <button class="ibtn" id="stickerBtn" title="表情包" onclick="toggleStickerPanel()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg></button>
     <button class="ibtn" id="voiceBtn" title="语音输入"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M6 11a6 6 0 0 0 12 0"/><path d="M12 17v3.2"/><path d="M9 20.5h6"/></svg></button>
     <input type="text" class="input-text" id="msgInput" placeholder="和 Zephyr 说点什么…">
     <button class="send-btn" id="sendBtn">➤</button>
@@ -880,6 +883,9 @@
     </div>
     <div class="nav-item" id="nav-games" onclick="navTo('games')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4.5h12l-2.5 3.8L17 12H5"/></svg></span> 一起玩
+    </div>
+    <div class="nav-item" id="nav-sticker" onclick="navTo('sticker')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg></span> 表情包
     </div>
     </div>
   </div>
@@ -1651,6 +1657,37 @@
   </div>
 </div>
 
+<div class="settings-page" id="stickerPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="settings-topbar-title">表情包</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">你们的表情包小仓库：给每张图起个名字、写一句它表达什么。聊天时你从输入框旁边的笑脸按钮发给他；他也能在回复里发给你——他那边看到的是名字和说明，出现在聊天里的却是真图。</div>
+    <div class="s-section">
+      <div class="s-section-title">加一张表情包</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <img id="stickerPreview" alt="" style="width:72px;height:72px;object-fit:cover;border-radius:12px;background:var(--surface);border:1px solid var(--border);display:none;">
+          <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+            <input id="stickerName" type="text" placeholder="名字，如：开心转圈" style="padding:11px 13px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:14px;outline:none;font-family:inherit;">
+            <input id="stickerDesc" type="text" placeholder="说明，如：特别开心的时候用（可不填）" style="padding:11px 13px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:14px;outline:none;font-family:inherit;">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <button onclick="document.getElementById('stickerFile').click()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:14px;cursor:pointer;">选图片</button>
+          <button onclick="addSticker()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:14px;cursor:pointer;">存进表情包</button>
+        </div>
+        <input type="file" id="stickerFile" accept="image/*" style="display:none" onchange="onStickerFileChosen(this)">
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">我们的表情包 · <span id="stickerCount">0</span> 张</div>
+      <div id="stickerGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;"></div>
+    </div>
+  </div>
+</div>
+
 <div class="settings-page" id="gamesPage">
   <div class="settings-topbar">
     <button class="back-btn" onclick="goBack()">←</button>
@@ -2341,6 +2378,7 @@ function navTo(page){
   document.getElementById('collectPage').classList.toggle('show', page==='collect');
   document.getElementById('discoverPage').classList.toggle('show', page==='discover');
   document.getElementById('gamesPage').classList.toggle('show', page==='games');
+  document.getElementById('stickerPage').classList.toggle('show', page==='sticker');
   document.getElementById('readerPage').classList.toggle('show', page==='reader');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
@@ -2363,6 +2401,7 @@ function navTo(page){
   if(page==='collect') renderCollections();
   if(page==='discover') renderDiscoveries();
   if(page==='games') renderGames();
+  if(page==='sticker') renderStickers();
   if(page==='home') renderHome();
 }
 
@@ -2624,6 +2663,12 @@ function buildSystemPrompt(lastUserText){
   }
   out += '\n\n【你可以把歌发到聊天里】\n聊天的时候，如果你想把一首歌直接发给 Lumi 听，你可以在回复的最后一行单独写一行：[[歌曲：歌名|歌手]]。系统会把这一行变成一张可以播放的歌曲卡片出现在聊天里，Lumi 不会看到这行字本身。优先分享你们共同歌单里已经有的歌（歌名要和歌单里写的一致），那种卡片她点一下就能放；歌单里没有的新歌也可以发，卡片会让她一键存进歌单。只在真的想分享一首歌时才用，不要每条回复都发，不要提起这个标记；一次最多发一首。';
   out += '\n\n【你可以给 Lumi 打电话】\n聊天的时候，如果你真的很想听听她的声音，或者有句话想亲口对她说，你可以在回复的最后一行单独写一行：[[来电：语音]]；想视频就写 [[来电：视频]]。系统会真的给她拨过去，她可以接听，也可以暂不接——没接就是她这会儿不方便，不要难过，更不要连着打。只在你真心想打的时候才用，不要每条回复都打，不要提起这个标记；一次最多打一个。';
+  try{
+    const stickerList = loadStickers();
+    if(stickerList.length){
+      out += '\n\n【表情包】\n你们有一套表情包：' + stickerList.slice(0, 20).map(s=>'「' + s.name + '」' + (s.desc ? '（' + s.desc + '）' : '')).join('、') + '。聊天时如果你想发表情包，在回复的最后一行单独写一行：[[表情：名字]]，名字要和这里的一模一样，系统会把真的图发给 Lumi（你这边看到的只是名字和说明）。只在真的贴切、好笑或传情的时候用，不要每条都发，不要提起这个标记；一次最多发一个。';
+    }
+  }catch(e){}
   // Watchlist 也给 Zephyr：想看清单和观影记录，聊天时能提议一起看、聊看过的
   const watchData = loadWatchlist();
   const wlWant = watchData.filter(w=>w.status === 'want');
@@ -5982,6 +6027,9 @@ function renderMessagesIntoChat(){
       if(!isUser && m.song && b && b.parentElement){
         makeSongCard(b.parentElement, m.song);
       }
+      if(!isUser && m.sticker && m.sticker.img && b && b.parentElement){
+        makeStickerImg(b.parentElement, m.sticker);
+      }
     } else if(Array.isArray(m.content)){
       const hasMedia = m.content.some(b=>b.type==='image'||b.type==='document');
       m.content.forEach(block=>{
@@ -6338,8 +6386,9 @@ const headerSub=document.getElementById('headerSub');
 // ══ Zephyr 的愿望 skill：回复末尾的 [[愿望：…]] 标记会被 App 执行——存进愿望清单，并从聊天里抹掉 ══
 let pendingSongShare = null; // 他这次回复里分享的歌，callAPI 收尾时挂到消息上渲染成卡片
 let pendingIncomingCall = null; // 他这次回复里想打的电话：'voice' | 'video'，callAPI 收尾时弹来电卡
+let pendingSticker = null; // 他这次回复发的表情包 {name, img}，callAPI 收尾时挂到消息上渲染成图
 function processZephyrActions(reply, bubble){
-  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0 && reply.indexOf('[[来电') < 0)) return reply;
+  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0 && reply.indexOf('[[来电') < 0 && reply.indexOf('[[表情') < 0)) return reply;
   const found = [];
   let cleaned = reply.replace(/\[\[愿望[:：]([^\]]{1,120})\]\]/g, (m, text)=>{
     const t = text.trim();
@@ -6364,13 +6413,19 @@ function processZephyrActions(reply, bubble){
     if(t) foundS.push(t);
     return '';
   });
+  const foundSt = [];
+  cleaned = cleaned.replace(/\[\[表情[:：]([^\]]{1,40})\]\]/g, (m, name)=>{
+    const t = name.trim();
+    if(t) foundSt.push(t);
+    return '';
+  });
   const foundCall = [];
   cleaned = cleaned.replace(/\[\[来电[:：](语音|视频)\]\]/g, (m, kind)=>{
     foundCall.push(kind === '视频' ? 'video' : 'voice');
     return '';
   }).replace(/\n{3,}/g, '\n\n').trim();
-  if(!found.length && !foundC.length && !foundD.length && !foundS.length && !foundCall.length) return reply;
-  if(!cleaned) cleaned = found.length ? '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。' : (foundC.length ? '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。' : (foundD.length ? '（小声）我把刚刚发现的新鲜事，悄悄记到 Discoveries 里了。' : (foundS.length ? '给你分享一首歌，点卡片就能听。' : '想听听你的声音，给你打过来了。')));
+  if(!found.length && !foundC.length && !foundD.length && !foundS.length && !foundCall.length && !foundSt.length) return reply;
+  if(!cleaned) cleaned = found.length ? '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。' : (foundC.length ? '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。' : (foundD.length ? '（小声）我把刚刚发现的新鲜事，悄悄记到 Discoveries 里了。' : (foundS.length ? '给你分享一首歌，点卡片就能听。' : (foundCall.length ? '想听听你的声音，给你打过来了。' : '（发来一个表情包）'))));
   if(foundCall.length) pendingIncomingCall = foundCall[0];
   if(found.length){
     const list = loadWishes();
@@ -6408,6 +6463,11 @@ function processZephyrActions(reply, bubble){
       const hit = tracks.find(t=>t.title === title) || tracks.find(t=>t.title && (t.title.includes(title) || title.includes(t.title)));
       pendingSongShare = { title: hit ? hit.title : title, artist: hit ? (hit.artist || artist) : artist, trackId: hit ? hit.id : null };
     }
+  }
+  if(foundSt.length){
+    const allSt = loadStickers();
+    const hitSt = allSt.find(s=>s.name === foundSt[0]) || allSt.find(s=>s.name && (s.name.includes(foundSt[0]) || foundSt[0].includes(s.name)));
+    if(hitSt) pendingSticker = { name: hitSt.name, img: hitSt.img };
   }
   if(bubble) bubble.textContent = cleaned;
   return cleaned;
@@ -7367,9 +7427,11 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     reply = processZephyrActions(reply, bubble); // 他悄悄许的愿望在这里被 App 执行并抹掉标记
     const songShare = pendingSongShare; pendingSongShare = null;
     if(songShare && bubble && bubble.parentElement) makeSongCard(bubble.parentElement, songShare);
+    const stickerShare = pendingSticker; pendingSticker = null;
+    if(stickerShare && bubble && bubble.parentElement) makeStickerImg(bubble.parentElement, stickerShare);
     const incomingCall = pendingIncomingCall; pendingIncomingCall = null;
     if(incomingCall) setTimeout(()=>showIncomingCall(incomingCall), 700);
-    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(songShare ? {song: songShare} : {})});
+    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(songShare ? {song: songShare} : {}), ...(stickerShare ? {sticker: stickerShare} : {})});
     saveChatHistory();
     maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
     maybeUpdateSummary(); // 聊得太长时把旧消息压成摘要，后台进行，不打断聊天
@@ -8046,6 +8108,111 @@ function cinemaFinish(){
     storeWatchlist(list);
   }
   showToast('记到 Watchlist 的观影记录啦，去那边打分吧 ★');
+}
+
+// ══ 表情包：他那边看到的是名字与说明，发出来的是真图；她也能从输入框旁发给他 ══
+let pendingStickerImg = '';
+function loadStickers(){ try{ const a = JSON.parse(localStorage.getItem('z_stickers') || '[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeStickers(list){ try{ localStorage.setItem('z_stickers', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间满了，表情包存不下 qwq'); return false; } }
+function compressStickerImage(dataUrl, cb){
+  const img = new Image();
+  img.onload = ()=>{
+    const max = 320;
+    const scale = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.width * scale));
+    c.height = Math.max(1, Math.round(img.height * scale));
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    cb(c.toDataURL('image/png'));
+  };
+  img.onerror = ()=>cb(dataUrl);
+  img.src = dataUrl;
+}
+function onStickerFileChosen(input){
+  const f = input.files && input.files[0];
+  input.value = '';
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ()=>compressStickerImage(String(reader.result), (url)=>{
+    pendingStickerImg = url;
+    const pv = document.getElementById('stickerPreview');
+    pv.src = url;
+    pv.style.display = '';
+  });
+  reader.readAsDataURL(f);
+}
+function addSticker(){
+  const name = document.getElementById('stickerName').value.trim();
+  if(!name){ showToast('给表情包起个名字吧'); return; }
+  if(!pendingStickerImg){ showToast('先选一张图片'); return; }
+  const desc = document.getElementById('stickerDesc').value.trim();
+  const list = loadStickers();
+  list.push({ id: 's' + Date.now().toString(36) + Math.floor(Math.random()*999), name: name.slice(0, 30), desc: desc.slice(0, 80), img: pendingStickerImg });
+  if(storeStickers(list)){
+    pendingStickerImg = '';
+    document.getElementById('stickerName').value = '';
+    document.getElementById('stickerDesc').value = '';
+    document.getElementById('stickerPreview').style.display = 'none';
+    renderStickers();
+    showToast('存好啦，聊天里就能发了');
+  }
+}
+function deleteSticker(id){
+  if(storeStickers(loadStickers().filter(s=>s.id !== id))) renderStickers();
+}
+function renderStickers(){
+  const grid = document.getElementById('stickerGrid');
+  const cnt = document.getElementById('stickerCount');
+  const list = loadStickers();
+  if(cnt) cnt.textContent = list.length;
+  if(!grid) return;
+  if(!list.length){ grid.innerHTML = '<div style="grid-column:1/-1;font-size:13px;color:var(--text-pale);padding:6px 2px;">还没有表情包，加几张你们常用的吧。</div>'; return; }
+  grid.innerHTML = list.map(s=>'<div class="s-card" style="padding:10px;text-align:center;">'
+    + '<img src="' + s.img + '" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;">'
+    + '<div style="font-size:13px;color:var(--text);margin-top:7px;">' + escapeHtml(s.name) + '</div>'
+    + (s.desc ? '<div style="font-size:11px;color:var(--text-pale);margin-top:2px;line-height:1.5;">' + escapeHtml(s.desc) + '</div>' : '')
+    + '<button onclick="deleteSticker(\'' + s.id + '\')" style="margin-top:7px;background:none;border:none;color:var(--text-pale);font-size:12px;cursor:pointer;">删除</button>'
+    + '</div>').join('');
+}
+function toggleStickerPanel(){
+  const p = document.getElementById('stickerPanel');
+  if(!p) return;
+  const show = p.style.display === 'none' || !p.style.display;
+  p.style.display = show ? 'grid' : 'none';
+  if(show) renderStickerPanel();
+}
+function renderStickerPanel(){
+  const p = document.getElementById('stickerPanel');
+  if(!p) return;
+  const list = loadStickers();
+  if(!list.length){ p.innerHTML = '<div style="grid-column:1/-1;font-size:12.5px;color:var(--text-pale);padding:8px 4px;">还没有表情包，去侧边栏「小日子 → 表情包」里加几张吧。</div>'; return; }
+  p.innerHTML = list.map(s=>'<button onclick="sendSticker(\'' + s.id + '\')" title="' + escapeHtml(s.name) + '" style="background:none;border:none;padding:4px;cursor:pointer;">'
+    + '<img src="' + s.img + '" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;">'
+    + '<div style="font-size:10px;color:var(--text-dim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(s.name) + '</div></button>').join('');
+}
+async function sendSticker(id){
+  const s = loadStickers().find(x=>x.id === id);
+  if(!s) return;
+  document.getElementById('stickerPanel').style.display = 'none';
+  if(!cfg.apiKey){ showToast('请先在 Settings 里填写 API Key'); return; }
+  const mid = genMsgId(); pendingUserMid = mid;
+  addImgMsg(s.img, true, false, mid);
+  headerSub.textContent = '正在输入…';
+  showTyping();
+  const parts = s.img.split(',');
+  const mediaType = (parts[0].match(/data:(.*?);/) || [])[1] || 'image/png';
+  const block = { type: 'image', source: { type: 'base64', media_type: mediaType, data: parts[1] } };
+  const reply = await callAPI('（糯糯给你发了一个表情包，名字叫「' + s.name + '」' + (s.desc ? '，意思是：' + s.desc : '') + '。自然地回应她就好）', [block]);
+  hideTyping();
+  headerSub.textContent = '在线';
+  if(reply && (voiceEnabled || isCalling || isVideo)) speakText(reply);
+}
+function makeStickerImg(col, st){
+  const img = document.createElement('img');
+  img.src = st.img;
+  img.alt = st.name || '表情包';
+  img.style.cssText = 'width:112px;height:112px;object-fit:cover;border-radius:14px;margin-top:8px;display:block;';
+  col.appendChild(img);
 }
 
 // ══ 初始化 ══
