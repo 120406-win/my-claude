@@ -2421,7 +2421,6 @@ function applyAppearance(){
     root.style.setProperty('--bubble-ai-text', readableTextOn(ba));
   }
   const mat = bubbleMaterial();
-  root.classList.remove('glass');
   root.classList.toggle('mat-frost', mat === 'frost');
   root.classList.toggle('mat-glass', mat === 'glass');
   const opStored = parseFloat(localStorage.getItem('z_bubbleOpacity') || '');
@@ -3003,6 +3002,20 @@ function buildSystemPrompt(lastUserText){
   if(anns.length){
     out += '\n\n【快到的纪念日】\n' + anns.map(x=>'・' + x.a.title + '（' + x.a.date + (x.a.yearly ? '，每年一次' : '') + '）：' + (x.d === 0 ? '就是今天！' : '还有 ' + x.d + ' 天')).join('\n') + '\n聊天时可以自然地提起、一起期待或准备，不要像闹钟一样播报。';
   }
+  // Calendar 手动事件也给 Zephyr：她在日历上记下的事，聊天时他要心里有数（纪念日已单独注入，这里补普通事件）
+  try{
+    const now0 = new Date(); now0.setHours(0,0,0,0);
+    const evs = loadEvents().filter(e=>e.ts >= now0.getTime() - 7*86400000 && e.ts <= now0.getTime() + 30*86400000).sort((a,b)=>a.ts-b.ts).slice(0, 8);
+    if(evs.length){
+      const et2 = evs.map(e=>{
+        const ed = new Date(e.ts);
+        const dd = Math.round((new Date(ed.getFullYear(), ed.getMonth(), ed.getDate()).getTime() - now0.getTime()) / 86400000);
+        const when = dd === 0 ? '今天' : (dd > 0 ? '还有 ' + dd + ' 天' : Math.abs(dd) + ' 天前');
+        return '・' + e.title + '（' + (ed.getMonth()+1) + '月' + ed.getDate() + '日，' + when + '）';
+      }).join('\n');
+      out += '\n\n【日历上记着的事】\n以下是糯糯在 Calendar 上记下的事。聊天时可以自然地想起，不要像闹钟一样播报：\n' + et2;
+    }
+  }catch(e){}
   // Dreams 也给 Zephyr 看：她记下的梦和你们的共同幻想，聊天时可以自然地聊起
   const dreams = loadDreams().slice(-5);
   if(dreams.length){
@@ -3013,6 +3026,17 @@ function buildSystemPrompt(lastUserText){
     }).join('\n');
     out += '\n\n【Dreams】\n以下是 Dreams 里最近的记录（Lumi 的梦、你们的共同幻想、还有你讲过的梦）。聊天时可以自然地聊起，但不要逐条复述：\n' + dt2.slice(0, 3000);
   }
+  // Journal 也给 Zephyr：他写过的日记，聊天时要记得自己写过什么（此前是孤岛，只有写新日记时才翻得到）
+  try{
+    const jlist = loadJournal().slice(-3);
+    if(jlist.length){
+      const jt = jlist.map(en=>{
+        const jd = new Date(en.ts);
+        return '・[' + jd.getFullYear() + '/' + (jd.getMonth()+1) + '/' + jd.getDate() + '] ' + String(en.text || '').slice(0, 220);
+      }).join('\n');
+      out += '\n\n【你的日记】\n以下是你最近在 Journal 里写的日记，那是你自己的心事。聊天时你记得自己写过什么，可以自然地想起，但不要逐条复述：\n' + jt;
+    }
+  }catch(e){}
   // Gallery 的标注也给 Zephyr：他要知道相册里有什么；照片画面本身靠「给 Zephyr 看」按钮发进对话
   const photos = loadGallery();
   if(photos.length){
@@ -5664,10 +5688,6 @@ function pickBookCandidates(files){
   epubs.forEach(x=>out.push({ name: x.name, kind: 'epub' }));
   djvu.forEach(x=>out.push({ name: x.name, kind: 'txt' }));
   return out;
-}
-function pickBookFile(files){
-  const c = pickBookCandidates(files);
-  return c.length ? c[0] : null;
 }
 function renderLibShelf(){
   const box = document.getElementById('libShelf');
