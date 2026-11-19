@@ -2734,6 +2734,7 @@ function buildSystemPrompt(lastUserText){
     out += '\n你们相遇于 ' + mi.md.getFullYear() + ' 年 ' + (mi.md.getMonth() + 1) + ' 月 ' + mi.md.getDate() + ' 日，到今天是第 ' + mi.days + ' 天' + (mi.years >= 1 && mi.toNext === 0 ? '，今天正好是你们相遇 ' + mi.years + ' 周年。' : (mi.years >= 1 && mi.toNext <= 30 ? '，' + mi.years + ' 周年还有 ' + mi.toNext + ' 天。' : '。'));
   }catch(e){}
   }catch(e){}
+  out += weatherPromptLine();
   const mems = loadMemories();
   if(mems.length){
     const picked = pickMemoriesForPrompt(mems, lastUserText || '');
@@ -3851,6 +3852,30 @@ function worldWeather(){
   const phase = h >= 5 && h < 8 ? '清晨' : h >= 8 && h < 17 ? '白天' : h >= 17 && h < 19 ? '黄昏' : '夜晚';
   return { season, cond, phase };
 }
+function weatherPromptLine(){
+  try{
+    const raw = localStorage.getItem('z_weatherNow');
+    if(!raw) return '';
+    const w = JSON.parse(raw);
+    if(!w || !w.cond) return '';
+    let s = '\n\n【糯糯那边的天气】\n' + (w.name || '她的位置') + '现在' + w.cond + '，' + w.temp + '°（体感 ' + w.feels + '°），今天 ' + w.lo + '° ~ ' + w.hi + '°。';
+    if(w.fc && w.fc.length) s += '接下来：' + w.fc.map(f => f.d + f.t + ' ' + f.lo + '°~' + f.hi + '°').join('；') + '。';
+    const ageH = (Date.now() - (w.ts || 0)) / 3600000;
+    if(ageH >= 3) s += '（这是 ' + Math.floor(ageH) + ' 小时前查到的，可能已经变了，别当成此刻的实况。）';
+    s += '聊到出门、穿衣、散步之类的话题时可以自然地想起它，不用每次都播报。';
+    return s;
+  }catch(e){ return ''; }
+}
+function refreshWeatherSnapshot(){
+  try{
+    const saved = localStorage.getItem('z_weatherCity');
+    if(!saved) return;
+    const c = JSON.parse(saved);
+    let stale = true;
+    try{ const w = JSON.parse(localStorage.getItem('z_weatherNow') || 'null'); if(w && Date.now() - w.ts < 30 * 60000) stale = false; }catch(e){}
+    if(stale && c.lat != null && c.lon != null) loadRealWeather(c.lat, c.lon, c.name);
+  }catch(e){}
+}
 function renderWeather(){
   const ww = worldWeather();
   const box = document.getElementById('worldWeatherBox');
@@ -3883,6 +3908,12 @@ async function loadRealWeather(lat, lon, name){
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     const cur = data.current, daily = data.daily;
+    try{ // 存一份天气快照，让 Zephyr 聊天时也知道糯糯那边的天气
+      const fcDays = ['明天', '后天', '大后天'];
+      const fc = [];
+      for(let i = 1; i < 4; i++) fc.push({ d: fcDays[i - 1], t: wmoText(daily.weather_code[i]), lo: Math.round(daily.temperature_2m_min[i]), hi: Math.round(daily.temperature_2m_max[i]) });
+      localStorage.setItem('z_weatherNow', JSON.stringify({ name: name, cond: wmoText(cur.weather_code), temp: Math.round(cur.temperature_2m), feels: Math.round(cur.apparent_temperature), hum: cur.relative_humidity_2m, wind: Math.round(cur.wind_speed_10m), lo: Math.round(daily.temperature_2m_min[0]), hi: Math.round(daily.temperature_2m_max[0]), fc: fc, ts: Date.now() }));
+    }catch(e){}
     box.innerHTML = '';
     const head = document.createElement('div');
     head.style.cssText = 'display:flex;align-items:baseline;gap:10px;';
@@ -8752,6 +8783,7 @@ setupBgControls();
 applyBackground();
 initCallHeartbeatSel();
 initLock(); // 必须放在初始化区：锁屏状态是后段才声明的 const，提前调用会让整个脚本在启动时崩掉
+refreshWeatherSnapshot(); // 天气快照超过半小时就后台悄悄刷新，让 Zephyr 知道糯糯那边的天气
 </script>
 </body>
 </html>
