@@ -965,7 +965,7 @@
         <div id="usageSummary" style="display:flex;flex-direction:column;gap:9px;font-size:13px;color:var(--text);"></div>
         <div style="font-size:12px;color:var(--text-dim);margin-top:14px;">按模型累计</div>
         <div id="usageModels" style="display:flex;flex-direction:column;gap:9px;font-size:13px;color:var(--text);margin-top:7px;"></div>
-        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-top:12px;">费用按下面的单价估算（美元 / 每百万 token；缓存读按输入价 1 折、缓存写按 1.25 倍）。中转接口的实际价格可能不一样，以你填的为准。统计从这一版开始记，之前的聊天不补记。</div>
+        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-top:12px;">按单价估算，中转实际价可能不同；从这一版开始记。</div>
         <div style="font-size:12.5px;color:var(--text-dim);margin-top:12px;">当前模型 <span id="usageModelName" style="color:var(--text);"></span> 的单价</div>
         <div style="display:flex;gap:8px;margin-top:8px;">
           <input id="usagePriceIn" type="number" step="0.01" min="0" placeholder="输入价" style="flex:1;min-width:0;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13.5px;outline:none;font-family:inherit;">
@@ -1007,18 +1007,18 @@
             </div>
             <div class="slider-val" id="maxTokVal">800</div>
           </div>
-          <input type="range" id="maxTokSlider" min="100" max="2000" step="100" value="800">
+          <input type="range" id="maxTokSlider" min="100" max="16000" step="100" value="800">
         </div>
         <div class="s-row">
-          <div class="s-row-label">思考过程（Thinking）<div class="s-row-sub">让 Zephyr 回复前先深度思考，并把思考过程显示在回复上方（可折叠）。会更慢、更费 token；开启时 Temperature / Top P 不生效。需要模型和接口支持，不支持时会发送失败，关掉即可。</div></div>
+          <div class="s-row-label">思考过程（Thinking）<div class="s-row-sub">开启时 Temperature / Top P 不生效；模型不支持会发送失败</div></div>
           <input type="checkbox" id="thinkingToggle" onchange="toggleThinking(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
         </div>
         <div class="s-row">
-          <div class="s-row-label">联网搜索（Web Search）<div class="s-row-sub">让 Zephyr 在聊天时像官网那样上网搜索：遇到时事、实时信息或他不确定的事，他会开口要搜，App 帮他搜完把结果喂给他再回答，回复下方会附上来源。和 Kelivo 同款机制，中转接口也能用；需要下面这个搜索 Key。</div></div>
+          <div class="s-row-label">联网搜索（Web Search）<div class="s-row-sub">需要搜索 Key；回复会附来源</div></div>
           <input type="checkbox" id="webSearchToggle" onchange="toggleWebSearch(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
         </div>
         <div class="s-row">
-          <div class="s-row-label">搜索通道<div class="s-row-sub">Tavily 偏全球内容；博查（Bocha）是国内的 AI 搜索，中文和国内资讯更强。两个 Key 各填各的，随时切换。百度千帆的接口不允许网页直连（跨域限制），所以没法直接用百度，博查就是它的平替。</div></div>
+          <div class="s-row-label">搜索通道<div class="s-row-sub">Tavily 偏全球，博查偏中文</div></div>
           <select id="searchProviderSel" onchange="setSearchProvider(this.value)" style="flex-shrink:0;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:13px;">
             <option value="tavily">Tavily</option>
             <option value="bocha">博查 Bocha</option>
@@ -1027,7 +1027,7 @@
         <div class="s-row">
           <div>
             <div class="s-row-label">Tavily Key</div>
-            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;line-height:1.6;">tavily.com 免费注册就有（每月 1000 次，不用绑卡）。只存在这台设备上，不进备份导出。</div>
+            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;line-height:1.6;">每月免费 1000 次；只存本机，不进备份</div>
           </div>
         </div>
         <div style="padding:0 16px 14px;">
@@ -1036,7 +1036,7 @@
         <div class="s-row">
           <div>
             <div class="s-row-label">博查 Key</div>
-            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;line-height:1.6;">去 bochaai.com 开放平台用手机号注册，在控制台创建 API Key 填进来。注册有免费体验额度，之后按量计费也很便宜。</div>
+            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;line-height:1.6;">bochaai.com 注册创建，别忘了领免费试用包</div>
           </div>
         </div>
         <div style="padding:0 16px 14px;">
@@ -1201,7 +1201,6 @@
             <option value="120">安静 120 秒他找话头</option>
           </select>
         </div>
-        <div style="font-size:11px;color:var(--text-pale);line-height:1.6;padding:2px 2px 0;">通话里两人都安静超过这个时间（再随机延后一点），Zephyr 会主动说一句；连说 10 句没等到你就停。</div>
         <div class="s-row">
           <div class="s-row-label">外语附翻译</div>
           <select class="s-input" id="enZhSel" onchange="setEnZh(this.value)">
@@ -1209,7 +1208,6 @@
             <option value="0">关</option>
           </select>
         </div>
-        <div style="font-size:11px;color:var(--text-pale);line-height:1.6;padding:2px 2px 0;">开启后，他用英文、韩语、日语、德语、法语、粤语等其他语言回复时只会念原文，中文翻译会作为小字附在气泡下面给你看。</div>
       </div>
     </div>
 
@@ -1239,7 +1237,7 @@
       <div class="s-section-title">锁屏</div>
       <div class="s-card" style="padding:14px 16px;">
         <div id="lockStatus" style="font-size:13px;color:var(--text-dim);line-height:1.7;">还没开启。</div>
-        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-top:8px;">说清楚：这个锁是防顺手翻看的——比如手机临时借给别人、或者放在桌上被人拿起来。它不是加密，数据本来就存在这台设备的浏览器里。忘了图案可以用密保问题找回；密保也忘了，就只能清掉浏览器数据，所以记得偶尔导出备份。</div>
+        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-top:8px;">防顺手翻看，不是加密。忘了图案用密保找回；密保也忘了只能清浏览器数据，记得导出备份。</div>
         <div style="display:flex;gap:8px;margin-top:12px;">
           <button onclick="setupLockPattern()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13.5px;cursor:pointer;">设置 / 修改图案</button>
           <button onclick="disableLock()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13.5px;cursor:pointer;">关闭锁屏</button>
@@ -1254,7 +1252,7 @@
     <div class="s-section">
       <div class="s-section-title">数据备份</div>
       <div class="s-card" style="padding:14px 16px;">
-        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-bottom:12px;">把对话、记忆、日记、愿望、信件和设置导出成一个文件收好，换设备或浏览器出意外时可以恢复。出于安全，API Key 不会写进备份文件，恢复后重新填一次就好。</div>
+        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-bottom:12px;">导出全部数据成一个文件收好，换设备或出意外时可恢复。API Key 不进备份，恢复后重填。</div>
         <div style="display:flex;gap:8px;">
           <button onclick="exportData()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">导出全部数据</button>
           <button onclick="document.getElementById('importFileInput').click()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">导入恢复</button>
@@ -1268,7 +1266,7 @@
     <div class="s-section">
       <div class="s-section-title">导入聊天记录</div>
       <div class="s-card" style="padding:14px 16px;">
-        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-bottom:12px;">把以前在别的前端或其他地方的聊天记录带进 Zephyr。支持 Kelivo 备份包（.zip，聊天记录和 Kelivo 的长期记忆都能一起搬过来）/ JSON / JSONL / TXT / Markdown。</div>
+        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-bottom:12px;">支持 Kelivo 备份包（.zip，含长期记忆）/ JSON / JSONL / TXT / Markdown。</div>
         <div style="display:flex;gap:8px;">
           <select id="importMode" style="flex:1;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
             <option value="both">存为历史 + 提取记忆</option>
@@ -1305,7 +1303,7 @@
       <div class="s-card">
         <div class="s-row">
           <div class="s-row-label">聊天时自动记下重要的事
-            <div class="s-row-sub">每聊 10 条，Zephyr 会自己总结一遍，把重要的写进长期记忆（会多用一点点 API 额度）</div>
+            <div class="s-row-sub">每聊 10 条自动总结一次</div>
           </div>
           <input type="checkbox" id="autoMemToggle" onchange="toggleAutoMem(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
         </div>
@@ -1319,7 +1317,7 @@
       <div class="s-card">
         <div class="s-row">
           <div class="s-row-label">把聊过的旧消息压成摘要
-            <div class="s-row-sub">对话很长时，较早的消息会自动总结成一段笔记放在上下文最前面，他不会断片，也省额度（会多用一点点 API 额度）</div>
+            <div class="s-row-sub">长对话自动总结前文，他不会断片，也省额度</div>
           </div>
           <input type="checkbox" id="summaryToggle" onchange="toggleSummary(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
         </div>
