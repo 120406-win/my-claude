@@ -817,7 +817,14 @@
   <div class="nav-divider"></div>
 
   <div class="nav-section">
-    <div class="nav-label">Memory</div>
+    <div class="nav-label" onclick="toggleMemoryNav()" style="display:flex;align-items:center;justify-content:space-between;padding-right:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
+      <span>Memory</span>
+      <span style="display:flex;align-items:center;gap:6px;">
+        <span id="memoryNavDot" style="display:none;width:7px;height:7px;border-radius:50%;background:var(--accent);"></span>
+        <svg id="memoryNavChevron" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s;"><path d="M6 9l6 6 6-6"/></svg>
+      </span>
+    </div>
+    <div id="memoryNavGroup">
     <div class="nav-item" id="nav-memory" onclick="navTo('memory')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.5C7 16.5 3.5 13.3 3.5 9.6 3.5 7 5.5 5 8 5c1.7 0 3.2.9 4 2.3C12.8 5.9 14.3 5 16 5c2.5 0 4.5 2 4.5 4.6 0 3.7-3.5 6.9-8.5 10.9z"/></svg></span> Memory
     </div>
@@ -868,6 +875,7 @@
     </div>
     <div class="nav-item" id="nav-games" onclick="navTo('games')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4.5h12l-2.5 3.8L17 12H5"/></svg></span> 一起玩
+    </div>
     </div>
   </div>
 </div>
@@ -2862,6 +2870,8 @@ function updateLettersBadge(){
   const n = loadLetters().filter(l=>l.from==='zephyr' && !l.read && !l.draft).length;
   badge.style.display = n ? '' : 'none';
   badge.textContent = n;
+  const dot = document.getElementById('memoryNavDot');
+  if(dot) dot.style.display = n ? '' : 'none';
 }
 function letterDateStr(ts){
   const d = new Date(ts);
@@ -4886,6 +4896,17 @@ document.getElementById('menuBtn').addEventListener('click', openSidebar);
 document.getElementById('sidebarOverlay').addEventListener('click', closeSidebar);
 function openSidebar(){ document.getElementById('sidebar').classList.add('show'); document.getElementById('sidebarOverlay').classList.add('show'); }
 function closeSidebar(){ document.getElementById('sidebar').classList.remove('show'); document.getElementById('sidebarOverlay').classList.remove('show'); }
+// Memory 分组折叠：点标题展开/收起，收起状态会被记住；默认收起，侧边栏只剩一行
+function toggleMemoryNav(force){
+  const grp = document.getElementById('memoryNavGroup');
+  const chev = document.getElementById('memoryNavChevron');
+  if(!grp) return;
+  const open = typeof force === 'boolean' ? force : grp.style.display === 'none';
+  grp.style.display = open ? '' : 'none';
+  if(chev) chev.style.transform = open ? '' : 'rotate(-90deg)';
+  try{ localStorage.setItem('z_navMemoryOpen', open ? '1' : '0'); }catch(e){}
+}
+(function(){ let saved = null; try{ saved = localStorage.getItem('z_navMemoryOpen'); }catch(e){} toggleMemoryNav(saved === '1'); })();
 document.getElementById('newConvBtn').addEventListener('click', newConversation);
 
 // ══ Toast ══
