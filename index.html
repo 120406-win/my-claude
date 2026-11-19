@@ -643,6 +643,8 @@
     .home-date { font-size:12.5px; color:var(--text-pale); margin-top:4px; letter-spacing:.08em; }
     .home-greet { font-size:15px; color:var(--text); margin-top:12px; }
     .home-chat-card { display:flex; align-items:center; gap:14px; background:linear-gradient(135deg, var(--accent), var(--accent-s)); border:1px solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius:20px; padding:18px; cursor:pointer; box-shadow:0 12px 32px color-mix(in srgb, var(--accent) 32%, transparent); margin-bottom:14px; }
+    .home-world-card { display:flex; align-items:center; gap:14px; background:linear-gradient(135deg,#141448,#23235e 60%,#2d2d6e); border:1px solid rgba(255,255,255,.16); border-radius:20px; padding:18px; cursor:pointer; box-shadow:0 12px 32px rgba(10,10,50,.35); margin-bottom:14px; position:relative; overflow:hidden; }
+    .home-world-card::after { content:''; position:absolute; right:14px; top:10px; width:3px; height:3px; border-radius:50%; background:#fff; box-shadow:-26px 14px 0 rgba(255,255,255,.75), -58px 4px 0 rgba(255,255,255,.5), -12px 30px 0 rgba(255,255,255,.45), -84px 22px 0 rgba(255,255,255,.6); }
     .home-meet-card { display:flex; align-items:center; gap:14px; background:color-mix(in srgb, var(--surface) 82%, transparent); border:1px solid var(--border); border-radius:20px; padding:16px 18px; margin-bottom:14px; }
     .home-meet-avatars { display:flex; align-items:center; flex-shrink:0; }
     .home-meet-avatar { width:44px; height:44px; border-radius:50%; overflow:hidden; background:color-mix(in srgb, var(--accent) 14%, transparent); border:2px solid var(--surface); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -785,6 +787,13 @@
         <div style="font-size:12.5px;color:rgba(255,255,255,.75);margin-top:2px;">他在这里等你</div>
       </div>
     </div>
+    <div class="home-world-card" onclick="navTo('world')">
+      <div class="home-chat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg></div>
+      <div>
+        <div style="font-size:16px;font-weight:600;color:#fff;">Zephyr World</div>
+        <div style="font-size:12.5px;color:rgba(255,255,255,.75);margin-top:2px;" id="homeWorldSub">进去逛逛</div>
+      </div>
+    </div>
     <div class="home-grid">
       <div class="home-card" onclick="navTo('capsule')">
         <div class="home-card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10" width="15" height="9.5" rx="2.5"/><path d="M8.5 10V7a3.5 3.5 0 0 1 7 0v3"/><circle cx="12" cy="14.8" r="1.5"/></svg></div>
@@ -835,9 +844,6 @@
     <div class="nav-item" id="nav-home" onclick="navTo('home')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5.5 9.3V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.3"/><path d="M9.5 21v-6h5v6"/></svg></span> Home
     </div>
-    <div class="nav-item" id="nav-world" onclick="navTo('world')">
-      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg></span> World
-    </div>
     <div class="nav-item active" id="nav-chat" onclick="navTo('chat')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></span> Chat
     </div>
@@ -873,9 +879,6 @@
     <div class="nav-item" id="nav-journal" onclick="navTo('journal')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V4a1 1 0 0 0-1-1H6.5A2.5 2.5 0 0 0 4 5.5v14z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></svg></span> Journal
     </div>
-    <div class="nav-item" id="nav-note" onclick="navTo('note')">
-      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h13.5v13L14 21.5H6z"/><path d="M19.5 16.5H14v5.5"/><path d="M9 8.5h7M9 12h5"/></svg></span> 便条
-    </div>
     <div class="nav-item" id="nav-wishes" onclick="navTo('wishes')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span> Wishes
     </div>
@@ -903,11 +906,23 @@
     <div class="nav-item" id="nav-watchlist" onclick="navTo('watchlist')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M10.3 9.3l4.7 2.7-4.7 2.7z"/></svg></span> Watchlist
     </div>
-    <div class="nav-item" id="nav-cinema" onclick="navTo('cinema')">
-      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M7.5 5v14M16.5 5v14M3.5 9.5h4M3.5 14.5h4M16.5 9.5h4M16.5 14.5h4"/></svg></span> 观影室
-    </div>
     <div class="nav-item" id="nav-reading" onclick="navTo('reading')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span> Reading
+    </div>
+    <div class="nav-item" id="nav-discover" onclick="navTo('discover')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2.1 4.9-4.9 2.1 2.1-4.9z"/></svg></span> Discoveries
+    </div>
+    <div class="nav-item" id="nav-explore" onclick="navTo('explore')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.4-6.5-10.3A6.5 6.5 0 0 1 12 4.5a6.5 6.5 0 0 1 6.5 6.2C18.5 15.6 12 21 12 21z"/><circle cx="12" cy="10.8" r="2.3"/></svg></span> Explore
+    </div>
+    <div class="nav-item" id="nav-lounge" onclick="navTo('lounge')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13.5A8.5 8.5 0 1 1 10.5 4 6.8 6.8 0 0 0 20 13.5z"/><path d="M17.5 3.5l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6z"/></svg></span> Lounge
+    </div>
+    <div class="nav-item" id="nav-note" onclick="navTo('note')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5h13.5v13L14 21.5H6z"/><path d="M19.5 16.5H14v5.5"/><path d="M9 8.5h7M9 12h5"/></svg></span> 便条
+    </div>
+    <div class="nav-item" id="nav-cinema" onclick="navTo('cinema')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M7.5 5v14M16.5 5v14M3.5 9.5h4M3.5 14.5h4M16.5 9.5h4M16.5 14.5h4"/></svg></span> 观影室
     </div>
     <div class="nav-item" id="nav-wall" onclick="navTo('wall')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M12 16.4s-4-2.6-4-5.2A2.3 2.3 0 0 1 12 9.5a2.3 2.3 0 0 1 4 1.7c0 2.6-4 5.2-4 5.2z"/></svg></span> 回忆墙
@@ -920,15 +935,6 @@
     </div>
     <div class="nav-item" id="nav-collect" onclick="navTo('collect')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4.2L6 20V5a1 1 0 0 1 1-1z"/></svg></span> 共同收藏
-    </div>
-    <div class="nav-item" id="nav-discover" onclick="navTo('discover')">
-      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2.1 4.9-4.9 2.1 2.1-4.9z"/></svg></span> Discoveries
-    </div>
-    <div class="nav-item" id="nav-explore" onclick="navTo('explore')">
-      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.4-6.5-10.3A6.5 6.5 0 0 1 12 4.5a6.5 6.5 0 0 1 6.5 6.2C18.5 15.6 12 21 12 21z"/><circle cx="12" cy="10.8" r="2.3"/></svg></span> Explore
-    </div>
-    <div class="nav-item" id="nav-lounge" onclick="navTo('lounge')">
-      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13.5A8.5 8.5 0 1 1 10.5 4 6.8 6.8 0 0 0 20 13.5z"/><path d="M17.5 3.5l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6z"/></svg></span> Lounge
     </div>
     <div class="nav-item" id="nav-games" onclick="navTo('games')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4.5h12l-2.5 3.8L17 12H5"/></svg></span> 一起玩
@@ -2782,6 +2788,7 @@ function renderHome(){
   renderMeetCard();
   // 时间胶囊：最近一颗待打开的
   const sealed = loadCapsules().filter(c=>!c.opened).sort((a,b)=>a.openTs - b.openTs);
+  try{ setHomeText('homeWorldSub', '他现在在' + worldPlaceById(zephyrWorldPlace()).name + '，进去逛逛'); }catch(e){}
   if(!sealed.length) setHomeText('homeCapsuleText', '还没有封存的胶囊，去封一颗给未来吧');
   else {
     const c = sealed[0];
