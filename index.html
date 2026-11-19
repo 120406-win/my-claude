@@ -395,6 +395,7 @@
     .empty-tip { text-align:center; margin-top:80px; color:var(--text-pale); font-size:15px; }
     .msg-row { display:flex; margin-bottom:14px; align-items:flex-end; gap:8px; -webkit-touch-callout:none; }
     .msg-row.user { flex-direction:row-reverse; }
+    .msg-row.row-selected { background:color-mix(in srgb, var(--accent) 13%, transparent); border-radius:14px; }
     .msg-avatar {
       width:28px; height:28px; border-radius:50%;
       background:var(--accent);
@@ -1862,9 +1863,22 @@
       <button id="msgSheetCopy" onclick="copyMsgText()" style="width:100%;padding:15px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">复制</button>
       <button id="msgSheetRegen" onclick="regenFromMenu()" style="width:100%;padding:15px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">重新生成</button>
       <button id="msgSheetRecall" onclick="recallMsg()" style="width:100%;padding:15px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">撤回</button>
+      <button id="msgSheetSelect" onclick="enterSelectMode(msgMenuMid)" style="width:100%;padding:15px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">多选</button>
+      <button id="msgSheetSeal" onclick="sealToHere()" style="width:100%;padding:15px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">封档到此处</button>
+      <button id="msgSheetUnseal" onclick="unsealConv()" style="width:100%;padding:15px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">取消封档</button>
       <button onclick="deleteMsg()" style="width:100%;padding:15px;background:none;border:none;color:#e0657a;font-size:15px;cursor:pointer;">删除</button>
     </div>
     <button onclick="closeMsgMenu()" style="width:100%;padding:15px;border-radius:14px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:15px;cursor:pointer;">取消</button>
+  </div>
+</div>
+
+<!-- 选择模式底栏 -->
+<div id="selectBar" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:210;background:var(--surface);border-top:1px solid var(--border);padding:10px 14px calc(10px + env(safe-area-inset-bottom));align-items:center;gap:10px;justify-content:space-between;">
+  <span id="selectCount" style="font-size:13px;color:var(--text-dim);white-space:nowrap;">已选 0 条</span>
+  <div style="display:flex;gap:8px;">
+    <button onclick="memoryFromSelected()" style="padding:9px 14px;border-radius:999px;background:transparent;border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">生成记忆</button>
+    <button onclick="deleteSelected()" style="padding:9px 14px;border-radius:999px;background:transparent;border:1px solid var(--border);color:#e0657a;font-size:13px;cursor:pointer;">删除</button>
+    <button onclick="exitSelectMode()" style="padding:9px 14px;border-radius:999px;background:transparent;border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">取消</button>
   </div>
 </div>
 
@@ -2766,6 +2780,15 @@ function maybeUpdateSummary(){
     const all = loadSummaries(); delete all[activeConvId]; storeSummaries(all);
     return;
   }
+  const convSeal = getActiveConv();
+  if(sum && convSeal && convSeal.sealedMid){
+    const si = hist.findIndex(m=>m.mid === convSeal.sealedMid);
+    // 封档线越过了摘要覆盖的范围：被封的内容连摘要也不再发，摘要作废
+    if(si >= 0 && ai <= si){
+      const all = loadSummaries(); delete all[activeConvId]; storeSummaries(all);
+      return;
+    }
+  }
   if(hist.length - (ai + 1) > SUMMARY_TRIGGER) runSummaryUpdate();
 }
 async function runSummaryUpdate(){
@@ -2776,7 +2799,9 @@ async function runSummaryUpdate(){
     const sum = getConvSummary(convId);
     const hist = messages.filter(m=>!m.recalled);
     const ai = summaryAnchorIndex(hist, sum);
-    const uncovered = hist.slice(ai + 1);
+    const convSeal2 = getActiveConv();
+    const si2 = (convSeal2 && convSeal2.sealedMid) ? hist.findIndex(m=>m.mid === convSeal2.sealedMid) : -1;
+    const uncovered = hist.slice(Math.max(ai, si2) + 1);
     if(uncovered.length <= SUMMARY_KEEP_RECENT) return;
     const chunk = uncovered.slice(0, uncovered.length - SUMMARY_KEEP_RECENT);
     if(chunk.length < 6) return;
@@ -5759,6 +5784,7 @@ function newConversation(){
 }
 
 function switchConversation(id){
+  if(selecting) exitSelectMode();
   if(id === activeConvId){ closeSidebar(); return; }
   activeConvId = id;
   messages = getActiveConv().messages;
@@ -5889,6 +5915,18 @@ function renderMessagesIntoChat(){
       });
     }
   });
+  // 封档线：画在被封档的那条消息下面
+  const convForSeal = getActiveConv();
+  if(convForSeal && convForSeal.sealedMid){
+    const row = chatWrap.querySelector('.msg-row[data-mid="' + convForSeal.sealedMid + '"]');
+    if(row){
+      const div = document.createElement('div');
+      div.style.cssText = 'display:flex;align-items:center;gap:10px;margin:14px 6px;color:var(--text-pale);font-size:11px;';
+      div.innerHTML = '<span style="flex:1;height:1px;background:var(--border);"></span>封档线 · 之前的对话不会再发给 Zephyr<span style="flex:1;height:1px;background:var(--border);"></span>';
+      row.after(div);
+    }
+  }
+  if(selecting) paintSelection();
   updateRegenButton();
 }
 
@@ -5969,6 +6007,10 @@ function openMsgMenu(mid){
   document.getElementById('msgSheetCopy').style.display = (!m.recalled && text) ? '' : 'none';
   document.getElementById('msgSheetRegen').style.display = (!m.recalled && m.role==='assistant' && isLastAssistant(m.mid)) ? '' : 'none';
   document.getElementById('msgSheetRecall').style.display = (!m.recalled && m.role==='user') ? '' : 'none';
+  document.getElementById('msgSheetSelect').style.display = (!m.recalled) ? '' : 'none';
+  document.getElementById('msgSheetSeal').style.display = (!m.recalled) ? '' : 'none';
+  const convNow = getActiveConv();
+  document.getElementById('msgSheetUnseal').style.display = (convNow && convNow.sealedMid) ? '' : 'none';
   document.getElementById('msgSheet').style.display = 'flex';
 }
 function closeMsgMenu(){ document.getElementById('msgSheet').style.display = 'none'; msgMenuMid = null; }
@@ -6006,6 +6048,113 @@ function deleteMsg(){
   saveConversations();
   renderMessagesIntoChat();
   showToast('已删除');
+}
+// ══ 封档线：这条及之前的对话不再发给 Zephyr（记录还在，随时可取消封档） ══
+function sealToHere(){
+  const mid = msgMenuMid;
+  closeMsgMenu();
+  if(!mid) return;
+  const conv = getActiveConv();
+  if(!conv) return;
+  conv.sealedMid = mid;
+  saveConversations();
+  renderMessagesIntoChat();
+  showToast('已封档，这条之前的对话不会再发给 Zephyr');
+}
+function unsealConv(){
+  closeMsgMenu();
+  const conv = getActiveConv();
+  if(!conv) return;
+  delete conv.sealedMid;
+  saveConversations();
+  renderMessagesIntoChat();
+  showToast('已取消封档');
+}
+// ══ 选择模式：点选多条消息，批量删除或只用它们生成记忆 ══
+let selecting = false;
+const selectedMids = new Set();
+function enterSelectMode(mid){
+  closeMsgMenu();
+  selecting = true;
+  selectedMids.clear();
+  if(mid) selectedMids.add(mid);
+  document.getElementById('selectBar').style.display = 'flex';
+  paintSelection();
+  showToast('点任意消息来勾选，再点一次取消');
+}
+function exitSelectMode(){
+  selecting = false;
+  selectedMids.clear();
+  const bar = document.getElementById('selectBar');
+  if(bar) bar.style.display = 'none';
+  paintSelection();
+}
+function paintSelection(){
+  const c = document.getElementById('selectCount');
+  if(c) c.textContent = '已选 ' + selectedMids.size + ' 条';
+  chatWrap.querySelectorAll('.msg-row').forEach(r=>{
+    r.classList.toggle('row-selected', selecting && selectedMids.has(r.dataset.mid));
+  });
+}
+chatWrap.addEventListener('click', (e)=>{
+  if(!selecting) return;
+  const row = e.target.closest('.msg-row');
+  if(!row || !row.dataset.mid) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if(selectedMids.has(row.dataset.mid)) selectedMids.delete(row.dataset.mid);
+  else selectedMids.add(row.dataset.mid);
+  paintSelection();
+}, true);
+function deleteSelected(){
+  if(!selectedMids.size){ showToast('先点选几条消息吧'); return; }
+  if(!confirm('删掉选中的 ' + selectedMids.size + ' 条消息？')) return;
+  const conv = getActiveConv();
+  conv.messages = conv.messages.filter(x=>!selectedMids.has(x.mid));
+  messages = conv.messages;
+  saveConversations();
+  exitSelectMode();
+  renderMessagesIntoChat();
+  showToast('已删除');
+}
+async function memoryFromSelected(){
+  if(!selectedMids.size){ showToast('先点选几条消息吧'); return; }
+  const picked = messages.filter(m=>selectedMids.has(m.mid) && !m.recalled);
+  if(!picked.length){ showToast('选中的消息没有内容'); return; }
+  exitSelectMode();
+  showToast('正在从选中的消息里提炼记忆…');
+  const transcript = picked.map(m=>(m.role === 'user' ? 'Lumi：' : 'Zephyr：') + msgToText(m)).filter(t=>t.length > 7).join('\n').slice(0, 12000);
+  if(!transcript){ showToast('选中的消息没有可提炼的文字'); return; }
+  try{
+    const base = (cfg.apiUrl || 'https://api.anthropic.com/v1').replace(/\/$/, '');
+    const res = await fetch(base + '/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: cfg.model, max_tokens: 700, system: AUTO_MEM_PROMPT, messages: [{ role: 'user', content: '请整理这段对话：\n' + transcript }] })
+    });
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const out = (data.content || []).filter(b=>b.type === 'text').map(b=>b.text).join('');
+    const s = out.indexOf('['), e2 = out.lastIndexOf(']');
+    if(s < 0 || e2 <= s) throw new Error('parse');
+    const items = JSON.parse(out.slice(s, e2 + 1));
+    const existing = loadMemories();
+    const seen = new Set(existing.map(m=>m.text.replace(/\s+/g, '')));
+    const added = [];
+    for(const it of (Array.isArray(items) ? items : [])){
+      const text = (it && typeof it.text === 'string') ? it.text.trim() : '';
+      if(!text || text.length > 220) continue;
+      const key = text.replace(/\s+/g, '');
+      if(seen.has(key)) continue;
+      seen.add(key);
+      added.push({ id: 'm' + Date.now().toString(36) + Math.floor(Math.random()*9999), cat: MEM_CATS.includes(it.cat) ? it.cat : '共同经历', text, ts: Date.now(), ...([-1,0,1].includes(it.v) ? { v: it.v } : {}), ...([0,1,2].includes(it.a) ? { a: it.a } : {}) });
+      if(added.length >= 8) break;
+    }
+    if(added.length){
+      storeMemories(existing.concat(added));
+      showToast('从选中消息里记下了 ' + added.length + ' 条新记忆 ~');
+    } else showToast('这几条里没有提炼出新的长期记忆');
+  }catch(e){ showToast('提炼失败了，等下再试试'); }
 }
 // ══ 重新生成：删掉最后一条回复，用同一条用户消息再问一次（API 截断时可以多试几次） ══
 function lastVisibleMsg(){
@@ -6955,12 +7104,14 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     const base=(cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/,'');
     // 发给 API 的历史要清洗：去掉本地用的 mid，并跳过已撤回的消息（撤回 = Zephyr 真的看不到）
     const histAll = messages.filter(m=>!m.recalled);
-    let histForApi = histAll;
+    const convForApi = getActiveConv();
+    const sealCut = (convForApi && convForApi.sealedMid) ? histAll.findIndex(m=>m.mid === convForApi.sealedMid) : -1;
+    let histForApi = sealCut >= 0 ? histAll.slice(sealCut + 1) : histAll;
     let summaryPair = null;
     const convSum = activeConvId ? getConvSummary(activeConvId) : null;
     if(convSum){
       const ai = summaryAnchorIndex(histAll, convSum);
-      if(ai >= 0){
+      if(ai >= 0 && ai > sealCut){
         // 已被摘要覆盖的旧消息不再逐条发，只把摘要放在最前面
         histForApi = histAll.slice(ai + 1);
         summaryPair = [
