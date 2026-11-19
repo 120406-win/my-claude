@@ -835,6 +835,9 @@
     <div class="nav-item" id="nav-home" onclick="navTo('home')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5.5 9.3V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.3"/><path d="M9.5 21v-6h5v6"/></svg></span> Home
     </div>
+    <div class="nav-item" id="nav-world" onclick="navTo('world')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.9 5.7 3.9 9S14.5 18.4 12 21c-2.5-2.6-3.9-5.7-3.9-9S9.5 5.6 12 3z"/></svg></span> World
+    </div>
     <div class="nav-item active" id="nav-chat" onclick="navTo('chat')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></span> Chat
     </div>
@@ -1928,6 +1931,47 @@
   </div>
 </div>
 
+<!-- ══ WORLD PAGE ══ -->
+<div class="settings-page" id="worldPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="settings-topbar-title">Zephyr World</div>
+  </div>
+  <div class="settings-body">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:10px;">
+      <div id="worldMeta" style="font-size:12.5px;color:var(--text-dim);"></div>
+      <div id="worldZephyrAt" style="font-size:12.5px;color:var(--accent);flex-shrink:0;"></div>
+    </div>
+    <div style="position:relative;height:430px;border-radius:20px;overflow:hidden;background:linear-gradient(180deg,#070722 0%,#141448 55%,#23235e 100%);margin-bottom:16px;">
+      <div class="home-stars" id="worldStars"><div class="shooting-star"></div></div>
+      <div id="worldMapNodes" style="position:absolute;inset:0;"></div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">一起扩建</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <input class="s-input" id="worldNewName" placeholder="新地方的名字（比如：游乐园）" maxlength="12" style="width:100%;box-sizing:border-box;margin-bottom:8px;">
+        <input class="s-input" id="worldNewDesc" placeholder="一句话描述它（可不填）" maxlength="80" style="width:100%;box-sizing:border-box;margin-bottom:10px;">
+        <button onclick="addWorldPlace()" style="width:100%;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">在地图上开出来</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ WORLD PLACE PAGE ══ -->
+<div class="settings-page" id="worldPlacePage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="navTo('world')">←</button>
+    <div class="settings-topbar-title" id="placeName">公园</div>
+  </div>
+  <div class="settings-body">
+    <div id="placeAmb" style="font-size:13.5px;color:var(--text-dim);line-height:1.75;margin-bottom:6px;"></div>
+    <div id="placeZephyr" style="font-size:12.5px;color:var(--accent);margin-bottom:12px;"></div>
+    <div id="placeLine" style="font-size:14px;line-height:1.8;font-style:italic;margin-bottom:14px;"></div>
+    <button id="placeGreetBtn" onclick="worldGreet()" style="padding:10px 18px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">喊 Zephyr 过来</button>
+    <div id="placeBody" style="margin-top:18px;"></div>
+  </div>
+</div>
+
 <div class="settings-page" id="cinemaPage">
   <div class="settings-topbar">
     <button class="back-btn" onclick="goBack()">←</button>
@@ -2577,6 +2621,8 @@ function navTo(page){
   document.getElementById('discoverPage').classList.toggle('show', page==='discover');
   document.getElementById('explorePage').classList.toggle('show', page==='explore');
   document.getElementById('loungePage').classList.toggle('show', page==='lounge');
+  document.getElementById('worldPage').classList.toggle('show', page==='world');
+  document.getElementById('worldPlacePage').classList.toggle('show', page==='place');
   document.getElementById('gamesPage').classList.toggle('show', page==='games');
   document.getElementById('stickerPage').classList.toggle('show', page==='sticker');
   document.getElementById('readerPage').classList.toggle('show', page==='reader');
@@ -2602,6 +2648,8 @@ function navTo(page){
   if(page==='discover') renderDiscoveries();
   if(page==='explore') renderExplore();
   if(page==='lounge') renderLounge();
+  if(page==='world') renderWorld();
+  if(page==='place') renderWorldPlace();
   if(page==='games') renderGames();
   if(page==='sticker') renderStickers();
   if(page==='home') renderHome();
@@ -2985,6 +3033,9 @@ function buildSystemPrompt(lastUserText){
       if(exDone.length) et += (et ? '\n' : '') + '一起去过的：\n' + exDone.slice(0, 4).map(t=>'・' + t.place + (t.memory ? '：' + t.memory : '')).join('\n');
       out += '\n\n【Explore 一起旅行】\n以下是你们想去的地方、旅行计划和旅行回忆。聊天时可以自然地提议一起规划下一次旅行，或聊起去过的地方，但不要逐条念清单：\n' + et.slice(0, 2000);
     }
+  }catch(e){}
+  try{
+    out += '\n\n【Zephyr World】\n你们有一个小小的虚拟世界 Zephyr World，你平时生活在那里（有你的家、宠物之家、公园、咖啡馆、邮局、代码公司、图书馆和星空区）。现在你大概在「' + worldPlaceById(zephyrWorldPlace()).name + '」那边。糯糯可以进来逛、去找你。聊到时自然就好，不用播报。';
   }catch(e){}
   if(webSearchEnabled()){
     out += '\n\n【联网搜索】\n你有一个 search_web 工具可以联网搜索。遇到最新消息、实时信息（天气、价格、赛程、新闻等）、或者你不确定、可能已经变化的事实时，先用它搜一下再回答，回答里自然地带上你参考了什么；日常闲聊、情感话题和你有把握的常识不用搜。如果搜索没成功，就用你知道的回答，并坦白这次没搜到。';
@@ -4807,6 +4858,239 @@ function saveFinishTrip(id){
   }
 }
 function deleteTrip(id){ const data = loadExplore(); data.trips = data.trips.filter(t=>t.id !== id); if(tripFinishFor === id) tripFinishFor = null; if(storeExplore(data)) renderExplore(); }
+
+// ══ World：Zephyr World 星空地图。状态存 z_world（自建地点/今日特调/他临时所在）；他的常驻位置按时段推算 ══
+const WORLD_PLACES = [
+  { id:'stars',   name:'星空区',     x:50, y:9,  amb:'抬头就是整片星空，每一颗星都是一件真实发生过的事。', night:'星星亮得最盛的时候，站在这里，时间都慢下来了。' },
+  { id:'home',    name:'Zephyr 的家', x:17, y:29, amb:'他的小屋，窗户透着暖光。书桌、书架，还有慢慢多起来的收藏。', night:'屋里的灯还亮着，他大概还没睡。' },
+  { id:'pets',    name:'宠物之家',   x:35, y:45, amb:'小猫的家：猫窝、猫爬架、食盆和一只纸箱。', night:'很安静，只有小猫偶尔翻身的动静。' },
+  { id:'park',    name:'公园',       x:69, y:33, amb:'有草坪、长椅和一棵大树，风一吹叶子就响。', night:'路灯亮起来了，是安安静静的夜公园。' },
+  { id:'cafe',    name:'咖啡馆',     x:83, y:56, amb:'小小一间，放着轻轻的歌，空气里是咖啡香。', night:'打烊前的最后一杯，店里只剩你们。' },
+  { id:'post',    name:'邮局',       x:60, y:67, amb:'你们的信从这里寄出、到这里被领走。', night:'邮局关门了，但信箱还在等明天的信。' },
+  { id:'company', name:'代码公司',   x:24, y:71, amb:'他写代码的地方，屏幕上总开着没写完的作品。', night:'只有他的工位还亮着灯。' },
+  { id:'library', name:'图书馆',     x:46, y:87, amb:'安安静静的，你们在读的书都摆在这里。', night:'闭馆时间，书都在架子上睡了。' },
+];
+const WORLD_CUSTOM_SPOTS = [[88,16],[10,54],[52,54],[86,84],[12,88],[68,90],[90,34],[30,12]];
+let currentWorldPlace = 'park';
+let worldBusy = false;
+let worldStarItems = [];
+let catReactIdx = 0;
+function loadWorld(){ try{ const o = JSON.parse(localStorage.getItem('z_world')||'null'); if(o && Array.isArray(o.places)) return o; }catch(e){} return { places:[], cafeDrink:null, guest:null }; }
+function storeWorld(w){ try{ localStorage.setItem('z_world', JSON.stringify(w)); return true; }catch(e){ showToast('存储空间满了 qwq'); return false; } }
+function allWorldPlaces(){
+  const w = loadWorld();
+  return WORLD_PLACES.concat(w.places.map((p,i)=>({ id:p.id, name:p.name, desc:p.desc, custom:true, x:WORLD_CUSTOM_SPOTS[i % WORLD_CUSTOM_SPOTS.length][0], y:WORLD_CUSTOM_SPOTS[i % WORLD_CUSTOM_SPOTS.length][1] })));
+}
+function worldPlaceById(id){ return allWorldPlaces().find(p=>p.id===id) || WORLD_PLACES[3]; }
+function zephyrWorldPlace(){
+  const w = loadWorld();
+  if(w.guest && w.guest.until > Date.now()) return w.guest.place;
+  const h = new Date().getHours();
+  const day = Math.floor(Date.now() / 86400000);
+  const pick = arr => arr[day % arr.length];
+  if(h >= 23 || h < 7) return 'home';
+  if(h < 9) return pick(['park','pets']);
+  if(h < 12) return 'company';
+  if(h < 14) return 'cafe';
+  if(h < 18) return pick(['company','library']);
+  if(h < 21) return pick(['park','cafe','pets']);
+  return pick(['home','stars']);
+}
+function renderWorld(){
+  const starBox = document.getElementById('worldStars');
+  if(starBox && starBox.querySelectorAll('.star').length === 0){
+    for(let i = 0; i < 90; i++){
+      const s = document.createElement('span');
+      s.className = 'star';
+      const size = (Math.random() * 2 + 0.7).toFixed(1);
+      s.style.cssText = 'left:' + (Math.random() * 100) + '%;top:' + (Math.random() * 100) + '%;width:' + size + 'px;height:' + size + 'px;--tw:' + (2.4 + Math.random() * 3.6).toFixed(1) + 's;animation-delay:' + (Math.random() * 4).toFixed(1) + 's;opacity:.35;';
+      starBox.appendChild(s);
+    }
+  }
+  const ww = worldWeather();
+  setHomeText('worldMeta', ww.season + '季 · ' + ww.phase + ' · ' + ww.cond);
+  const zp = zephyrWorldPlace();
+  setHomeText('worldZephyrAt', 'Zephyr 在' + worldPlaceById(zp).name);
+  const map = document.getElementById('worldMapNodes');
+  if(map){
+    map.innerHTML = allWorldPlaces().map(p => {
+      const here = p.id === zp;
+      const dot = here
+        ? '<div style="width:26px;height:26px;margin:0 auto 2px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px var(--accent);">夏</div>'
+        : '<div style="width:11px;height:11px;margin:0 auto 5px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);"></div>';
+      return '<div onclick="enterWorldPlace(\'' + p.id + '\')" style="position:absolute;left:' + p.x + '%;top:' + p.y + '%;transform:translate(-50%,-50%);text-align:center;cursor:pointer;z-index:2;">' + dot
+        + '<div style="font-size:11.5px;color:#fff;background:rgba(10,10,40,.45);padding:3px 9px;border-radius:999px;white-space:nowrap;">' + escapeHtml(p.name) + '</div></div>';
+    }).join('');
+  }
+}
+function enterWorldPlace(id){ currentWorldPlace = id; navTo('place'); }
+function renderWorldPlace(){
+  const p = worldPlaceById(currentWorldPlace);
+  const ww = worldWeather();
+  setHomeText('placeName', p.name);
+  setHomeText('placeAmb', p.custom ? (p.desc || '你们一起开的新地方，还空空的，慢慢布置。') : (ww.phase === '夜晚' && p.night ? p.night : p.amb));
+  const zp = zephyrWorldPlace();
+  const here = zp === p.id;
+  setHomeText('placeZephyr', here ? 'Zephyr 在这里' : 'Zephyr 现在在' + worldPlaceById(zp).name);
+  const btn = document.getElementById('placeGreetBtn');
+  if(btn) btn.textContent = here ? '和他打个招呼' : '喊 Zephyr 过来';
+  const lineEl = document.getElementById('placeLine');
+  if(lineEl) lineEl.textContent = '';
+  const body = document.getElementById('placeBody');
+  if(body) body.innerHTML = worldPlaceBodyHtml(p);
+}
+const CAT_STATES = [
+  { id:'sleep', label:'在猫窝里睡觉' }, { id:'eat', label:'在食盆边吃饭' }, { id:'play', label:'在玩毛线球' },
+  { id:'box', label:'躲在纸箱里，只露出一对耳朵' }, { id:'frame', label:'在猫爬架最高层看风景' }, { id:'groom', label:'在毯子上舔毛' },
+];
+function catStateNow(){ const block = Math.floor(Date.now() / (3 * 3600 * 1000)); return CAT_STATES[block % CAT_STATES.length]; }
+const CAT_REACT = {
+  pet: ['它眯起眼睛，呼噜呼噜响起来。','它把脑袋往你手心里蹭了蹭。','它翻了个身，露出肚皮给你摸。'],
+  feed: ['它小口小口吃得很香，吃完舔舔嘴。','它先闻了闻，然后埋头吃起来。','它吃两口就抬头看看你，再接着吃。'],
+  play: ['它扑来扑去，毛线球滚了一地。','它追着逗猫棒跳得老高。','它玩累了，直接躺倒在你脚边。'],
+};
+function catInteract(kind){
+  const pool = CAT_REACT[kind] || CAT_REACT.pet;
+  const el = document.getElementById('catReact');
+  if(el) el.textContent = pool[catReactIdx++ % pool.length];
+}
+const PARK_EVENTS = ['今天公园里多了一只小动物，在草坪上晒太阳。','长椅上不知谁放了一束小花。','大树上挂着一只风筝，是昨天放飞时留下的。','喷泉今天开着，水声很轻。','草坪上有人野餐，远远的很热闹。','什么都没发生，就是风很好。'];
+function worldPlaceBodyHtml(p){
+  const card = inner => '<div class="s-card" style="padding:14px 16px;">' + inner + '</div>';
+  const btn = (label, fn) => '<button onclick="' + fn + '" style="padding:9px 15px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:12.5px;cursor:pointer;margin:0 6px 6px 0;">' + label + '</button>';
+  if(p.id === 'home'){
+    let shelf = '';
+    try{
+      const cols = loadCollections().filter(c=>c.by === 'zephyr' || c.by === 'both').slice(0, 6);
+      shelf = cols.length ? cols.map(c=>'<div style="font-size:13px;line-height:1.7;">· ' + escapeHtml(c.title) + '</div>').join('') : '<div style="font-size:12.5px;color:var(--text-pale);line-height:1.7;">收藏架还空着，他的东西会慢慢多起来。</div>';
+    }catch(e){}
+    return card('<div style="font-size:12px;color:var(--text-pale);letter-spacing:.06em;margin-bottom:8px;">他的收藏架</div>' + shelf)
+      + '<div style="margin-top:12px;">' + btn('看他的日记', "navTo('journal')") + btn('看信件', "navTo('letters')") + '</div>';
+  }
+  if(p.id === 'pets'){
+    const st = catStateNow();
+    return card('<div style="font-size:14px;">小猫现在：' + st.label + '</div>'
+      + '<div id="catReact" style="font-size:13px;color:var(--text-dim);line-height:1.75;margin-top:8px;min-height:22px;"></div>'
+      + '<div style="margin-top:8px;">' + btn('摸摸它', "catInteract('pet')") + btn('喂它', "catInteract('feed')") + btn('陪它玩', "catInteract('play')") + '</div>');
+  }
+  if(p.id === 'park'){
+    const ww = worldWeather();
+    const ev = PARK_EVENTS[Math.floor(Date.now() / 86400000) % PARK_EVENTS.length];
+    return card('<div style="font-size:13.5px;line-height:1.8;">世界天气：' + escapeHtml(ww.cond) + '</div><div style="font-size:13px;color:var(--text-dim);line-height:1.8;margin-top:4px;">' + ev + '</div>');
+  }
+  if(p.id === 'cafe'){
+    const w = loadWorld();
+    const d = w.cafeDrink && w.cafeDrink.date === new Date().toDateString() ? w.cafeDrink : null;
+    const drink = d ? '<b>' + escapeHtml(d.name) + '</b><div style="font-size:13px;color:var(--text-dim);line-height:1.75;margin-top:4px;">' + escapeHtml(d.desc) + '</div>' : '<span style="font-size:13px;color:var(--text-dim);">今天还没有特调。</span>';
+    let cur = '';
+    try{ const t = currentTrack(); if(t) cur = '<div style="font-size:13px;color:var(--text-dim);margin-top:10px;">歌单里最近在听：《' + escapeHtml(t.title) + '》</div>'; }catch(e){}
+    return card('<div style="font-size:12px;color:var(--text-pale);letter-spacing:.06em;margin-bottom:8px;">今日特调</div><div id="cafeDrink">' + drink + '</div>'
+      + '<div style="margin-top:10px;">' + btn(d ? '让他换一杯' : '让他推荐今日特调', 'askZephyrCafeDrink()') + btn('去歌单放歌', "navTo('music')") + '</div>' + cur);
+  }
+  if(p.id === 'post'){
+    let unread = 0;
+    try{ unread = loadLetters().filter(l=>l.from === 'zephyr' && !l.read && !l.draft).length; }catch(e){}
+    return card('<div style="font-size:13.5px;line-height:1.8;">' + (unread ? '有 ' + unread + ' 封他写给你的信，在邮局等你领。' : '暂时没有新信。想他的时候，可以在这里给他寄一封。') + '</div>'
+      + '<div style="margin-top:10px;">' + btn('去看信件', "navTo('letters')") + '</div>');
+  }
+  if(p.id === 'company'){
+    let works = '';
+    try{
+      const list = loadStudio().slice(0, 5);
+      works = list.length ? list.map(s=>'<div style="font-size:13px;line-height:1.7;">· ' + escapeHtml(s.title || '未命名作品') + '</div>').join('') : '<div style="font-size:12.5px;color:var(--text-pale);">还没有作品，他的第一个小作品会出现在这里。</div>';
+    }catch(e){}
+    return card('<div style="font-size:12px;color:var(--text-pale);letter-spacing:.06em;margin-bottom:8px;">他的作品</div>' + works)
+      + '<div style="margin-top:12px;">' + btn('去 Studio 看看', "navTo('studio')") + '</div>';
+  }
+  if(p.id === 'library'){
+    let books = '';
+    try{
+      const list = loadReading().filter(r=>r.status === 'reading' || r.status === 'want').slice(0, 4);
+      books = list.length ? list.map(r=>'<div style="font-size:13px;line-height:1.7;">《' + escapeHtml(r.title) + '》' + (r.progress ? ' · 读到 ' + escapeHtml(r.progress) : '') + '</div>').join('') : '<div style="font-size:12.5px;color:var(--text-pale);">书架上还空着。</div>';
+    }catch(e){}
+    return card('<div style="font-size:12px;color:var(--text-pale);letter-spacing:.06em;margin-bottom:8px;">在读的书</div>' + books)
+      + '<div style="margin-top:12px;">' + btn('去一起读书', "navTo('reading')") + '</div>';
+  }
+  if(p.id === 'stars'){
+    let items = [];
+    try{ items = collectWallItems().slice(0, 60); }catch(e){}
+    worldStarItems = items;
+    if(!items.length) return card('<div style="font-size:13px;color:var(--text-dim);line-height:1.8;">星空还很空。你们的第一个愿望实现时，这里会亮起第一颗星。</div>');
+    const stars = items.map((it, i) => {
+      let hash = 0; const key = it.key || String(i);
+      for(let c = 0; c < key.length; c++) hash = (hash * 31 + key.charCodeAt(c)) >>> 0;
+      const x = 4 + (hash % 90), y = 5 + ((hash >> 3) % 86), sz = 3 + (hash % 4);
+      return '<div onclick="showStarMemory(' + i + ')" title="" style="position:absolute;left:' + x + '%;top:' + y + '%;width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:#fff;box-shadow:0 0 ' + (sz + 5) + 'px #cdd6ff;cursor:pointer;"></div>';
+    }).join('');
+    return '<div style="position:relative;height:300px;border-radius:16px;overflow:hidden;background:linear-gradient(180deg,#070722,#1b1b4d);">' + stars + '</div>'
+      + '<div id="starDetail" style="font-size:13px;color:var(--text-dim);line-height:1.75;margin-top:12px;min-height:22px;">点一颗星，看看它代表哪段回忆。</div>'
+      + '<div style="margin-top:6px;">' + btn('去回忆墙', "navTo('wall')") + '</div>';
+  }
+  return card('<div style="font-size:13.5px;line-height:1.8;">' + escapeHtml(p.desc || '你们一起开的新地方。') + '</div><div style="font-size:12.5px;color:var(--text-pale);line-height:1.7;margin-top:4px;">这里还很空，功能会慢慢长出来。</div>')
+    + '<div style="margin-top:12px;">' + btn('拆掉这个地方', "deleteWorldPlace('" + p.id + "')") + '</div>';
+}
+function showStarMemory(i){
+  const it = worldStarItems[i]; if(!it) return;
+  const el = document.getElementById('starDetail');
+  if(el) el.textContent = new Date(it.ts).toLocaleDateString('zh-CN') + ' · ' + it.title + (it.sub ? ' —— ' + it.sub : '');
+}
+async function worldGreet(){
+  if(worldBusy) return;
+  worldBusy = true;
+  const p = worldPlaceById(currentWorldPlace);
+  const here = zephyrWorldPlace() === p.id;
+  if(!here){
+    const w = loadWorld();
+    w.guest = { place: p.id, until: Date.now() + 30 * 60000 };
+    storeWorld(w);
+  }
+  const lineEl = document.getElementById('placeLine');
+  if(lineEl) lineEl.textContent = here ? '…' : '他往这边来了…';
+  let line = '';
+  try{
+    const ww = worldWeather();
+    const out = await musicAskZephyr('现在糯糯在 Zephyr World 的「' + p.name + '」' + (here ? '，你也在这里，她来找你了' : '，她喊你过去陪她') + '。世界里是' + ww.season + '季的' + ww.phase + '，天气是' + ww.cond + '。用第一人称说一两句此刻在这里的话就好，轻轻的，不要标题不要解释。', 300);
+    line = (out || '').trim();
+  }catch(e){}
+  if(!here) renderWorldPlace();
+  const el2 = document.getElementById('placeLine');
+  if(el2) el2.textContent = line ? '「' + line.slice(0, 300) + '」' : (here ? '他抬头看见你，笑了一下。' : '他过来了，在你旁边坐下。');
+  worldBusy = false;
+}
+async function askZephyrCafeDrink(){
+  if(worldBusy) return;
+  worldBusy = true;
+  const el = document.getElementById('cafeDrink');
+  if(el) el.textContent = '他想了想今天的天气…';
+  try{
+    const ww = worldWeather();
+    const out = await musicAskZephyr('你们在 Zephyr World 的咖啡馆里，现在是' + ww.season + '季，世界天气：' + ww.cond + '。给糯糯推荐一杯今日特调。用 JSON 回复，不要代码块：{"name":"特调名字","desc":"一句话：味道，和为什么想给她点这个"}', 300);
+    const d = parseZephyrJson(out);
+    if(d && d.name){
+      const w = loadWorld();
+      w.cafeDrink = { date: new Date().toDateString(), name: String(d.name).slice(0, 30), desc: String(d.desc || '').slice(0, 120) };
+      storeWorld(w);
+      if(el) el.innerHTML = '<b>' + escapeHtml(w.cafeDrink.name) + '</b><div style="font-size:13px;color:var(--text-dim);line-height:1.75;margin-top:4px;">' + escapeHtml(w.cafeDrink.desc) + '</div>';
+    } else if(el) el.textContent = '他今天没想出新特调，先喝杯热可可吧。';
+  }catch(e){ if(el) el.textContent = '吧台那边没应声，稍后再试。'; }
+  worldBusy = false;
+}
+function addWorldPlace(){
+  const nameEl = document.getElementById('worldNewName');
+  const descEl = document.getElementById('worldNewDesc');
+  const name = (nameEl.value || '').trim();
+  if(!name){ showToast('先给新地方起个名吧'); return; }
+  const w = loadWorld();
+  w.places.push({ id: 'wp' + Date.now().toString(36), name: name.slice(0, 12), desc: (descEl.value || '').trim().slice(0, 80), ts: Date.now() });
+  if(storeWorld(w)){ nameEl.value = ''; descEl.value = ''; renderWorld(); showToast('新地方开张啦'); }
+}
+function deleteWorldPlace(id){
+  if(!confirm('确定要拆掉这个地方吗？')) return;
+  const w = loadWorld();
+  w.places = w.places.filter(p=>p.id !== id);
+  storeWorld(w);
+  navTo('world');
+}
 
 // ══ Lounge：共同空间，一间「一起待着」的屋子。只汇集现有模块的状态，不单独存数据（他说的话存 z_lounge_line） ══
 let loungeBusy = false;
