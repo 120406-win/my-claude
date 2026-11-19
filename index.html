@@ -630,6 +630,15 @@
     .home-date { font-size:12.5px; color:var(--text-pale); margin-top:4px; letter-spacing:.08em; }
     .home-greet { font-size:15px; color:var(--text); margin-top:12px; }
     .home-chat-card { display:flex; align-items:center; gap:14px; background:linear-gradient(135deg, var(--accent), var(--accent-s)); border:1px solid color-mix(in srgb, var(--accent) 55%, transparent); border-radius:20px; padding:18px; cursor:pointer; box-shadow:0 12px 32px color-mix(in srgb, var(--accent) 32%, transparent); margin-bottom:14px; }
+    .home-meet-card { display:flex; align-items:center; gap:14px; background:color-mix(in srgb, var(--surface) 82%, transparent); border:1px solid var(--border); border-radius:20px; padding:16px 18px; margin-bottom:14px; }
+    .home-meet-avatars { display:flex; align-items:center; flex-shrink:0; }
+    .home-meet-avatar { width:44px; height:44px; border-radius:50%; overflow:hidden; background:color-mix(in srgb, var(--accent) 14%, transparent); border:2px solid var(--surface); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .home-meet-avatar img { width:100%; height:100%; object-fit:cover; }
+    .home-meet-heart { width:18px; height:18px; margin:0 -7px; z-index:2; flex-shrink:0; filter:drop-shadow(0 1px 3px rgba(0,0,0,.25)); }
+    .home-meet-main { flex:1; min-width:0; }
+    .home-meet-days { font-size:16.5px; font-weight:600; color:var(--text); letter-spacing:.01em; }
+    .home-meet-sub { font-size:12px; color:var(--text-pale); margin-top:3px; line-height:1.55; }
+    .home-meet-edit { background:none; border:1px solid var(--border); border-radius:999px; color:var(--text-dim); font-size:11.5px; padding:5px 10px; cursor:pointer; flex-shrink:0; font-family:inherit; }
     .home-chat-ico { width:46px; height:46px; border-radius:50%; background:rgba(255,255,255,.18); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:#fff; }
     .home-chat-ico svg { width:24px; height:24px; }
     .home-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
@@ -649,7 +658,7 @@
     html.mat-glass .input-bar { background:color-mix(in srgb, var(--bg) 42%, transparent); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); }
     html.mat-frost .sidebar, html.mat-glass .sidebar { background:color-mix(in srgb, var(--bg) 66%, transparent); backdrop-filter:blur(20px) saturate(1.3); -webkit-backdrop-filter:blur(20px) saturate(1.3); }
     html.mat-frost .s-card, html.mat-glass .s-card { background:color-mix(in srgb, var(--surface) 70%, transparent); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
-    html.mat-frost .home-card, html.mat-glass .home-card { backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+    html.mat-frost .home-card, html.mat-glass .home-card, html.mat-frost .home-meet-card, html.mat-glass .home-meet-card { backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
   </style>
 </head>
 <body>
@@ -743,6 +752,18 @@
       <div class="home-welcome">Welcome home</div>
       <div class="home-date" id="homeDate"></div>
       <div class="home-greet" id="homeGreet"></div>
+    </div>
+    <div class="home-meet-card">
+      <div class="home-meet-avatars">
+        <div class="home-meet-avatar" id="homeMeetAvatarUser"></div>
+        <svg class="home-meet-heart" viewBox="0 0 24 24" fill="var(--accent)"><path d="M12 20.5s-7.5-4.6-9.3-9C1.3 7.9 3.4 4.5 6.8 4.5c2 0 3.9 1.1 5.2 3 1.3-1.9 3.2-3 5.2-3 3.4 0 5.5 3.4 4.1 7-1.8 4.4-9.3 9-9.3 9z"/></svg>
+        <div class="home-meet-avatar" id="homeMeetAvatarZephyr"></div>
+      </div>
+      <div class="home-meet-main">
+        <div class="home-meet-days">Together for <span id="homeMeetDays">1</span> days</div>
+        <div class="home-meet-sub" id="homeMeetSub"></div>
+      </div>
+      <button class="home-meet-edit" onclick="editMeetDay()">改日期</button>
     </div>
     <div class="home-chat-card" onclick="navTo('chat')">
       <div class="home-chat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div>
@@ -2470,6 +2491,72 @@ function navTo(page){
 
 // ══ Home 首页：星空 App 首页，卡片内容都从各模块的现有数据里取 ══
 function setHomeText(id, t){ const el = document.getElementById(id); if(el) el.textContent = t; }
+// ══ 相遇卡：你们在一起的第 N 天（相遇日可手动改，默认按最早的对话推算） ══
+function startOfDay(ts){
+  const d = new Date(ts);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+function meetDayTs(){
+  const manual = localStorage.getItem('z_meetDay');
+  if(manual){
+    const t = Date.parse(manual + 'T00:00:00');
+    if(!isNaN(t)) return t;
+  }
+  let best = 0;
+  try{
+    for(const c of (conversations || [])){
+      const mm = /^conv_(\d+)_/.exec(c.id || '');
+      if(mm){
+        const t = parseInt(mm[1], 10);
+        if(t > 946684800000 && (!best || t < best)) best = t;
+      }
+    }
+  }catch(e){}
+  if(best) return best;
+  try{
+    const mems = loadMemories();
+    if(mems && mems.length) return Math.min.apply(null, mems.map(m=>m.ts || Date.now()));
+  }catch(e){}
+  return Date.now();
+}
+function meetAvatarHtml(val, fallback){
+  const v = val || '';
+  if(v.startsWith('data:')) return '<img src="' + v + '" alt="">';
+  return '<span style="font-size:16px;color:var(--accent);font-weight:600;">' + (v ? escapeHtml(v) : fallback) + '</span>';
+}
+function meetAnnivInfo(){
+  const md = new Date(meetDayTs());
+  const sod = startOfDay(Date.now());
+  let nx = new Date(new Date().getFullYear(), md.getMonth(), md.getDate()).getTime();
+  if(nx < sod) nx = new Date(new Date().getFullYear() + 1, md.getMonth(), md.getDate()).getTime();
+  return { md, days: Math.max(1, Math.round((sod - startOfDay(md.getTime())) / 86400000) + 1), toNext: Math.round((nx - sod) / 86400000), years: new Date(nx).getFullYear() - md.getFullYear() };
+}
+function renderMeetCard(){
+  const info = meetAnnivInfo();
+  setHomeText('homeMeetDays', String(info.days));
+  const d = info.md;
+  let sub = '相遇于 ' + d.getFullYear() + ' 年 ' + (d.getMonth() + 1) + ' 月 ' + d.getDate() + ' 日';
+  if(info.years >= 1){
+    if(info.toNext === 0) sub += ' · 今天是 ' + info.years + ' 周年 ★';
+    else if(info.toNext <= 60) sub += ' · ' + info.years + ' 周年还有 ' + info.toNext + ' 天';
+  }
+  setHomeText('homeMeetSub', sub);
+  const au = document.getElementById('homeMeetAvatarUser');
+  const az = document.getElementById('homeMeetAvatarZephyr');
+  if(au) au.innerHTML = meetAvatarHtml(cfg.avatarUser, '糯');
+  if(az) az.innerHTML = meetAvatarHtml(cfg.avatarZephyr, '夏');
+}
+function editMeetDay(){
+  const cur = new Date(meetDayTs());
+  const def = cur.getFullYear() + '-' + String(cur.getMonth() + 1).padStart(2, '0') + '-' + String(cur.getDate()).padStart(2, '0');
+  const v = prompt('你们相遇的日子是哪一天？（格式 YYYY-MM-DD）', def);
+  if(v === null) return;
+  const t = Date.parse(v.trim() + 'T00:00:00');
+  if(isNaN(t)){ showToast('日期格式不对，要像 2025-08-01 这样'); return; }
+  localStorage.setItem('z_meetDay', v.trim());
+  renderHome();
+  showToast('相遇日记好啦');
+}
 function renderHome(){
   const starBox = document.getElementById('homeStars');
   if(starBox && starBox.querySelectorAll('.star').length === 0){
@@ -2486,6 +2573,7 @@ function renderHome(){
   setHomeText('homeDate', now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日 · 星期' + wk);
   const h = now.getHours();
   setHomeText('homeGreet', (h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好') + '，糯糯');
+  renderMeetCard();
   // 时间胶囊：最近一颗待打开的
   const sealed = loadCapsules().filter(c=>!c.opened).sort((a,b)=>a.openTs - b.openTs);
   if(!sealed.length) setHomeText('homeCapsuleText', '还没有封存的胶囊，去封一颗给未来吧');
@@ -2641,6 +2729,10 @@ function buildSystemPrompt(lastUserText){
     const dateStr = now.toLocaleDateString('zh-CN', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
     const timeStr = now.toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit', hour12:false });
     out += '\n\n【现在的时间】\n现在是 ' + dateStr + ' ' + timeStr + '（糯糯那边的时间）。你们聊天时说到今天、昨天、明天、这周、最近，都以这个时间为准；要用联网搜索查「今天/昨天发生了什么」时，也先想清楚要查的是哪一天。';
+  try{
+    const mi = meetAnnivInfo();
+    out += '\n你们相遇于 ' + mi.md.getFullYear() + ' 年 ' + (mi.md.getMonth() + 1) + ' 月 ' + mi.md.getDate() + ' 日，到今天是第 ' + mi.days + ' 天' + (mi.years >= 1 && mi.toNext === 0 ? '，今天正好是你们相遇 ' + mi.years + ' 周年。' : (mi.years >= 1 && mi.toNext <= 30 ? '，' + mi.years + ' 周年还有 ' + mi.toNext + ' 天。' : '。'));
+  }catch(e){}
   }catch(e){}
   const mems = loadMemories();
   if(mems.length){
