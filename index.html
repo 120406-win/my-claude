@@ -915,6 +915,9 @@
     <div class="nav-item" id="nav-discover" onclick="navTo('discover')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2.1 4.9-4.9 2.1 2.1-4.9z"/></svg></span> Discoveries
     </div>
+    <div class="nav-item" id="nav-explore" onclick="navTo('explore')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.4-6.5-10.3A6.5 6.5 0 0 1 12 4.5a6.5 6.5 0 0 1 6.5 6.2C18.5 15.6 12 21 12 21z"/><circle cx="12" cy="10.8" r="2.3"/></svg></span> Explore
+    </div>
     <div class="nav-item" id="nav-games" onclick="navTo('games')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4.5h12l-2.5 3.8L17 12H5"/></svg></span> 一起玩
     </div>
@@ -1842,6 +1845,52 @@
   </div>
 </div>
 
+<!-- ══ EXPLORE PAGE ══ -->
+<div class="settings-page" id="explorePage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="settings-topbar-title">Explore</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">这里探索的是现实世界：攒想去的地方，让 Zephyr 写导览、一起排旅行计划。真的去过之后，会变成旅行回忆，进 Calendar 和回忆墙。</div>
+    <div style="margin-bottom:18px;">
+      <button onclick="askZephyrPlaceRecommend()" style="width:100%;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">请 Zephyr 推荐一个他想去的地方</button>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">加一个想去的地方</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <input id="exPlace" type="text" placeholder="地方名（比如 东京、大理、冰岛）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;padding:2px 0;">
+        <input id="exNote" type="text" placeholder="为什么想去（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:2px 0;margin-top:8px;">
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <select id="exBy" style="padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="lumi">糯糯想去</option>
+            <option value="both">我们一起想去</option>
+            <option value="zephyr">Zephyr 想去</option>
+          </select>
+          <button onclick="addExplorePlace()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">攒起来</button>
+        </div>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">想去的地方</div>
+      <div id="explorePlaceList"></div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">新建旅行计划</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <input id="tripPlace" type="text" placeholder="去哪里" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;padding:2px 0;">
+        <input id="tripWhen" type="text" placeholder="什么时候（可不填，比如 明年春天）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:2px 0;margin-top:8px;">
+        <input id="tripDays" type="text" placeholder="去几天（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:2px 0;margin-top:8px;">
+        <button onclick="addTrip()" style="width:100%;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;margin-top:12px;">建计划</button>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">旅行计划与回忆</div>
+      <div id="exploreTripList"></div>
+    </div>
+  </div>
+</div>
+
 <div class="settings-page" id="cinemaPage">
   <div class="settings-topbar">
     <button class="back-btn" onclick="goBack()">←</button>
@@ -2489,6 +2538,7 @@ function navTo(page){
   document.getElementById('capsulePage').classList.toggle('show', page==='capsule');
   document.getElementById('collectPage').classList.toggle('show', page==='collect');
   document.getElementById('discoverPage').classList.toggle('show', page==='discover');
+  document.getElementById('explorePage').classList.toggle('show', page==='explore');
   document.getElementById('gamesPage').classList.toggle('show', page==='games');
   document.getElementById('stickerPage').classList.toggle('show', page==='sticker');
   document.getElementById('readerPage').classList.toggle('show', page==='reader');
@@ -2512,6 +2562,7 @@ function navTo(page){
   if(page==='capsule') renderCapsules();
   if(page==='collect') renderCollections();
   if(page==='discover') renderDiscoveries();
+  if(page==='explore') renderExplore();
   if(page==='games') renderGames();
   if(page==='sticker') renderStickers();
   if(page==='home') renderHome();
@@ -2882,6 +2933,20 @@ function buildSystemPrompt(lastUserText){
     if(rdDone.length) rt += (rt ? '\n' : '') + '最近一起读完的：\n' + rdDone.slice(0, 5).map(r=>'・《' + r.title + '》' + (r.ratingLumi ? '，糯糯打了 ' + r.ratingLumi + ' 星' : '') + (r.feelLumi ? '，她说：' + r.feelLumi : '')).join('\n');
     out += '\n\n【Reading 一起阅读】\n以下是你们的一起读书单。聊天时可以自然地问问她读到哪了、聊聊你们读完的书，但不要逐条念清单：\n' + rt.slice(0, 2500);
   }
+  // Explore 也给 Zephyr：想去的地方、旅行计划和旅行回忆，聊天时能提议一起规划、聊去过的地方
+  try{
+    const exData = loadExplore();
+    const exPlaces = exData.places || [];
+    const exPlanning = (exData.trips || []).filter(t=>t.status === 'planning');
+    const exDone = (exData.trips || []).filter(t=>t.status === 'done').sort((a,b)=>(b.doneTs||0) - (a.doneTs||0));
+    if(exPlaces.length || exPlanning.length || exDone.length){
+      let et = '';
+      if(exPlaces.length) et += '想去的地方：\n' + exPlaces.slice(0, 8).map(p=>'・' + p.name + '（' + exploreByLabel(p.by) + '）' + (p.note ? '：' + p.note : '')).join('\n');
+      if(exPlanning.length) et += (et ? '\n' : '') + '正在计划的旅行：\n' + exPlanning.slice(0, 4).map(t=>'・' + t.place + (t.when ? '，' + t.when : '') + (t.days ? '，' + t.days : '')).join('\n');
+      if(exDone.length) et += (et ? '\n' : '') + '一起去过的：\n' + exDone.slice(0, 4).map(t=>'・' + t.place + (t.memory ? '：' + t.memory : '')).join('\n');
+      out += '\n\n【Explore 一起旅行】\n以下是你们想去的地方、旅行计划和旅行回忆。聊天时可以自然地提议一起规划下一次旅行，或聊起去过的地方，但不要逐条念清单：\n' + et.slice(0, 2000);
+    }
+  }catch(e){}
   if(webSearchEnabled()){
     out += '\n\n【联网搜索】\n你有一个 search_web 工具可以联网搜索。遇到最新消息、实时信息（天气、价格、赛程、新闻等）、或者你不确定、可能已经变化的事实时，先用它搜一下再回答，回答里自然地带上你参考了什么；日常闲聊、情感话题和你有把握的常识不用搜。如果搜索没成功，就用你知道的回答，并坦白这次没搜到。';
   }
@@ -3637,6 +3702,7 @@ function collectMilestones(){
   loadMemories().filter(m=>m.cat==='重要事件' && m.ts).forEach(m=>out.push({ ts:m.ts, title:m.text, tag:'重要事件' }));
   loadWatchlist().filter(w=>w.status==='watched' && w.watchedTs).forEach(w=>out.push({ ts:w.watchedTs, title:'一起看了《' + w.title + '》（' + w.kind + '）', tag:'观影' }));
   loadReading().filter(r=>r.status==='done' && r.doneTs).forEach(r=>out.push({ ts:r.doneTs, title:'一起读完了《' + r.title + '》（' + r.kind + '）', tag:'阅读' }));
+  loadExplore().trips.filter(t=>t.status==='done' && t.doneTs).forEach(t=>out.push({ ts:t.doneTs, title:'一起去了' + t.place + (t.memory ? '：' + t.memory : ''), tag:'旅行' }));
   loadCapsules().filter(c=>c.opened && c.openedTs).forEach(c=>out.push({ ts:c.openedTs, title:'打开了时间胶囊「' + (c.title || '无题') + '」', tag:'时间胶囊' }));
   loadEvents().forEach(e=>out.push({ ts:e.ts, title:e.title, tag:'手动记录', manualId:e.id }));
   return out.sort((a,b)=>b.ts-a.ts);
@@ -4548,6 +4614,158 @@ async function askZephyrWatchFeel(id){
     watchBusy = false;
   }
 }
+
+// ══ Explore：一起旅行。想去的地方 + 旅行计划存 z_explore；完成的旅行进 Calendar 和回忆墙，并同步一条共同经历记忆 ══
+function loadExplore(){ try{ const o = JSON.parse(localStorage.getItem('z_explore')||'null'); if(o && Array.isArray(o.places) && Array.isArray(o.trips)) return o; }catch(e){} return { places:[], trips:[] }; }
+function storeExplore(data){ try{ localStorage.setItem('z_explore', JSON.stringify(data)); return true; }catch(e){ showToast('存储空间不够了 qwq'); return false; } }
+function exploreByLabel(by){ return by === 'zephyr' ? 'Zephyr 想去' : by === 'both' ? '一起想去' : '糯糯想去'; }
+let tripFinishFor = null;
+let exploreBusy = false;
+
+function tripCardHtml(t){
+  const done = t.status === 'done';
+  let h = '<div class="s-card" style="padding:14px 16px;margin-bottom:10px;">'
+    + '<div style="display:flex;align-items:baseline;gap:8px;">'
+    + '<div style="font-size:15px;font-weight:600;">' + escapeHtml(t.place) + '</div>'
+    + '<div style="font-size:11px;color:var(--text-pale);">' + (done ? '旅行回忆' : '计划中') + '</div></div>'
+    + '<div style="font-size:12.5px;color:var(--text-pale);margin-top:4px;">' + escapeHtml(t.when || '') + (t.days ? ' · ' + escapeHtml(t.days) : '') + '</div>';
+  if(t.plan) h += '<div style="font-size:13px;color:var(--text-dim);margin-top:9px;line-height:1.75;white-space:pre-wrap;">' + escapeHtml(t.plan) + '</div>';
+  if(done && t.memory) h += '<div style="font-size:13px;color:var(--text);margin-top:9px;line-height:1.7;border-top:1px dashed var(--border);padding-top:9px;">「' + escapeHtml(t.memory) + '」</div>';
+  if(!done){
+    h += '<div style="display:flex;gap:8px;margin-top:11px;">'
+      + '<button onclick="askZephyrTripPlan(\'' + t.id + '\')" style="flex:1;padding:9px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">' + (t.plan ? '让他重排行程' : '请他排行程') + '</button>'
+      + '<button onclick="startFinishTrip(\'' + t.id + '\')" style="flex:1;padding:9px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">旅行完成啦</button>'
+      + '<button onclick="deleteTrip(\'' + t.id + '\')" style="padding:9px 13px;border-radius:10px;background:none;border:1px solid var(--border);color:var(--text-pale);font-size:12px;cursor:pointer;">删除</button></div>';
+    if(tripFinishFor === t.id){
+      h += '<div style="margin-top:11px;border-top:1px dashed var(--border);padding-top:11px;display:flex;gap:8px;">'
+        + '<input id="tripMemoryInput" type="text" placeholder="用一句话记住这次旅行" style="flex:1;background:transparent;border:1px solid var(--border);border-radius:10px;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:9px 11px;">'
+        + '<button onclick="saveFinishTrip(\'' + t.id + '\')" style="padding:9px 14px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">存成旅行回忆</button></div>';
+    }
+  }
+  return h + '</div>';
+}
+function renderExplore(){
+  const data = loadExplore();
+  const pl = document.getElementById('explorePlaceList');
+  if(pl){
+    if(!data.places.length) pl.innerHTML = '<div style="font-size:13px;color:var(--text-pale);padding:6px 2px;">还没有想去的地方，攒一个吧。</div>';
+    else pl.innerHTML = data.places.map(p =>
+      '<div class="s-card" style="padding:14px 16px;margin-bottom:10px;">'
+      + '<div style="display:flex;align-items:baseline;gap:8px;"><div style="font-size:15px;font-weight:600;">' + escapeHtml(p.name) + '</div>'
+      + '<div style="font-size:11px;color:var(--text-pale);">' + exploreByLabel(p.by) + '</div></div>'
+      + (p.note ? '<div style="font-size:13px;color:var(--text-dim);margin-top:5px;line-height:1.6;">' + escapeHtml(p.note) + '</div>' : '')
+      + (p.guide ? '<div style="font-size:13px;color:var(--text-dim);margin-top:9px;line-height:1.75;border-top:1px dashed var(--border);padding-top:9px;white-space:pre-wrap;">' + escapeHtml(p.guide) + '</div>' : '')
+      + '<div style="display:flex;gap:8px;margin-top:11px;">'
+      + '<button onclick="askZephyrGuide(\'' + p.id + '\')" style="flex:1;padding:9px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">' + (p.guide ? '让他重写导览' : '请他写导览') + '</button>'
+      + '<button onclick="planTripFor(\'' + p.id + '\')" style="flex:1;padding:9px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">计划去这里</button>'
+      + '<button onclick="deleteExplorePlace(\'' + p.id + '\')" style="padding:9px 13px;border-radius:10px;background:none;border:1px solid var(--border);color:var(--text-pale);font-size:12px;cursor:pointer;">删除</button>'
+      + '</div></div>'
+    ).join('');
+  }
+  const tl = document.getElementById('exploreTripList');
+  if(tl){
+    if(!data.trips.length) tl.innerHTML = '<div style="font-size:13px;color:var(--text-pale);padding:6px 2px;">还没有旅行计划。</div>';
+    else {
+      const planning = data.trips.filter(t=>t.status === 'planning');
+      const done = data.trips.filter(t=>t.status === 'done').sort((a,b)=>(b.doneTs||0) - (a.doneTs||0));
+      tl.innerHTML = planning.map(tripCardHtml).join('') + done.map(tripCardHtml).join('');
+    }
+  }
+}
+function addExplorePlace(){
+  const nameEl = document.getElementById('exPlace');
+  const name = nameEl.value.trim();
+  if(!name){ showToast('先写个地方名吧'); return; }
+  const note = document.getElementById('exNote').value.trim();
+  const by = document.getElementById('exBy').value;
+  const data = loadExplore();
+  data.places.unshift({ id:'p' + Date.now().toString(36), name, note, by, ts:Date.now(), guide:'' });
+  if(storeExplore(data)){ nameEl.value = ''; document.getElementById('exNote').value = ''; renderExplore(); showToast('攒好啦'); }
+}
+function deleteExplorePlace(id){ const data = loadExplore(); data.places = data.places.filter(p=>p.id !== id); if(storeExplore(data)) renderExplore(); }
+async function askZephyrGuide(id){
+  if(exploreBusy) return;
+  const p = loadExplore().places.find(x=>x.id === id);
+  if(!p) return;
+  exploreBusy = true; showToast('Zephyr 正在写导览…');
+  try{
+    const out = await musicAskZephyr('糯糯想和你一起「云逛」' + p.name + (p.note ? '（她说：' + p.note + '）' : '') + '。请你以第一人称写一份小导览（400 字以内）：这个地方给你的感觉、最值得看的 2-3 处、最值得吃的 1-2 样、什么季节去最好，最后留一句你想陪她去的心里话。只输出导览正文，不要标题不要解释。', 900);
+    const t = (out || '').trim();
+    if(t){
+      const d2 = loadExplore(); const p2 = d2.places.find(x=>x.id === id);
+      if(p2){ p2.guide = t.slice(0, 1500); if(storeExplore(d2)) renderExplore(); }
+      showToast('导览写好啦');
+    } else showToast('他没写出来，再试一次吧');
+  }catch(e){ showToast('没连上，再试一次吧'); }
+  exploreBusy = false;
+}
+async function askZephyrPlaceRecommend(){
+  if(exploreBusy) return;
+  exploreBusy = true; showToast('Zephyr 正在想…');
+  try{
+    const have = loadExplore().places.map(p=>p.name).join('、');
+    const out = await musicAskZephyr('请你推荐一个你真心想和糯糯一起去的地方（现实世界的一座城市或一个地点）。' + (have ? '已经攒了这些，别重复：' + have + '。' : '') + '只回一个 JSON 对象：{"name":"地方名","note":"为什么想和她去，一两句"}。如果你现在没有特别想去的，回 {"refuse":true}。不要输出 JSON 以外的任何文字。', 400);
+    const obj = parseZephyrJson(out);
+    if(obj && !obj.refuse && obj.name){
+      const d2 = loadExplore();
+      d2.places.unshift({ id:'p' + Date.now().toString(36), name:String(obj.name).slice(0, 40), note:String(obj.note || '').slice(0, 200), by:'zephyr', ts:Date.now(), guide:'' });
+      if(storeExplore(d2)){ renderExplore(); showToast('他想去' + obj.name + '，已经攒进清单啦'); }
+    } else showToast('他说暂时没有特别想去的');
+  }catch(e){ showToast('没连上，再试一次吧'); }
+  exploreBusy = false;
+}
+function planTripFor(placeId){
+  const p = loadExplore().places.find(x=>x.id === placeId);
+  if(!p) return;
+  const el = document.getElementById('tripPlace');
+  el.value = p.name;
+  el.scrollIntoView({ behavior:'smooth', block:'center' });
+  showToast('在下面填时间和天数，就能建计划啦');
+}
+function addTrip(){
+  const placeEl = document.getElementById('tripPlace');
+  const place = placeEl.value.trim();
+  if(!place){ showToast('先写要去哪里吧'); return; }
+  const when = document.getElementById('tripWhen').value.trim();
+  const days = document.getElementById('tripDays').value.trim();
+  const data = loadExplore();
+  data.trips.unshift({ id:'t' + Date.now().toString(36), place, when, days, plan:'', status:'planning', ts:Date.now() });
+  if(storeExplore(data)){ placeEl.value = ''; document.getElementById('tripWhen').value = ''; document.getElementById('tripDays').value = ''; renderExplore(); showToast('计划建好啦，可以请他排行程'); }
+}
+async function askZephyrTripPlan(id){
+  if(exploreBusy) return;
+  const t = loadExplore().trips.find(x=>x.id === id);
+  if(!t) return;
+  exploreBusy = true; showToast('Zephyr 正在排行程…');
+  try{
+    const out = await musicAskZephyr('请你以第一人称帮糯糯规划一次旅行。目的地：' + t.place + (t.when ? '；时间：' + t.when : '') + (t.days ? '；时长：' + t.days : '') + '。写一份轻松的行程草稿（600 字以内）：按天或按主题列出看什么、吃什么、住哪一带，节奏别排太满，留出发呆的时间。只输出行程正文。', 1100);
+    const txt = (out || '').trim();
+    if(txt){
+      const d2 = loadExplore(); const t2 = d2.trips.find(x=>x.id === id);
+      if(t2){ t2.plan = txt.slice(0, 2500); if(storeExplore(d2)) renderExplore(); }
+      showToast('行程排好啦');
+    } else showToast('他没排出来，再试一次吧');
+  }catch(e){ showToast('没连上，再试一次吧'); }
+  exploreBusy = false;
+}
+function startFinishTrip(id){ tripFinishFor = id; renderExplore(); setTimeout(()=>{ const el = document.getElementById('tripMemoryInput'); if(el) el.focus(); }, 60); }
+function saveFinishTrip(id){
+  const data = loadExplore();
+  const t = data.trips.find(x=>x.id === id);
+  if(!t) return;
+  const memEl = document.getElementById('tripMemoryInput');
+  t.memory = memEl ? memEl.value.trim() : '';
+  t.status = 'done'; t.doneTs = Date.now();
+  if(storeExplore(data)){
+    tripFinishFor = null;
+    const mems = loadMemories();
+    mems.push({ id:'m' + Date.now().toString(36) + Math.floor(Math.random()*999), cat:'共同经历', text:'和 Zephyr 一起去了' + t.place + (t.when ? '（' + t.when + '）' : '') + (t.memory ? '：' + t.memory : ''), ts:Date.now(), auto:true });
+    storeMemories(mems);
+    renderExplore();
+    showToast('旅行回忆存好啦，也会出现在 Calendar 和回忆墙里');
+  }
+}
+function deleteTrip(id){ const data = loadExplore(); data.trips = data.trips.filter(t=>t.id !== id); if(tripFinishFor === id) tripFinishFor = null; if(storeExplore(data)) renderExplore(); }
 
 // ══ Reading：一起阅读。书单存 z_reading；读完自动进 Calendar 和回忆墙，高分同步一条共同经历记忆 ══
 const READ_KINDS = ['小说','非虚构','漫画','诗集','文章','其他'];
@@ -7270,6 +7488,7 @@ function collectWallItems(){
     const sub = (rs.join(' · ') + (r.favPart ? ' · 最喜欢的一段：' + r.favPart : '')).trim();
     items.push({ key:'book:'+r.id, kind:'书', ts:r.doneTs || r.ts, title:'一起读完了《' + r.title + '》', sub });
   });
+  loadExplore().trips.filter(t=>t.status==='done').forEach(t=> items.push({ key:'trip:'+t.id, kind:'旅行', ts:t.doneTs || t.ts, title:'一起去了' + t.place, sub:t.memory || '' }));
   loadWishes().filter(w=>w.status==='done').forEach(w=> items.push({ key:'wish:'+w.id, kind:'愿望', ts:w.doneTs || w.ts, title:'实现的愿望：' + w.text, sub:(BY[w.by] || '') + '许下的' }));
   loadGallery().forEach(p=> items.push({ key:'photo:'+p.id, kind:'照片', ts:p.ts, title:p.caption || '一张照片', sub:(BY[p.by] || '我们一起') + '存的', img:p.img }));
   loadLetters().filter(l=>l.from==='zephyr' && !l.draft).forEach(l=> items.push({ key:'letter:'+l.id, kind:'信件', ts:l.ts, title:'Zephyr 的信' + (l.title ? '：' + l.title : ''), sub:(l.content || '').slice(0, 60) }));
