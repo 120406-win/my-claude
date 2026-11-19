@@ -1732,6 +1732,16 @@
       </div>
     </div>
     <div class="s-section">
+      <div class="s-section-title">在线找片</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <div style="display:flex;gap:8px;">
+          <input id="filmQ" type="text" placeholder="搜档案馆里的片，如：卓别林、夜之活死人" style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;padding:2px 0;">
+          <button onclick="searchOnlineFilms()" style="flex:none;padding:9px 16px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">搜一搜</button>
+        </div>
+        <div id="filmResults"></div>
+      </div>
+    </div>
+    <div class="s-section">
       <div class="s-section-title">想看清单</div>
       <div id="watchWantList"></div>
     </div>
@@ -4712,6 +4722,78 @@ function watchByLabel(by){ return by === 'zephyr' ? 'Zephyr 想看' : (by === 'b
 function starStr(n){ return n ? '★'.repeat(n) + '☆'.repeat(5 - n) : '未评分'; }
 let watchBusy = false, watchFormFor = null, watchFormRating = 0, watchFormFeel = '', watchFormScene = '';
 function fmtDay(ts){ const d = new Date(ts); return d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate(); }
+// ══ 在线找片：互联网档案馆的电影（公版老片为主），加进想看时把播放与字幕链接一起存下 ══
+let filmBusy = false, filmItems = [], filmFilesById = {};
+function archiveFileUrl(identifier, name){ return 'https://archive.org/download/' + encodeURIComponent(identifier) + '/' + String(name).split('/').map(encodeURIComponent).join('/'); }
+function fmtFileSize(b){ if(!b) return ''; if(b > 1073741824) return (b / 1073741824).toFixed(1) + ' GB'; if(b > 1048576) return Math.round(b / 1048576) + ' MB'; return Math.max(1, Math.round(b / 1024)) + ' KB'; }
+async function searchOnlineFilms(){
+  if(filmBusy) return;
+  const q = document.getElementById('filmQ').value.trim();
+  const box = document.getElementById('filmResults');
+  if(!q){ showToast('先写想搜什么呀 ~'); return; }
+  filmBusy = true;
+  box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:10px 0 2px;">正在档案馆里翻…</div>';
+  try{
+    const query = '(title:(' + q + ') OR creator:(' + q + ')) AND mediatype:movies';
+    const url = 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent(query) + '&fl[]=identifier&fl[]=title&fl[]=creator&fl[]=year&rows=15&page=1&output=json';
+    const r = await fetch(url);
+    const j = await r.json();
+    filmItems = (j && j.response && j.response.docs) || [];
+    filmFilesById = {};
+    if(!filmItems.length){ box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:10px 0 2px;">没翻到，换个关键词试试（公版老片比较多）</div>'; return; }
+    box.innerHTML = filmItems.map((it, i)=>'<div style="border-top:1px solid var(--border);padding:10px 0 2px;">'
+      + '<div style="display:flex;gap:8px;align-items:center;"><div style="flex:1;min-width:0;"><div style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(fixMojibake(it.title || it.identifier)) + '</div>'
+      + '<div style="font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(it.creator || '') + (it.year ? ' · ' + escapeHtml(String(it.year)) : '') + '</div></div>'
+      + '<button onclick="expandOnlineFilm(' + i + ', this)" style="flex:none;padding:7px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">看片源</button></div>'
+      + '<div class="film-files"></div></div>').join('');
+  }catch(e){
+    box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:10px 0 2px;">没搜成，待会儿再试 qwq</div>';
+  }finally{ filmBusy = false; }
+}
+function pickVideoFiles(files){
+  if(!Array.isArray(files)) return { videos: [], subs: [] };
+  const vids = files.filter(f=>f && f.name && /\.(mp4|m4v|webm|ogv|mov)$/i.test(f.name) && !/sample|preview|trailer/i.test(f.name));
+  const orig = vids.filter(f=>f.source === 'original');
+  const videos = (orig.length ? orig : vids).slice(0, 8).map(f=>({ name: f.name, title: fixMojibake(String(f.title || f.name.replace(/\.[^.]+$/, '').replace(/_/g, ' '))).slice(0, 120), size: +(f.size || 0) }));
+  const subs = files.filter(f=>f && f.name && /\.(srt|vtt)$/i.test(f.name)).slice(0, 6).map(f=>({ name: f.name }));
+  return { videos, subs };
+}
+async function expandOnlineFilm(i, btn){
+  const it = filmItems[i];
+  if(!it) return;
+  const holder = btn.parentElement.parentElement.querySelector('.film-files');
+  if(!holder) return;
+  if(holder.dataset.done){ holder.style.display = holder.style.display === 'none' ? '' : 'none'; return; }
+  btn.textContent = '取片源中…';
+  btn.disabled = true;
+  try{
+    const r = await fetch('https://archive.org/metadata/' + encodeURIComponent(it.identifier));
+    const j = await r.json();
+    const got = pickVideoFiles(j && j.files);
+    filmFilesById[it.identifier] = got;
+    holder.dataset.done = '1';
+    if(!got.videos.length){ holder.innerHTML = '<div style="font-size:12px;color:var(--text-pale);padding:6px 0;">这个条目里没有能直接播的视频文件</div>'; return; }
+    holder.innerHTML = got.videos.map((f, fi)=>'<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px dashed var(--border);">'
+      + '<div style="flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(f.title) + (f.size ? ' · ' + fmtFileSize(f.size) : '') + '</div>'
+      + '<button onclick="addOnlineFilm(' + i + ', ' + fi + ')" style="flex:none;padding:6px 11px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">加进想看</button></div>').join('')
+      + (got.subs.length ? '<div style="font-size:12px;color:var(--text-pale);padding:4px 0 2px;">带字幕文件，进观影室会自动挂上</div>' : '');
+  }catch(e){
+    holder.innerHTML = '<div style="font-size:12px;color:var(--text-pale);padding:6px 0;">片源没取到，待会儿再试</div>';
+  }finally{ btn.textContent = '看片源'; btn.disabled = false; }
+}
+function addOnlineFilm(i, vi){
+  const it = filmItems[i];
+  if(!it) return;
+  const got = filmFilesById[it.identifier];
+  const f = got && got.videos[vi];
+  if(!f) return;
+  const url = archiveFileUrl(it.identifier, f.name);
+  const list = loadWatchlist();
+  if(list.some(w=>w.url === url)){ showToast('这部已经在清单里啦'); return; }
+  const sub = got.subs && got.subs[0];
+  list.unshift({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), title: fixMojibake(it.title || f.title).slice(0, 120), kind:'电影', by:'lumi', note:'在线 · 互联网档案馆', status:'want', ts:Date.now(), url, subUrl: sub ? archiveFileUrl(it.identifier, sub.name) : '', subName: sub ? sub.name : '' });
+  if(storeWatchlist(list)){ renderWatchlist(); showToast('加进想看啦，去观影室就能看'); }
+}
 function renderWatchlist(){
   const list = loadWatchlist();
   // Zephyr 选的今晚看的
@@ -4737,7 +4819,7 @@ function renderWatchlist(){
     card.style.cssText = 'padding:13px 15px;margin-bottom:10px;';
     let html = '<div style="display:flex;gap:10px;align-items:flex-start;">'
       + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(w.title) + '》</div>'
-      + '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">' + escapeHtml(w.kind) + ' · ' + watchByLabel(w.by) + ' · ' + fmtDay(w.ts) + ' 加的</div>'
+      + '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">' + escapeHtml(w.kind) + ' · ' + watchByLabel(w.by) + ' · ' + fmtDay(w.ts) + ' 加的' + (w.url ? ' · 在线可播' : '') + (w.subUrl ? ' · 带字幕' : '') + '</div>'
       + (w.note ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:5px;">' + escapeHtml(w.note) + '</div>' : '')
       + '</div>'
       + '<button onclick="deleteWatchItem(\'' + w.id + '\')" style="flex:none;background:none;border:none;color:var(--text-pale);font-size:18px;cursor:pointer;padding:2px 6px;">×</button></div>'
