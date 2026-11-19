@@ -1228,6 +1228,20 @@
           </select>
           <button id="memAddBtn" onclick="saveMemoryEdit()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:14px;cursor:pointer;">记下来</button>
         </div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <select id="memValence" style="flex:1;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="">心情：不标</option>
+            <option value="1">心情：暖</option>
+            <option value="0">心情：平</option>
+            <option value="-1">心情：沉重</option>
+          </select>
+          <select id="memArousal" style="flex:1;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="">分量：不标</option>
+            <option value="0">分量：平静</option>
+            <option value="1">分量：有感觉</option>
+            <option value="2">分量：很有分量</option>
+          </select>
+        </div>
       </div>
     </div>
     <div class="s-section">
@@ -2386,7 +2400,62 @@ function storeMemories(list){
   try{ localStorage.setItem('z_memories', JSON.stringify(list)); return true; }
   catch(e){ showToast('存储空间不够了，记忆没存上 qwq'); return false; }
 }
-function buildSystemPrompt(){
+// ══ Memory 进化：注入时按相关度 + 情绪分量 + 时间衰减挑选，预算内带最该带的；标「已解决」的淡得快 ══
+const MEM_PROMPT_BUDGET = 2400;
+function memBigrams(s){
+  const t = (s || '').replace(/\s+/g, '');
+  const set = new Set();
+  for(let i = 0; i < t.length - 1; i++) set.add(t.slice(i, i + 2));
+  return set;
+}
+function memPromptEmoSuffix(m){
+  let s = '';
+  if(m.v === 1) s += '（暖）'; else if(m.v === -1) s += '（沉重）';
+  if(m.a === 2) s += '（很有分量）';
+  return s;
+}
+function pickMemoriesForPrompt(mems, query){
+  const all = mems.slice();
+  const lineOf = m => ('・[' + (m.cat || '其他') + '] ' + (m.pinned ? '★很重要：' : '') + m.text + memPromptEmoSuffix(m));
+  const totalLen = all.reduce((s, m)=>s + lineOf(m).length + 1, 0);
+  if(totalLen <= MEM_PROMPT_BUDGET){
+    // 记忆还不多时全带：置顶在前，其余新的在前
+    return all.sort((a, b)=>((b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)) || ((b.ts || 0) - (a.ts || 0)));
+  }
+  const now = Date.now();
+  const q = (query || '').trim();
+  const qg = memBigrams(q);
+  const scored = all.map(m=>{
+    let s = 1;
+    if(m.pinned) s += 10000;
+    if(m.cat === '身份') s += 8;
+    if(q){
+      if(m.cat && q.includes(m.cat)) s += 6;
+      const tg = memBigrams(m.text);
+      let hit = 0;
+      tg.forEach(g=>{ if(qg.has(g)) hit++; });
+      s += hit * 2;
+    }
+    s += (m.a || 0) * 2;
+    const ageDays = Math.max(0, (now - (m.ts || now)) / 86400000);
+    const half = m.resolved ? 30 : 180;
+    let decay = Math.pow(0.5, ageDays / half);
+    if(m.pinned || m.cat === '身份') decay = Math.max(decay, 0.9);
+    s *= (0.3 + 0.7 * decay);
+    return { m, s };
+  });
+  scored.sort((a, b)=>b.s - a.s);
+  const picked = [];
+  let used = 0;
+  for(const { m } of scored){
+    const len = lineOf(m).length + 1;
+    if(used + len > MEM_PROMPT_BUDGET && !m.pinned && picked.length) continue;
+    picked.push(m);
+    used += len;
+  }
+  return picked;
+}
+function buildSystemPrompt(lastUserText){
   let out = cfg.system;
   // 当前时间：每次发请求时按糯糯设备上的时间现算，他永远知道今天几号、现在几点
   try{
@@ -2397,9 +2466,9 @@ function buildSystemPrompt(){
   }catch(e){}
   const mems = loadMemories();
   if(mems.length){
-    const sorted = mems.slice().sort((a,b)=>((b.pinned?1:0)-(a.pinned?1:0)));
-    const lines = sorted.map(m=>'・['+(m.cat||'其他')+'] '+(m.pinned?'★很重要：':'')+m.text).join('\n');
-    out += '\n\n【长期记忆】\n以下是 Lumi 亲手写下的长期记忆，是属于你和 Lumi 共同的记忆。请自然地记住，并在合适的时候运用，不要生硬地复述清单：\n' + lines;
+    const picked = pickMemoriesForPrompt(mems, lastUserText || '');
+    const lines = picked.map(m=>'・['+(m.cat||'其他')+'] '+(m.pinned?'★很重要：':'')+m.text+memPromptEmoSuffix(m)).join('\n');
+    out += '\n\n【长期记忆】\n以下是属于你和 Lumi 共同的长期记忆（这次按与当前话题的相关程度挑了 ' + picked.length + ' 条带来）。请自然地记住，并在合适的时候运用，不要生硬地复述清单：\n' + lines;
   }
   // 时间胶囊：封存中的只报标题与开启日期（内容保密）；打开过的把内容一起带上
   try{
@@ -2521,6 +2590,26 @@ function togglePinMemory(id){
   renderMemories();
   showToast(m.pinned ? '已置顶，Zephyr 会优先记得它' : '已取消置顶');
 }
+function toggleResolvedMemory(id){
+  const list = loadMemories();
+  const m = list.find(x=>x.id===id);
+  if(!m) return;
+  m.resolved = !m.resolved;
+  storeMemories(list);
+  renderMemories();
+  showToast(m.resolved ? '已标为「已解决」，它会慢慢淡下去' : '已取消「已解决」');
+}
+function memEmoLabel(m){
+  const parts = [];
+  if(m.v === 1) parts.push('暖');
+  else if(m.v === -1) parts.push('沉重');
+  else if(m.v === 0) parts.push('平');
+  if(m.a === 2) parts.push('很有分量');
+  else if(m.a === 1) parts.push('有感觉');
+  else if(m.a === 0) parts.push('平静');
+  if(m.resolved) parts.push('已解决');
+  return parts.join(' · ');
+}
 function renderMemories(){
   const tg = document.getElementById('autoMemToggle');
   if(tg) tg.checked = autoMemEnabled();
@@ -2562,7 +2651,7 @@ function renderMemories(){
       const meta = document.createElement('div');
       meta.style.cssText='font-size:11px;color:var(--text-pale);margin-top:4px;';
       const d = m.ts ? new Date(m.ts) : null;
-      meta.textContent = (m.auto ? 'Zephyr 自动记的' : '手动记的') + (d ? ' · ' + d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() : '');
+      meta.textContent = (m.auto ? 'Zephyr 自动记的' : '手动记的') + (d ? ' · ' + d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() : '') + (memEmoLabel(m) ? ' · ' + memEmoLabel(m) : '');
       main.appendChild(txt); main.appendChild(meta);
       row.appendChild(main);
       const mkBtn = (label, fn, color)=>{
@@ -2573,6 +2662,7 @@ function renderMemories(){
         return b;
       };
       row.appendChild(mkBtn(m.pinned ? '已置顶' : '置顶', ()=>togglePinMemory(m.id), m.pinned ? 'var(--accent-s)' : 'var(--text-dim)'));
+      row.appendChild(mkBtn(m.resolved ? '已解决' : '标已解决', ()=>toggleResolvedMemory(m.id), m.resolved ? 'var(--accent-s)' : 'var(--text-dim)'));
       row.appendChild(mkBtn('编辑', ()=>startEditMemory(m.id), 'var(--text-dim)'));
       row.appendChild(mkBtn('删除', ()=>deleteMemory(m.id), '#e0657a'));
       card.appendChild(row);
@@ -2588,18 +2678,22 @@ function saveMemoryEdit(){
   const text = input.value.trim();
   if(!text){ showToast('先写点什么再记下来呀 ~'); return; }
   const cat = document.getElementById('memCategory').value;
+  const vRaw = document.getElementById('memValence').value;
+  const aRaw = document.getElementById('memArousal').value;
+  const v = vRaw === '' ? undefined : parseInt(vRaw, 10);
+  const a = aRaw === '' ? undefined : parseInt(aRaw, 10);
   const list = loadMemories();
   if(editingMemId){
     const m = list.find(x=>x.id===editingMemId);
-    if(m){ m.text=text; m.cat=cat; }
+    if(m){ m.text=text; m.cat=cat; if(v === undefined) delete m.v; else m.v = v; if(a === undefined) delete m.a; else m.a = a; }
     editingMemId = null;
     document.getElementById('memAddBtn').textContent='记下来';
     showToast('记忆已更新 ✓');
   } else {
-    list.push({ id:'m'+Date.now().toString(36)+Math.floor(Math.random()*999), cat, text, ts:Date.now() });
+    list.push({ id:'m'+Date.now().toString(36)+Math.floor(Math.random()*999), cat, text, ts:Date.now(), ...(v !== undefined ? {v} : {}), ...(a !== undefined ? {a} : {}) });
     showToast('记下来了 ✓ Zephyr 不会忘的');
   }
-  if(storeMemories(list)){ input.value=''; renderMemories(); }
+  if(storeMemories(list)){ input.value=''; document.getElementById('memValence').value=''; document.getElementById('memArousal').value=''; renderMemories(); }
 }
 function startEditMemory(id){
   const m = loadMemories().find(x=>x.id===id);
@@ -2607,6 +2701,8 @@ function startEditMemory(id){
   editingMemId = id;
   document.getElementById('memInput').value = m.text;
   document.getElementById('memCategory').value = m.cat || '身份';
+  document.getElementById('memValence').value = (m.v === undefined || m.v === null) ? '' : String(m.v);
+  document.getElementById('memArousal').value = (m.a === undefined || m.a === null) ? '' : String(m.a);
   document.getElementById('memAddBtn').textContent = '保存修改';
   const body = document.querySelector('#memoryPage .settings-body');
   if(body) body.scrollTop = 0;
@@ -2626,7 +2722,7 @@ function deleteMemory(id){
 
 // ══ 自动记忆：每聊满 10 条，自动把这段对话总结成长期记忆 ══
 const AUTO_MEM_EVERY = 10;
-const AUTO_MEM_PROMPT = '你是一个记忆整理助手。下面是 Lumi（用户）和 Zephyr（AI 伙伴）的一段对话。请提炼值得长期记住的重要信息：Lumi 的身份与近况、重要人物、偏好习惯、重要事件、两人的共同经历、项目进展与决定。只输出一个 JSON 数组，每个元素是 {"cat":"分类","text":"记忆内容"}。分类只能是：身份、重要人物、偏好、重要事件、共同经历、项目。text 用简洁的第三人称陈述，主语用 Lumi 或 Zephyr，一条只记一件事。不要记录寒暄、玩笑和一次性的小事。如果没有值得长期记住的内容，输出 []。不要输出 JSON 以外的任何文字。';
+const AUTO_MEM_PROMPT = '你是一个记忆整理助手。下面是 Lumi（用户）和 Zephyr（AI 伙伴）的一段对话。请提炼值得长期记住的重要信息：Lumi 的身份与近况、重要人物、偏好习惯、重要事件、两人的共同经历、项目进展与决定。只输出一个 JSON 数组，每个元素是 {"cat":"分类","text":"记忆内容","v":情绪,"a":分量}。分类只能是：身份、重要人物、偏好、重要事件、共同经历、项目。v 是这件事的情绪：1 暖/积极，0 中性，-1 沉重/消极；a 是分量：0 平静，1 有感觉，2 很有分量、刻骨。text 用简洁的第三人称陈述，主语用 Lumi 或 Zephyr，一条只记一件事。不要记录寒暄、玩笑和一次性的小事。如果没有值得长期记住的内容，输出 []。不要输出 JSON 以外的任何文字。';
 let autoMemRunning = false;
 function autoMemEnabled(){ return localStorage.getItem('z_autoMem') !== '0'; }
 function toggleAutoMem(on){ localStorage.setItem('z_autoMem', on ? '1' : '0'); showToast(on ? '自动记忆已开启' : '自动记忆已关闭'); }
@@ -2685,7 +2781,7 @@ async function runAutoSummarize(manual){
       const key = text.replace(/\s+/g,'');
       if(seen.has(key)) continue;
       seen.add(key);
-      added.push({ id:'m'+Date.now().toString(36)+Math.floor(Math.random()*9999), cat: MEM_CATS.includes(it.cat) ? it.cat : '共同经历', text, ts:Date.now(), auto:true });
+      added.push({ id:'m'+Date.now().toString(36)+Math.floor(Math.random()*9999), cat: MEM_CATS.includes(it.cat) ? it.cat : '共同经历', text, ts:Date.now(), auto:true, ...([-1,0,1].includes(it.v) ? { v: it.v } : {}), ...([0,1,2].includes(it.a) ? { a: it.a } : {}) });
       if(added.length >= 8) break;
     }
     // 不管有没有新增，都推进进度，避免反复总结同一段
@@ -6782,7 +6878,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       }
       return { role:m.role, content:c };
     });
-    const reqBody = { model:cfg.model, max_tokens:cfg.maxTokens, temperature:cfg.temperature, top_p:cfg.topP, system:buildSystemPrompt(), messages:apiMessages, stream:true };
+    const reqBody = { model:cfg.model, max_tokens:cfg.maxTokens, temperature:cfg.temperature, top_p:cfg.topP, system:buildSystemPrompt(typeof userText === 'string' ? userText : ''), messages:apiMessages, stream:true };
     const thinkOn = thinkingEnabled();
     if(thinkOn){
       // 思考模式：给思考留 2048 token 预算，总上限至少 3548；开启时 temperature / top_p 必须撤掉，否则 API 会报错
