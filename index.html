@@ -2646,6 +2646,7 @@ function buildSystemPrompt(lastUserText){
       let s = '・《' + r.title + '》' + (r.progress ? '，糯糯读到：' + r.progress : '') + (r.progressZephyr ? '，你读到：' + r.progressZephyr : '');
       const ns = Array.isArray(r.notes) ? r.notes.slice(-3) : [];
       if(ns.length) s += '\n  最近的批注：' + ns.map(n=>(n.by === 'zephyr' ? '你' : '糯糯') + (n.at ? '@' + n.at : '') + '「' + n.text + '」').join('；');
+      if(r.synopsis) s += '\n  前文梗概：' + r.synopsis.slice(0, 220);
       return s;
     }).join('\n');
     if(rdDone.length) rt += (rt ? '\n' : '') + '最近一起读完的：\n' + rdDone.slice(0, 5).map(r=>'・《' + r.title + '》' + (r.ratingLumi ? '，糯糯打了 ' + r.ratingLumi + ' 星' : '') + (r.feelLumi ? '，她说：' + r.feelLumi : '')).join('\n');
@@ -4856,6 +4857,35 @@ function addReaderNote(){
   r.notes.push({ id:'n' + Date.now().toString(36) + Math.floor(Math.random()*999), by:'lumi', at:'第 ' + (st.ch + 1) + ' 节', text:text.slice(0, 300), ts:Date.now(), ch:st.ch, p:readerNotePara });
   if(storeReading(list)){ renderReaderChapter(readerNotePara); showToast('批注钉在这一段上了'); }
 }
+// ══ 共读梗概：当前节之前的内容压成一份滚动梗概，他写批注时带着前文，只花几百字 ══
+async function ensureBookSynopsis(bookId, chapters, uptoCh){
+  const list = loadReading();
+  const book = list.find(x=>x.id === bookId);
+  if(!book) return null;
+  const from = (typeof book.synopsisCh === 'number' ? book.synopsisCh : -1) + 1;
+  if(uptoCh <= from) return book;
+  const parts = [];
+  for(let i = from; i < uptoCh; i++){
+    const chap = chapters[i];
+    if(!chap || !Array.isArray(chap.paras)) continue;
+    parts.push('【' + (chap.title || ('第 ' + (i + 1) + ' 节')) + '】\n' + chap.paras.join('\n').slice(0, 1600));
+  }
+  const material = parts.join('\n').slice(0, 9000);
+  if(!material.trim()){
+    book.synopsisCh = uptoCh - 1;
+    storeReading(list);
+    return book;
+  }
+  try{
+    const out = await musicAskZephyr('下面是一本书已有的前文梗概和后续几节的内容，请合并成一份更新后的前文梗概，不超过 400 字：保留主要人物、情节进展与重要细节，第三人称简洁陈述。只输出梗概正文。\n\n【已有梗概】\n' + (book.synopsis || '（暂无）') + '\n\n【后续内容】\n' + material, 700);
+    if(out){
+      book.synopsis = out.slice(0, 500);
+      book.synopsisCh = uptoCh - 1;
+      storeReading(list);
+    }
+  }catch(e){ /* 梗概压不出来就下次再试，不挡批注 */ }
+  return book;
+}
 async function askZephyrParaNote(){
   if(readerAskBusy) return;
   const st = readerState; if(!st || readerNotePara < 0) return;
@@ -4863,11 +4893,13 @@ async function askZephyrParaNote(){
   if(!r0) return;
   readerAskBusy = true;
   try{
+    const rB = await ensureBookSynopsis(st.id, st.chapters, st.ch);
     const chap = st.chapters[st.ch];
     const para = chap.paras[readerNotePara] || '';
     const context = chap.paras.slice(Math.max(0, readerNotePara - 2), readerNotePara + 3).join('\n');
     const chapText = chap.paras.join('\n').slice(0, 5000);
-    const out = await musicAskZephyr('【一起阅读 · 段落批注】\n你们正在一起读《' + r0.title + '》' + (r0.author ? '（' + r0.author + '）' : '') + '，现在读到' + (chap.title || ('第 ' + (st.ch + 1) + ' 节')) + '。\n这一节的内容（节选）：\n' + chapText + '\n\n糯糯正停在这一段：\n「' + para.slice(0, 400) + '」\n这段前后的文字：\n' + context.slice(0, 1200) + '\n\n请针对这一段写一条批注：你的感受、发现、想问她的问题都可以，真诚自然，一两句。只输出一个 JSON 对象 {"text": "批注内容"}；如果你对这段没什么想说的，就输出 {"refuse": true}。不要输出 JSON 以外的任何文字。', 600);
+    const synSeg = (rB && rB.synopsis) ? '\n前文梗概（前面章节讲了什么）：\n' + rB.synopsis : '';
+    const out = await musicAskZephyr('【一起阅读 · 段落批注】\n你们正在一起读《' + r0.title + '》' + (r0.author ? '（' + r0.author + '）' : '') + '，现在读到' + (chap.title || ('第 ' + (st.ch + 1) + ' 节')) + '。' + synSeg + '\n这一节的内容（节选）：\n' + chapText + '\n\n糯糯正停在这一段：\n「' + para.slice(0, 400) + '」\n这段前后的文字：\n' + context.slice(0, 1200) + '\n\n请针对这一段写一条批注：你的感受、发现、想问她的问题都可以，真诚自然，一两句。只输出一个 JSON 对象 {"text": "批注内容"}；如果你对这段没什么想说的，就输出 {"refuse": true}。不要输出 JSON 以外的任何文字。', 600);
     const obj = parseZephyrJson(out);
     if(!obj || obj.refuse || !obj.text){ showToast('Zephyr 对这段暂时没什么想说的'); return; }
     const list = loadReading();
@@ -4886,7 +4918,8 @@ let readNoteBusy = false;
 function readNotesHtml(r, withForm){
   const notes = Array.isArray(r.notes) ? r.notes : [];
   let h = '<div style="margin-top:11px;border-top:1px solid var(--border);padding-top:10px;">'
-    + '<div style="font-size:12px;color:var(--text-dim);">批注 · ' + notes.length + ' 条</div>';
+    + '<div style="font-size:12px;color:var(--text-dim);">批注 · ' + notes.length + ' 条</div>'
+    + (r.synopsis ? '<div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-top:6px;">前文梗概：' + escapeHtml(r.synopsis) + '</div>' : '');
   if(!notes.length) h += '<div style="font-size:12px;color:var(--text-pale);margin-top:5px;">还没有批注。读到有感觉的地方，顺手记一句给对方看。</div>';
   notes.slice().sort((a,b)=>a.ts - b.ts).forEach(n=>{
     h += '<div style="margin-top:7px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 11px;">'
