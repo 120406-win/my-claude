@@ -2187,7 +2187,6 @@ function applyTheme(t){
 }
 applyTheme(cfg.theme);
 applyAppearance();
-initLock();
 
 function setTheme(t){
   cfg.theme=t; localStorage.setItem('z_theme',t); applyTheme(t);
@@ -8751,6 +8750,7 @@ syncCallAvatars();
 setupBgControls();
 applyBackground();
 initCallHeartbeatSel();
+initLock(); // 必须放在初始化区：锁屏状态是后段才声明的 const，提前调用会让整个脚本在启动时崩掉
 </script>
 </body>
 </html>
