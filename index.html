@@ -1259,6 +1259,7 @@
           <button onclick="exportData()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">导出全部数据</button>
           <button onclick="document.getElementById('importFileInput').click()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">导入恢复</button>
         </div>
+        <div id="storageInfo" style="font-size:11.5px;color:var(--text-pale);line-height:1.7;margin-top:12px;"></div>
         <input type="file" id="importFileInput" accept=".json,application/json" style="display:none" onchange="importDataFile(this)">
       </div>
     </div>
@@ -2583,7 +2584,7 @@ function navTo(page){
   document.getElementById('readerPage').classList.toggle('show', page==='reader');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
-  if(page==='settings'){ loadSettings(); renderUsage(); renderLockSettings(); renderSchemes(); }
+  if(page==='settings'){ loadSettings(); renderUsage(); renderLockSettings(); renderSchemes(); renderStorageInfo(); }
   if(page==='memory') renderMemories();
   if(page==='journal') renderJournal();
   if(page==='wishes') renderWishes();
@@ -4384,7 +4385,7 @@ async function importKelivoZipFile(file, mode, status){
     if(mode === 'history' || mode === 'both'){
       const asc = convs.slice().sort((a,b)=>a.updated - b.updated);
       asc.forEach(c=>{
-        conversations.unshift({ id: genConvId(), title: String(c.title || '导入的对话').slice(0, 40), messages: c.messages.slice(0, 2000) });
+        conversations.unshift({ id: genConvId(), title: String(c.title || '导入的对话').slice(0, 40), messages: c.messages.slice(0, 10000) });
       });
       if(asc.length){ saveConversations(); renderConvList(); }
       parts.push('导入了 ' + asc.length + ' 个对话（共 ' + totalMsgs + ' 条消息）');
@@ -4434,7 +4435,7 @@ function importChatFile(input){
       showToast('导入失败：无法识别格式');
       return;
     }
-    const capped = msgs.slice(0, 2000);
+    const capped = msgs.slice(0, 10000);
     let parts = [];
     if(mode === 'history' || mode === 'both'){
       const conv = { id: genConvId(), title: '导入：' + file.name.replace(/\.[^.]+$/, '').slice(0, 20), messages: capped };
@@ -8241,8 +8242,9 @@ document.getElementById('fileInput').addEventListener('change',async e=>{
   const file=e.target.files[0]; if(!file) return; e.target.value='';
   const reader=new FileReader();
   reader.onload=async ev=>{
-    const dataUrl=ev.target.result;
-    const mediaType = file.type || 'image/jpeg';
+    const dataUrl = await compressChatImage(ev.target.result);
+    const mtMatch = dataUrl.match(/^data:([^;]+)/);
+    const mediaType = mtMatch ? mtMatch[1] : (file.type || 'image/jpeg');
     const mid = genMsgId(); pendingUserMid = mid;
     addImgMsg(dataUrl,true,false,mid); headerSub.textContent='正在识图…'; showTyping();
     const block = {type:'image', source:{type:'base64', media_type: mediaType, data: dataUrl.split(',')[1]}};
@@ -9184,6 +9186,46 @@ function cinemaFinish(){
 let pendingStickerImg = '';
 function loadStickers(){ try{ const a = JSON.parse(localStorage.getItem('z_stickers') || '[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
 function storeStickers(list){ try{ localStorage.setItem('z_stickers', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间满了，表情包存不下 qwq'); return false; } }
+// ══ 存储用量：让她在设置里看得见本机存了多少、什么最占地方 ══
+function fmtBytes(n){ return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+function renderStorageInfo(){
+  const el = document.getElementById('storageInfo');
+  if(!el) return;
+  const sizes = [];
+  let total = 0;
+  for(let i = 0; i < localStorage.length; i++){
+    const k = localStorage.key(i);
+    if(!k || !k.startsWith('z_')) continue;
+    const n = (localStorage.getItem(k) || '').length;
+    total += n; sizes.push([k, n]);
+  }
+  sizes.sort((a,b)=>b[1] - a[1]);
+  const NAMES = { z_conversations:'对话', z_gallery:'相册', z_stickers:'表情包', z_capsules:'时间胶囊', z_memories:'记忆' };
+  const top = sizes.slice(0, 3).map(([k, n]) => (NAMES[k] || k) + ' ' + fmtBytes(n)).join(' · ');
+  el.textContent = '本机已存约 ' + fmtBytes(total) + '（浏览器给每个网站的本地空间约 5 MB，满了会存不下新消息）' + (top ? '。占得最多：' + top + '。' : '');
+}
+// ══ 聊天图片先压缩再存：原图动不动几 MB，是存储爆掉的元凶 ══
+function compressChatImage(dataUrl){
+  return new Promise(res=>{
+    try{
+      const img = new Image();
+      img.onload = ()=>{
+        try{
+          const max = 1568;
+          const scale = Math.min(1, max / Math.max(img.width, img.height));
+          if(scale >= 1 && dataUrl.length < 700 * 1024){ res(dataUrl); return; }
+          const c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(img.width * scale));
+          c.height = Math.max(1, Math.round(img.height * scale));
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          res(c.toDataURL('image/jpeg', 0.85));
+        }catch(e){ res(dataUrl); }
+      };
+      img.onerror = ()=>res(dataUrl);
+      img.src = dataUrl;
+    }catch(e){ res(dataUrl); }
+  });
+}
 function compressStickerImage(dataUrl, cb){
   const img = new Image();
   img.onload = ()=>{
