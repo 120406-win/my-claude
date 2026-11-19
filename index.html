@@ -4166,7 +4166,7 @@ function mergeWrappedLines(lines){
     if(!t.trim()){ out.push(''); return; }
     const prev = out.length ? out[out.length - 1] : '';
     const prevTrim = prev.replace(/\s+$/, '');
-    if(prevTrim && prevTrim.length >= 25 && !/[。！？…」』）.!?]["'"」』]*$/.test(prevTrim) && !BOOK_HEAD_RE.test(t)){
+    if(prevTrim && prevTrim.length >= 25 && !/[。！？…」』）.!?]["'"“”‘’」』]*$/.test(prevTrim) && !BOOK_HEAD_RE.test(t)){
       out[out.length - 1] = prevTrim + t.trim();
       return;
     }
@@ -4217,10 +4217,14 @@ function xhtmlToParas(html){
   const re = /<(h1|h2|h3|p)[^>]*>([\s\S]*?)<\/\1>/gi;
   let m;
   while((m = re.exec(cleaned))){
-    const txt = decodeEntities(m[2].replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim();
-    if(!txt) continue;
-    if(!title && (m[1].toLowerCase() === 'h1' || m[1].toLowerCase() === 'h2')) title = txt;
-    paras.push(txt);
+    if(!title && (m[1].toLowerCase() === 'h1' || m[1].toLowerCase() === 'h2')){
+      const t = decodeEntities(m[2].replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ').trim();
+      if(t) title = t;
+    }
+    // 有的 EPUB 把一整回塞进一个 <p>，段落靠 <br> 和空行分隔：先换行再按行拆，硬换行再接回
+    const text = decodeEntities(m[2].replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ''));
+    const lines = text.split(/\r?\n/).map(l=>l.replace(/[ \t]+/g, ' ').trim());
+    mergeWrappedLines(lines).forEach(l=>{ const t = l.trim(); if(t) paras.push(t); });
   }
   if(!paras.length){
     const all = decodeEntities(cleaned.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
@@ -4239,7 +4243,7 @@ function parseEpubFromFiles(files){
   const containerKey = findKey('META-INF/container.xml');
   if(!containerKey) throw new Error('no container');
   const container = dec.decode(files[containerKey]);
-  const rootTag = (container.match(/<rootfile\b[^>]*>/) || [])[0];
+  const rootTag = (container.match(/<(?:[\w.-]+:)?rootfile\b[^>]*>/) || [])[0];
   const opfPath = rootTag && xmlAttr(rootTag, 'full-path');
   if(!opfPath) throw new Error('no rootfile');
   const opfKey = findKey(opfPath);
@@ -4247,18 +4251,18 @@ function parseEpubFromFiles(files){
   const opf = dec.decode(files[opfKey]);
   const base = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
   const manifest = {};
-  const itemRe = /<item\b[^>]*>/g;
+  const itemRe = /<(?:[\w.-]+:)?item\b[^>]*>/g;
   let im;
   while((im = itemRe.exec(opf))){
     const id = xmlAttr(im[0], 'id'), href = xmlAttr(im[0], 'href');
     if(id && href) manifest[id] = href;
   }
   const meta = {
-    title: decodeEntities((opf.match(/<dc:title[^>]*>([^<]*)<\/dc:title>/) || [])[1] || '').trim(),
-    author: decodeEntities((opf.match(/<dc:creator[^>]*>([^<]*)<\/dc:creator>/) || [])[1] || '').trim()
+    title: decodeEntities((opf.match(/<(?:[\w.-]+:)?title[^>]*>([^<]*)<\/(?:[\w.-]+:)?title>/) || [])[1] || '').trim(),
+    author: decodeEntities((opf.match(/<(?:[\w.-]+:)?creator[^>]*>([^<]*)<\/(?:[\w.-]+:)?creator>/) || [])[1] || '').trim()
   };
   const chapters = [];
-  const refRe = /<itemref\b[^>]*>/g;
+  const refRe = /<(?:[\w.-]+:)?itemref\b[^>]*>/g;
   let rm;
   while((rm = refRe.exec(opf))){
     const idref = xmlAttr(rm[0], 'idref');
@@ -4272,7 +4276,22 @@ function parseEpubFromFiles(files){
     if(got.paras.length) chapters.push({ title: got.title || ('第 ' + (chapters.length + 1) + ' 节'), paras: got.paras });
   }
   if(!chapters.length) throw new Error('no chapters');
-  return { chapters, meta };
+  // 档案馆的扫描版 EPUB 会把版权/制作说明单独做成一节，去掉它（正文足够多时才去）
+  const isBoiler = c => c.paras.every(p=>/produced in EPUB format|produced from|Project Gutenberg|archive\.org|Wikisource/i.test(p) || p.length < 30);
+  const cleaned = chapters.length > 5 ? chapters.filter(c=>!isBoiler(c)) : chapters;
+  // 一页一节的扫描版 EPUB（上千节、每节一两段）合并成大块，不然章节列表会长到没法用；
+  // 正常小说一回一节、每节段落多，不受影响
+  const counts = cleaned.map(c=>c.paras.length).sort((a,b)=>a-b);
+  const median = counts.length ? counts[Math.floor(counts.length / 2)] : 99;
+  if(cleaned.length > 60 && median <= 2){
+    const merged = [];
+    for(let i = 0; i < cleaned.length; i += 40){
+      const part = cleaned.slice(i, i + 40);
+      merged.push({ title: '第 ' + (merged.length + 1) + ' 部分', paras: part.flatMap(c=>c.paras) });
+    }
+    return { chapters: merged.length ? merged : cleaned, meta };
+  }
+  return { chapters: cleaned, meta };
 }
 async function parseEpubBuffer(buf){
   if(!window.fflate) await loadScriptOnce('https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js');
@@ -4333,15 +4352,22 @@ const LIB_SHELF = [
 ];
 let libResults = [];
 let libBusy = false;
+function pickBookCandidates(files){
+  const items = (files || []).filter(f=>f && f.name).map(f=>({ name: f.name, size: parseInt(f.size || '0', 10) || 0 }));
+  const bySize = (a, b)=>b.size - a.size;
+  // 干净的 TXT 最优先：不用解压组件、解析最稳（如维基文库来源的全文）；EPUB 次之；扫描 OCR 文本兜底
+  const txtClean = items.filter(x=>/\.txt$/i.test(x.name) && !/_djvu/i.test(x.name) && x.name.charAt(0) !== '_' && !/_meta\.|_files\.|_scandata\./i.test(x.name)).sort(bySize);
+  const epubs = items.filter(x=>/\.epub$/i.test(x.name) && !/lending/i.test(x.name) && !/_lcp/i.test(x.name) && x.name.charAt(0) !== '_').sort(bySize);
+  const djvu = items.filter(x=>/_djvu\.txt$/i.test(x.name)).sort(bySize);
+  const out = [];
+  txtClean.forEach(x=>out.push({ name: x.name, kind: 'txt' }));
+  epubs.forEach(x=>out.push({ name: x.name, kind: 'epub' }));
+  djvu.forEach(x=>out.push({ name: x.name, kind: 'txt' }));
+  return out;
+}
 function pickBookFile(files){
-  const names = (files || []).map(f=>f && f.name).filter(Boolean);
-  const epub = names.find(n=>/\.epub$/i.test(n) && !/lending/i.test(n) && n.charAt(0) !== '_');
-  if(epub) return { name: epub, kind: 'epub' };
-  const djvu = names.find(n=>/_djvu\.txt$/i.test(n));
-  if(djvu) return { name: djvu, kind: 'txt' };
-  const txt = names.find(n=>/\.txt$/i.test(n) && n.charAt(0) !== '_' && !/_meta\.|_files\.|_scandata\./i.test(n));
-  if(txt) return { name: txt, kind: 'txt' };
-  return null;
+  const c = pickBookCandidates(files);
+  return c.length ? c[0] : null;
 }
 function renderLibShelf(){
   const box = document.getElementById('libShelf');
@@ -4362,32 +4388,45 @@ async function libDownload(ident, title, author, btn){
   libBusy = true;
   const oldText = btn ? btn.textContent : '';
   if(btn){ btn.textContent = '下载中…'; btn.disabled = true; }
+  let stage = '取书目信息';
   try{
     const metaRes = await fetch('https://archive.org/metadata/' + encodeURIComponent(ident));
     if(!metaRes.ok) throw new Error('meta');
     const meta = await metaRes.json();
-    const pick = pickBookFile(meta.files || []);
-    if(!pick){ showToast('这本在档案馆是借阅版，下不了全文 qwq 换一本试试'); return; }
-    const dlRes = await fetch('https://archive.org/download/' + encodeURIComponent(ident) + '/' + encodeURIComponent(pick.name));
-    if(!dlRes.ok) throw new Error('dl');
-    const buf = await dlRes.arrayBuffer();
-    let chapters, metaTitle = '', metaAuthor = '';
-    if(pick.kind === 'epub'){
-      const r = await parseEpubBuffer(buf);
-      chapters = r.chapters; metaTitle = r.meta.title || ''; metaAuthor = r.meta.author || '';
-    } else {
-      chapters = parseTxtToChapters(parseTxtBuffer(buf));
+    const candidates = pickBookCandidates(meta.files || []);
+    if(!candidates.length){ showToast('这本在档案馆是借阅版，下不了全文 qwq 换一本试试'); return; }
+    let got = null, lastStage = '下载文件';
+    for(const cand of candidates.slice(0, 3)){
+      try{
+        stage = '下载文件';
+        const dlRes = await fetch('https://archive.org/download/' + encodeURIComponent(ident) + '/' + encodeURIComponent(cand.name));
+        if(!dlRes.ok) throw new Error('dl');
+        const buf = await dlRes.arrayBuffer();
+        stage = '解析书的内容';
+        let chapters, metaTitle = '', metaAuthor = '';
+        if(cand.kind === 'epub'){
+          const r = await parseEpubBuffer(buf);
+          chapters = r.chapters; metaTitle = r.meta.title || ''; metaAuthor = r.meta.author || '';
+        } else {
+          chapters = parseTxtToChapters(parseTxtBuffer(buf));
+        }
+        const paras = (chapters || []).reduce((a,c)=>a + c.paras.length, 0);
+        const chars = (chapters || []).reduce((a,c)=>a + c.paras.reduce((x,p)=>x + p.length, 0), 0);
+        if(chapters && chapters.length && paras >= 5 && chars >= 800){ got = { chapters, metaTitle, metaAuthor, cand }; break; }
+        lastStage = '解析书的内容';
+      }catch(e){ lastStage = stage; }
     }
-    if(!chapters || !chapters.length) throw new Error('empty');
+    if(!got){ showToast('卡在了「' + lastStage + '」这一步 qwq 换一本试试，或者把这句告诉宝宝'); return; }
+    stage = '存进书架';
     const list = loadReading();
-    const entry = { id:'r' + Date.now().toString(36) + Math.floor(Math.random()*999), title:(metaTitle || title || '未命名').slice(0, 80), author:metaAuthor || author || '', kind:'其他', by:'lumi', note:'从在线书库下载', cover:'https://archive.org/services/img/' + ident, status:'reading', ts:Date.now(), startedTs:Date.now(), local:true, fileKind:pick.kind, notes:[] };
+    const entry = { id:'r' + Date.now().toString(36) + Math.floor(Math.random()*999), title:(got.metaTitle || title || '未命名').slice(0, 80), author:got.metaAuthor || author || '', kind:'其他', by:'lumi', note:'从在线书库下载', cover:'https://archive.org/services/img/' + ident, status:'reading', ts:Date.now(), startedTs:Date.now(), local:true, fileKind:got.cand.kind, notes:[] };
     list.unshift(entry);
-    await bookPut(entry.id, { chapters, kind:pick.kind, fileName:pick.name });
+    await bookPut(entry.id, { chapters: got.chapters, kind: got.cand.kind, fileName: got.cand.name });
     if(!storeReading(list)){ showToast('书下好了，但书单存不下 qwq'); return; }
     renderReading();
     showToast('《' + entry.title + '》下好啦，点开就能读');
   }catch(e){
-    showToast('下载失败 qwq 网不太顺，待会儿再试一次');
+    showToast('卡在了「' + stage + '」这一步 qwq 待会儿再试，或者把这句告诉宝宝');
   }finally{
     libBusy = false;
     if(btn){ btn.textContent = oldText; btn.disabled = false; }
@@ -4407,7 +4446,7 @@ async function searchLibrary(){
     const res = await fetch(url);
     if(!res.ok) throw new Error('search');
     const data = await res.json();
-    const docs = ((data.response && data.response.docs) || []).filter(d=>d.identifier && !/annas|fanqie/i.test(d.identifier));
+    const docs = ((data.response && data.response.docs) || []).filter(d=>d.identifier && !/annas|fanqie|z-?library/i.test(d.identifier));
     libResults = docs;
     if(!docs.length){ status.textContent = '书库里没找到这本 —— 它只收公共版权的书哦。'; return; }
     status.textContent = '找到 ' + docs.length + ' 本，点「下载这本」就能读：';
