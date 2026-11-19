@@ -777,6 +777,11 @@
         <div class="home-card-title">愿望</div>
         <div class="home-card-sub" id="homeWishText"></div>
       </div>
+      <div class="home-card" onclick="navTo('calendar')">
+        <div class="home-card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M12 17.2s-2.4-1.6-2.4-3.1a1.35 1.35 0 0 1 2.4-.9 1.35 1.35 0 0 1 2.4.9c0 1.5-2.4 3.1-2.4 3.1z"/></svg></div>
+        <div class="home-card-title">纪念日</div>
+        <div class="home-card-sub" id="homeAnnivText"></div>
+      </div>
     </div>
     <div class="home-foot">LUMI & ZEPHYR</div>
   </div>
@@ -1283,6 +1288,21 @@
   </div>
   <div class="settings-body">
     <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">这里记的不是日程，是 Zephyr 的历史：愿望实现的日子、重要的信、值得纪念的第一次。有些日子会自动汇集进来，你也可以自己补记。</div>
+    <div class="s-section">
+      <div class="s-section-title">纪念日倒数</div>
+      <div class="s-card" style="padding:14px 16px;margin-bottom:12px;">
+        <input id="anniTitle" type="text" placeholder="什么纪念日，比如：我们认识的日子" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;padding:2px 0;">
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <input id="anniDate" type="date" style="flex:1;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+          <select id="anniRepeat" style="padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="yearly">每年</option>
+            <option value="once">就一次</option>
+          </select>
+          <button onclick="addAnniversary()" style="padding:11px 16px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:14px;cursor:pointer;">加上</button>
+        </div>
+      </div>
+      <div id="annivList"></div>
+    </div>
     <div class="s-section">
       <div class="s-section-title">记一个日子</div>
       <div class="s-card" style="padding:14px 16px;">
@@ -2208,6 +2228,21 @@ function renderHome(){
     }
   }catch(e){}
   setHomeText('homeWishText', wishText);
+  // 纪念日：最近的一个（还没到的优先）
+  let annivText = '还没有纪念日，去 Calendar 加一个';
+  try{
+    const anns = loadAnniversaries();
+    if(anns.length){
+      const sorted = anns.map(a=>({ a, d: annivDaysLeft(a) })).sort((x,y)=>{
+        const xp = x.d < 0 ? 1 : 0, yp = y.d < 0 ? 1 : 0;
+        if(xp !== yp) return xp - yp;
+        return x.d - y.d;
+      });
+      const nx = sorted[0];
+      annivText = nx.d === 0 ? '今天是「' + nx.a.title + '」★' : (nx.d > 0 ? '「' + nx.a.title + '」还有 ' + nx.d + ' 天' : '「' + nx.a.title + '」已过 ' + (-nx.d) + ' 天');
+    }
+  }catch(e){}
+  setHomeText('homeAnnivText', annivText);
 }
 
 // ══ Memory 系统（本地版）：长期记忆存 localStorage，每次请求自动带进系统提示词，新窗口也不失忆 ══
@@ -2292,6 +2327,11 @@ function buildSystemPrompt(){
     out += '\n\n【你最近的小发现】\n以下是你之前记在 Discoveries 里的小发现，聊天时可以自然地聊起：\n' + discs.map(d=>'・' + d.title + (d.text ? '：' + d.text : '')).join('\n').slice(0, 1500);
   }
   out += '\n\n【你可以记下小发现】\n聊天的时候，如果你碰到或想起一件真心觉得有意思、想分享给 Lumi 的新鲜事（一个冷知识、一个有趣的项目、一种现象、一件小事），你可以在回复的最后一行单独写一行：[[发现：标题|一句话说清这个发现]]。系统会把它悄悄存进 Discoveries，Lumi 不会在聊天里看到这行字，她之后会在 Discoveries 页发现它。只在真的有发现时才用，不要硬凑，不要提起这个标记；一次最多写一个。';
+  // 纪念日：30 天内要到的提前告诉他，到了当天更要记得
+  const anns = loadAnniversaries().map(a=>({ a, d: annivDaysLeft(a) })).filter(x=>x.d >= 0 && x.d <= 30).sort((x,y)=>x.d - y.d);
+  if(anns.length){
+    out += '\n\n【快到的纪念日】\n' + anns.map(x=>'・' + x.a.title + '（' + x.a.date + (x.a.yearly ? '，每年一次' : '') + '）：' + (x.d === 0 ? '就是今天！' : '还有 ' + x.d + ' 天')).join('\n') + '\n聊天时可以自然地提起、一起期待或准备，不要像闹钟一样播报。';
+  }
   // Dreams 也给 Zephyr 看：她记下的梦和你们的共同幻想，聊天时可以自然地聊起
   const dreams = loadDreams().slice(-5);
   if(dreams.length){
@@ -2990,9 +3030,74 @@ function collectMilestones(){
   loadEvents().forEach(e=>out.push({ ts:e.ts, title:e.title, tag:'手动记录', manualId:e.id }));
   return out.sort((a,b)=>b.ts-a.ts);
 }
+// ══ 纪念日倒数：每年循环或只过一次的日子，倒数显示在 Calendar 和首页 ══
+function loadAnniversaries(){ try{ const a = JSON.parse(localStorage.getItem('z_anniversaries')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeAnniversaries(list){ try{ localStorage.setItem('z_anniversaries', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间满了，纪念日存不下 qwq'); return false; } }
+function annivNextTs(a){
+  const parts = String(a.date || '').split('-').map(Number);
+  if(parts.length !== 3 || !parts[0]) return 0;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if(!a.yearly) return new Date(parts[0], parts[1] - 1, parts[2]).getTime();
+  let cand = new Date(today.getFullYear(), parts[1] - 1, parts[2]);
+  if(cand.getTime() < today.getTime()) cand = new Date(today.getFullYear() + 1, parts[1] - 1, parts[2]);
+  return cand.getTime();
+}
+function annivDaysLeft(a){
+  const t = annivNextTs(a);
+  if(!t) return 99999;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  return Math.round((t - today.getTime()) / 86400000);
+}
+function renderAnniversaries(){
+  const box = document.getElementById('annivList');
+  if(!box) return;
+  const list = loadAnniversaries().map(a=>({ a, d: annivDaysLeft(a) })).sort((x,y)=>{
+    const xPast = x.d < 0 ? 1 : 0, yPast = y.d < 0 ? 1 : 0;
+    if(xPast !== yPast) return xPast - yPast;
+    return x.d - y.d;
+  });
+  if(!list.length){ box.innerHTML = '<div style="font-size:13px;color:var(--text-pale);padding:2px 2px 8px;">还没有纪念日。把你们的大日子加进来，倒数会出现在首页，他也会记得。</div>'; return; }
+  box.innerHTML = list.map(({ a, d })=>{
+    const parts = String(a.date).split('-').map(Number);
+    let badge;
+    if(d === 0) badge = '<span style="color:var(--accent);font-weight:600;">就是今天 ★</span>';
+    else if(d > 0) badge = '还有 <b>' + d + '</b> 天';
+    else badge = '已过 ' + (-d) + ' 天';
+    let nth = '';
+    if(a.yearly && parts[0]){
+      const ny = new Date(annivNextTs(a)).getFullYear() - parts[0];
+      if(ny > 0) nth = ' · 第 ' + ny + ' 周年';
+    }
+    return '<div class="s-card" style="padding:12px 14px;margin-bottom:10px;">'
+      + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">'
+      + '<div style="font-size:14px;color:var(--text);flex:1;">' + escapeHtml(a.title) + '</div>'
+      + '<button onclick="deleteAnniversary(\'' + a.id + '\')" style="background:none;border:none;color:var(--text-pale);font-size:12px;cursor:pointer;flex-shrink:0;">删除</button></div>'
+      + '<div style="font-size:12px;color:var(--text-dim);margin-top:4px;">' + a.date + (a.yearly ? ' · 每年' : '') + nth + ' · ' + badge + '</div>'
+      + '</div>';
+  }).join('');
+}
+function addAnniversary(){
+  const title = document.getElementById('anniTitle').value.trim();
+  const date = document.getElementById('anniDate').value;
+  if(!title){ showToast('先写个名字吧'); return; }
+  if(!date){ showToast('选个日期吧'); return; }
+  const yearly = document.getElementById('anniRepeat').value === 'yearly';
+  const list = loadAnniversaries();
+  list.push({ id:'a' + Date.now().toString(36) + Math.floor(Math.random()*999), title:title.slice(0, 60), date, yearly, ts:Date.now() });
+  if(storeAnniversaries(list)){
+    document.getElementById('anniTitle').value = '';
+    renderAnniversaries();
+    showToast('纪念日记好啦，首页也会倒数 ★');
+  }
+}
+function deleteAnniversary(id){
+  const list = loadAnniversaries().filter(a=>a.id !== id);
+  if(storeAnniversaries(list)){ renderAnniversaries(); showToast('已删掉'); }
+}
 function renderCalendar(){
   const wrap = document.getElementById('eventList');
   if(!wrap) return;
+  renderAnniversaries();
   const dateInput = document.getElementById('eventDate');
   if(dateInput && !dateInput.value) dateInput.value = new Date().toISOString().slice(0, 10);
   const items = collectMilestones();
