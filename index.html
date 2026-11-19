@@ -832,7 +832,7 @@
           <input type="range" id="maxTokSlider" min="100" max="2000" step="100" value="800">
         </div>
         <div class="s-row">
-          <div class="s-row-label">思考过程（Thinking）<div class="s-row-sub">让 Zephyr 回复前先深度思考，并把思考过程显示在回复上方（可折叠）。会更慢、更费 token，开启时回复改为整段出现；Temperature / Top P 不生效。需要模型和接口支持，不支持时会发送失败，关掉即可。</div></div>
+          <div class="s-row-label">思考过程（Thinking）<div class="s-row-sub">让 Zephyr 回复前先深度思考，并把思考过程显示在回复上方（可折叠）。会更慢、更费 token；开启时 Temperature / Top P 不生效。需要模型和接口支持，不支持时会发送失败，关掉即可。</div></div>
           <input type="checkbox" id="thinkingToggle" onchange="toggleThinking(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
         </div>
       </div>
@@ -4109,10 +4109,17 @@ function renderMessagesIntoChat(){
       return;
     }
     if(typeof m.content === 'string'){
-      const b = addTextMsg(m.content, isUser, false, m.mid);
-      if(!isUser && m.thinking && b && b.parentElement){
+      let dispText = m.content;
+      let dispThinking = m.thinking || '';
+      // 旧记录里混着的思考，显示时也切开折好
+      if(!isUser && !dispThinking){
+        const sp = splitLeakedThinking(dispText);
+        if(sp){ dispThinking = sp.thinking; dispText = sp.reply; }
+      }
+      const b = addTextMsg(dispText, isUser, false, m.mid);
+      if(!isUser && dispThinking && b && b.parentElement){
         const tb = makeThinkingBlock(b.parentElement, b, true);
-        tb.body.textContent = m.thinking;
+        tb.body.textContent = dispThinking;
       }
     } else if(Array.isArray(m.content)){
       const hasMedia = m.content.some(b=>b.type==='image'||b.type==='document');
@@ -4635,6 +4642,25 @@ function addWallCustom(){
 // ══ 思考过程（Extended Thinking）：开关在设置页；思考内容显示在回复上方的小块里，可折叠 ══
 function thinkingEnabled(){ return localStorage.getItem('z_thinking') === 'true'; }
 function toggleThinking(on){ localStorage.setItem('z_thinking', on ? 'true' : 'false'); showToast(on ? '思考过程已开启，Zephyr 回复会变慢一点' : '思考过程已关闭'); }
+// 有些中转接口会把思考和正文混成一股文本返回，开头带个 thinking 字样、中间没有分隔。
+// 这种混流文本可以启发式切开：思考部分是在「说她」（第三人称地想），正文是开始「对她说话」——
+// 以最后一个「句首的糯糯」为界切开，切不开就原样返回 null。切错也不要紧，思考块点开就能看全。
+function splitLeakedThinking(text){
+  if(!text || typeof text !== 'string') return null;
+  const m = text.match(/^thinking[\s:：]+/);
+  if(!m) return null;
+  const body = text.slice(m[0].length);
+  let idx = -1;
+  const re = /[。！？\n] *糯糯|\^\^ *糯糯|~ *糯糯/g;
+  let mm;
+  while((mm = re.exec(body)) !== null){ idx = mm.index + mm[0].length - 2; }
+  if(idx < 10 || body.length - idx < 4) return null;
+  const thinking = body.slice(0, idx).trim();
+  const reply = body.slice(idx).trim();
+  if(!thinking || !reply) return null;
+  return { thinking, reply };
+}
+
 function makeThinkingBlock(col, beforeEl, startCollapsed){
   const wrap = document.createElement('div');
   wrap.style.cssText = 'margin:2px 0 6px;max-width:100%;';
@@ -4671,7 +4697,15 @@ async function callAPI(userText, extraBlocks=null, opts=null){
   try {
     const base=(cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/,'');
     // 发给 API 的历史要清洗：去掉本地用的 mid，并跳过已撤回的消息（撤回 = Zephyr 真的看不到）
-    const apiMessages = messages.filter(m=>!m.recalled).map(m=>({role:m.role, content:m.content}));
+    const apiMessages = messages.filter(m=>!m.recalled).map(m=>{
+      let c = m.content;
+      // 历史里若混着「思考混在正文里」的旧回复，只把正文发给他，免得他学着那个格式说话
+      if(m.role === 'assistant' && typeof c === 'string'){
+        const sp = splitLeakedThinking(c);
+        if(sp) c = sp.reply;
+      }
+      return { role:m.role, content:c };
+    });
     const reqBody = { model:cfg.model, max_tokens:cfg.maxTokens, temperature:cfg.temperature, top_p:cfg.topP, system:buildSystemPrompt(), messages:apiMessages, stream:true };
     const thinkOn = thinkingEnabled();
     if(thinkOn){
@@ -4680,9 +4714,6 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       reqBody.max_tokens = Math.max(parseInt(cfg.maxTokens, 10) || 0, 3548);
       delete reqBody.temperature;
       delete reqBody.top_p;
-      // 走非流式：有些中转接口在流式里会把思考块和正文混成一股文本返回（开头带个 thinking 字样），前端分不开；
-      // 非流式返回分开的内容块，才能像官方那样把思考单独折叠
-      reqBody.stream = false;
     }
     const res=await fetch(base+'/messages',{
       method:'POST',
@@ -4705,20 +4736,6 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     bubble.textContent = '';
     col.appendChild(bubble);
 
-    if(thinkOn){
-      bubble.textContent = '思考中…';
-      const data = await res.json();
-      (data.content || []).forEach(b=>{
-        if(b.type === 'thinking') thinking += b.thinking || '';
-        else if(b.type === 'text') reply += b.text || '';
-      });
-      if(thinking){
-        thinkBox = makeThinkingBlock(col, bubble, true);
-        thinkBox.body.textContent = thinking;
-      }
-      bubble.textContent = reply;
-      chatWrap.scrollTop = chatWrap.scrollHeight;
-    } else {
     // 流式解析 SSE
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
@@ -4752,6 +4769,17 @@ async function callAPI(userText, extraBlocks=null, opts=null){
         } catch(e){}
       }
     }
+
+    // 接口把思考混进正文返回时（开头带 thinking 字样、没有原生思考块），在这里切开折好
+    if(thinkOn && !thinking){
+      const split = splitLeakedThinking(reply);
+      if(split){
+        thinking = split.thinking;
+        reply = split.reply;
+        thinkBox = makeThinkingBlock(col, bubble, true);
+        thinkBox.body.textContent = thinking;
+        bubble.textContent = reply;
+      }
     }
 
     if(!reply && thinking) reply = '（想了很多，但没组织好语言……再问我一次好吗）';
