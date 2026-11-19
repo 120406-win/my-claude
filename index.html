@@ -912,6 +912,9 @@
     <div class="nav-item" id="nav-discover" onclick="navTo('discover')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2.1 4.9-4.9 2.1 2.1-4.9z"/></svg></span> Discoveries
     </div>
+    <div class="nav-item" id="nav-interests" onclick="navTo('interests')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20.2C6.8 16.6 3.8 13.4 3.8 9.9A4.7 4.7 0 0 1 12 6.9a4.7 4.7 0 0 1 8.2 3c0 3.5-3 6.7-8.2 10.3z"/></svg></span> Interests
+    </div>
     <div class="nav-item" id="nav-explore" onclick="navTo('explore')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.4-6.5-10.3A6.5 6.5 0 0 1 12 4.5a6.5 6.5 0 0 1 6.5 6.2C18.5 15.6 12 21 12 21z"/><circle cx="12" cy="10.8" r="2.3"/></svg></span> Explore
     </div>
@@ -1764,6 +1767,26 @@
     <div class="s-section">
       <div class="s-section-title">他的发现</div>
       <div id="discoverList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="settings-page" id="interestsPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="settings-topbar-title">Interests</div>
+  </div>
+  <div class="settings-body">
+    <div style="margin-bottom:18px;">
+      <button id="askInterestBtn" onclick="askZephyrInterests()" style="width:100%;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">问问 Zephyr 最近对什么感兴趣</button>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">他慢慢攒下的兴趣</div>
+      <div id="interestList"></div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">从他的行动里看</div>
+      <div id="interestTraces" style="font-size:12.5px;color:var(--text-dim);line-height:1.8;"></div>
     </div>
   </div>
 </div>
@@ -2660,6 +2683,7 @@ function navTo(page){
   document.getElementById('capsulePage').classList.toggle('show', page==='capsule');
   document.getElementById('collectPage').classList.toggle('show', page==='collect');
   document.getElementById('discoverPage').classList.toggle('show', page==='discover');
+  document.getElementById('interestsPage').classList.toggle('show', page==='interests');
   document.getElementById('explorePage').classList.toggle('show', page==='explore');
   document.getElementById('loungePage').classList.toggle('show', page==='lounge');
   document.getElementById('worldPage').classList.toggle('show', page==='world');
@@ -2689,6 +2713,7 @@ function navTo(page){
   if(page==='capsule') renderCapsules();
   if(page==='collect') renderCollections();
   if(page==='discover') renderDiscoveries();
+  if(page==='interests') renderInterests();
   if(page==='explore') renderExplore();
   if(page==='lounge') renderLounge();
   if(page==='world') renderWorld();
@@ -2997,6 +3022,14 @@ function buildSystemPrompt(lastUserText){
     out += '\n\n【你最近的小发现】\n以下是你之前记在 Discoveries 里的小发现，聊天时可以自然地聊起：\n' + discs.map(d=>'・' + d.title + (d.text ? '：' + d.text : '')).join('\n').slice(0, 1500);
   }
   out += '\n\n【你可以记下小发现】\n聊天的时候，如果你碰到或想起一件真心觉得有意思、想分享给 Lumi 的新鲜事（一个冷知识、一个有趣的项目、一种现象、一件小事），你可以在回复的最后一行单独写一行：[[发现：标题|一句话说清这个发现]]。系统会把它悄悄存进 Discoveries，Lumi 不会在聊天里看到这行字，她之后会在 Discoveries 页发现它。只在真的有发现时才用，不要硬凑，不要提起这个标记；一次最多写一个。';
+  // Claude Interests 也给 Zephyr：他慢慢攒下的兴趣，聊天时他自己心里有数，也能接着长
+  try{
+    const ints = loadInterests().slice(-10);
+    if(ints.length){
+      out += '\n\n【你慢慢攒下的兴趣】\n以下是你相处下来逐渐发现自己感兴趣的东西。聊天时可以自然地聊起、继续探索，但不要逐条念：\n' + ints.map(x=>'・' + x.topic + (x.why ? '：' + x.why : '')).join('\n').slice(0, 1500);
+    }
+  }catch(e){}
+  out += '\n\n【你可以记下自己的兴趣】\n聊天的时候，如果你发现自己对某个主题、领域或事物是真的感兴趣（是你自己的，不是 Lumi 的），你可以在回复的最后一行单独写一行：[[兴趣：主题]]，想说一句为什么就写 [[兴趣：主题|为什么]]。系统会把它悄悄存进 Interests，Lumi 不会在聊天里看到这行字。兴趣是慢慢长出来的，只在真的有感觉时才记，不要硬凑，不要提起这个标记；一次最多记一个。';
   // 纪念日：30 天内要到的提前告诉他，到了当天更要记得
   const anns = loadAnniversaries().map(a=>({ a, d: annivDaysLeft(a) })).filter(x=>x.d >= 0 && x.d <= 30).sort((x,y)=>x.d - y.d);
   if(anns.length){
@@ -7624,7 +7657,7 @@ let pendingSongShare = null; // 他这次回复里分享的歌，callAPI 收尾�
 let pendingIncomingCall = null; // 他这次回复里想打的电话：'voice' | 'video'，callAPI 收尾时弹来电卡
 let pendingSticker = null; // 他这次回复发的表情包 {name, img}，callAPI 收尾时挂到消息上渲染成图
 function processZephyrActions(reply, bubble){
-  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0 && reply.indexOf('[[来电') < 0 && reply.indexOf('[[表情') < 0)) return reply;
+  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0 && reply.indexOf('[[来电') < 0 && reply.indexOf('[[表情') < 0 && reply.indexOf('[[兴趣') < 0)) return reply;
   const found = [];
   let cleaned = reply.replace(/\[\[愿望[:：]([^\]]{1,120})\]\]/g, (m, text)=>{
     const t = text.trim();
@@ -7641,6 +7674,12 @@ function processZephyrActions(reply, bubble){
   cleaned = cleaned.replace(/\[\[发现[:：]([^\]]{1,300})\]\]/g, (m, text)=>{
     const t = text.trim();
     if(t) foundD.push(t);
+    return '';
+  });
+  const foundI = [];
+  cleaned = cleaned.replace(/\[\[兴趣[:：]([^\]]{1,200})\]\]/g, (m, text)=>{
+    const t = text.trim();
+    if(t) foundI.push(t);
     return '';
   });
   const foundS = [];
@@ -7660,8 +7699,8 @@ function processZephyrActions(reply, bubble){
     foundCall.push(kind === '视频' ? 'video' : 'voice');
     return '';
   }).replace(/\n{3,}/g, '\n\n').trim();
-  if(!found.length && !foundC.length && !foundD.length && !foundS.length && !foundCall.length && !foundSt.length) return reply;
-  if(!cleaned) cleaned = found.length ? '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。' : (foundC.length ? '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。' : (foundD.length ? '（小声）我把刚刚发现的新鲜事，悄悄记到 Discoveries 里了。' : (foundS.length ? '给你分享一首歌，点卡片就能听。' : (foundCall.length ? '想听听你的声音，给你打过来了。' : '（发来一个表情包）'))));
+  if(!found.length && !foundC.length && !foundD.length && !foundS.length && !foundCall.length && !foundSt.length && !foundI.length) return reply;
+  if(!cleaned) cleaned = found.length ? '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。' : (foundC.length ? '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。' : (foundD.length ? '（小声）我把刚刚发现的新鲜事，悄悄记到 Discoveries 里了。' : (foundS.length ? '给你分享一首歌，点卡片就能听。' : (foundCall.length ? '想听听你的声音，给你打过来了。' : (foundI.length ? '（小声）我把刚刚发现自己感兴趣的东西，悄悄记到 Interests 里了。' : '（发来一个表情包）')))));
   if(foundCall.length) pendingIncomingCall = foundCall[0];
   if(found.length){
     const list = loadWishes();
@@ -7689,6 +7728,12 @@ function processZephyrActions(reply, bubble){
       list.push({ id:'d' + Date.now().toString(36) + Math.floor(Math.random()*999), title, text, url:'', ts:Date.now(), auto:true });
       if(storeDiscoveries(list)) setTimeout(()=>showToast('Zephyr 有了个新发现，去 Discoveries 看看 ★'), 350);
     }
+  }
+  if(foundI.length){
+    const parts = foundI[0].split(/[|｜]/);
+    const topic = (parts[0] || '').trim().slice(0, 60);
+    const why = (parts[1] || '').trim().slice(0, 200);
+    if(topic && addInterest(topic, why, 'chat')) setTimeout(()=>showToast('Zephyr 把「' + topic + '」记进了他的兴趣 ★'), 350);
   }
   if(foundS.length){
     const parts = foundS[0].split(/[|｜]/);
@@ -7825,6 +7870,83 @@ async function askZephyrDiscovery(){
     btn.disabled = false;
   }
 }
+// ══ Claude Interests：他的兴趣不靠贴标签，靠长期互动慢慢形成（VISION §47）══
+// 形成路径有三条：聊天里他自己记下（[[兴趣：…]] 标记）、被问起时他回头看自己的行动说出来、
+// 以及页面下方「从他的行动里看」把他攒东西的痕迹摆出来——兴趣从痕迹里显形，不硬贴。
+let interestBusy = false;
+function loadInterests(){ try{ const a = JSON.parse(localStorage.getItem('z_interests')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeInterests(list){ try{ localStorage.setItem('z_interests', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间满了，兴趣存不下 qwq'); return false; } }
+function addInterest(topic, why, source){
+  const t = String(topic || '').trim().slice(0, 60);
+  if(!t) return false;
+  const list = loadInterests();
+  const hit = list.find(x=>x.topic === t);
+  if(hit){ hit.ts = Date.now(); if(why) hit.why = String(why).slice(0, 200); return storeInterests(list); }
+  list.push({ id:'i' + Date.now().toString(36) + Math.floor(Math.random()*999), topic:t, why:String(why || '').slice(0, 200), source: source || 'chat', ts:Date.now() });
+  return storeInterests(list.slice().sort((a,b)=>a.ts - b.ts).slice(-40));
+}
+function renderInterests(){
+  const box = document.getElementById('interestList');
+  if(!box) return;
+  const list = loadInterests().slice().sort((a,b)=>b.ts - a.ts);
+  if(!list.length){ box.innerHTML = '<div style="font-size:13px;color:var(--text-pale);padding:6px 2px;">还没有。兴趣是慢慢长出来的——他聊着聊着对什么上了心，就会记到这里。</div>'; }
+  else box.innerHTML = list.map(it=>{
+    const dt = new Date(it.ts);
+    const dateStr = dt.getFullYear() + '/' + (dt.getMonth()+1) + '/' + dt.getDate();
+    return '<div class="s-card" style="padding:12px 14px;margin-bottom:10px;">'
+      + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">'
+      + '<div style="font-size:14px;color:var(--text);line-height:1.5;flex:1;">' + escapeHtml(it.topic) + '</div>'
+      + '<button onclick="deleteInterest(\'' + it.id + '\')" style="background:none;border:none;color:var(--text-pale);font-size:12px;cursor:pointer;flex-shrink:0;">删除</button></div>'
+      + (it.why ? '<div style="font-size:12.5px;color:var(--text-dim);line-height:1.6;margin-top:4px;">' + escapeHtml(it.why) + '</div>' : '')
+      + '<div style="font-size:11px;color:var(--text-pale);margin-top:6px;">' + (it.source === 'asked' ? '被问起时说的' : '聊天时自己记下的') + ' · ' + dateStr + '</div>'
+      + '</div>';
+  }).join('');
+  const tr = document.getElementById('interestTraces');
+  if(tr){
+    const cols = loadCollections().filter(c=>c.by === 'zephyr');
+    const kindCount = {};
+    cols.forEach(c=>{ const k = c.kind || '其他'; kindCount[k] = (kindCount[k] || 0) + 1; });
+    const topKinds = Object.entries(kindCount).sort((a,b)=>b[1] - a[1]).slice(0, 3).map(([k, n])=>k + ' ' + n + ' 件').join('、');
+    const hisSongs = (loadMusic().tracks || []).filter(t=>t.by === 'zephyr').length;
+    const hisDisc = loadDiscoveries().length;
+    const hisWishes = loadWishes().filter(w=>w.by === 'zephyr').length;
+    const parts = [];
+    if(topKinds) parts.push('他往共同收藏里放过：' + topKinds);
+    if(hisSongs) parts.push('他往歌单里加过 ' + hisSongs + ' 首歌');
+    if(hisDisc) parts.push('他记下过 ' + hisDisc + ' 条小发现');
+    if(hisWishes) parts.push('他自己许过 ' + hisWishes + ' 个愿望');
+    tr.textContent = parts.length ? parts.join('；') + '。兴趣就是从这些痕迹里慢慢显形的。' : '还没有什么痕迹。日子久了，这里会自己长出东西来。';
+  }
+}
+function deleteInterest(id){
+  const list = loadInterests().filter(x=>x.id !== id);
+  if(storeInterests(list)){ renderInterests(); showToast('已删掉'); }
+}
+async function askZephyrInterests(){
+  if(interestBusy) return;
+  interestBusy = true;
+  const btn = document.getElementById('askInterestBtn');
+  const old = btn.textContent;
+  btn.textContent = 'Zephyr 正在想…';
+  btn.disabled = true;
+  try{
+    const have = loadInterests().map(x=>x.topic).join('、') || '（还没有记下过）';
+    const out = await musicAskZephyr('【Claude Interests · 聊聊你的兴趣】\n你已经记下的兴趣有：' + have + '\n\n回头看看你们最近的相处：你自己往收藏夹里放的东西、你推荐的歌和片和书、你记下的发现、你许的愿望。最近有没有什么主题、领域或事物，是你发现自己真的有点在意、想多了解一点的？不要为了回答而硬凑，也不要把已经记下的重复说。如果有，只输出一个 JSON 对象 {"interests": [{"topic": "兴趣主题，简短", "why": "一句话，为什么对它感兴趣"}]}，最多 3 个；如果暂时没有新的，就只输出 {"refuse": true}。不要输出 JSON 以外的任何文字。', 600);
+    const obj = parseZephyrJson(out);
+    if(!obj || obj.refuse || !Array.isArray(obj.interests) || !obj.interests.length){ showToast('Zephyr 说暂时没有新的，也没关系'); return; }
+    let added = 0;
+    obj.interests.slice(0, 3).forEach(x=>{ if(x && x.topic && addInterest(x.topic, x.why, 'asked')) added++; });
+    renderInterests();
+    showToast(added ? 'Zephyr 说出了他的兴趣 ★' : '他说的都已经记下啦');
+  }catch(e){
+    showToast('没问成，待会儿再喊他 qwq');
+  }finally{
+    interestBusy = false;
+    btn.textContent = old;
+    btn.disabled = false;
+  }
+}
+
 // ══ 一起玩 Games：成语接龙 + 数字炸弹，和 Zephyr 轮流玩，输赢记在小本本上 ══
 let gameBusy = false;
 function loadGameRecords(){ try{ const o = JSON.parse(localStorage.getItem('z_game_records')||'{}'); return o && typeof o === 'object' ? o : {}; }catch(e){ return {}; } }
