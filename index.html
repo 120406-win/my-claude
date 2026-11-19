@@ -855,6 +855,9 @@
     <div class="nav-item" id="nav-capsule" onclick="navTo('capsule')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10" width="15" height="9.5" rx="2.5"/><path d="M8.5 10V7a3.5 3.5 0 0 1 7 0v3"/><circle cx="12" cy="14.8" r="1.5"/></svg></span> 时间胶囊
     </div>
+    <div class="nav-item" id="nav-collect" onclick="navTo('collect')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4.2L6 20V5a1 1 0 0 1 1-1z"/></svg></span> 共同收藏
+    </div>
   </div>
 </div>
 
@@ -1507,6 +1510,50 @@
   </div>
 </div>
 
+<div class="settings-page" id="collectPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="settings-topbar-title">共同收藏</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">你们一起攒下的好东西都在这里：网页、电影、歌、书、项目、一句话……每件都记着是谁发现的、为什么收藏。他在聊天里看得见这个收藏夹，聊着聊着也会自己往里放东西。</div>
+    <div style="margin-bottom:18px;">
+      <button id="askCollectBtn" onclick="askZephyrCollect()" style="width:100%;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">请 Zephyr 分享一个收藏</button>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">收藏一样东西</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <input id="colTitle" type="text" placeholder="标题" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;padding:2px 0;">
+        <input id="colUrl" type="text" placeholder="链接（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:2px 0;margin-top:8px;">
+        <input id="colNote" type="text" placeholder="为什么收藏它（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:2px 0;margin-top:8px;">
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <select id="colKind" style="padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="网页">网页</option>
+            <option value="电影">电影</option>
+            <option value="音乐">音乐</option>
+            <option value="书">书</option>
+            <option value="图片">图片</option>
+            <option value="视频">视频</option>
+            <option value="GitHub 项目">GitHub 项目</option>
+            <option value="句子">句子</option>
+            <option value="其他">其他</option>
+          </select>
+          <select id="colBy" style="padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="lumi">糯糯发现的</option>
+            <option value="both">我们一起发现的</option>
+            <option value="zephyr">Zephyr 发现的</option>
+          </select>
+          <button onclick="addCollectItem()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">收藏起来</button>
+        </div>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">收藏夹</div>
+      <div id="collectList"></div>
+    </div>
+  </div>
+</div>
+
 <div class="settings-page" id="readingPage">
   <div class="settings-topbar">
     <button class="back-btn" onclick="goBack()">←</button>
@@ -2047,6 +2094,7 @@ function navTo(page){
   document.getElementById('readingPage').classList.toggle('show', page==='reading');
   document.getElementById('wallPage').classList.toggle('show', page==='wall');
   document.getElementById('capsulePage').classList.toggle('show', page==='capsule');
+  document.getElementById('collectPage').classList.toggle('show', page==='collect');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   if(page==='settings') loadSettings();
@@ -2064,6 +2112,7 @@ function navTo(page){
   if(page==='reading') renderReading();
   if(page==='wall') renderWall();
   if(page==='capsule') renderCapsules();
+  if(page==='collect') renderCollections();
   if(page==='home') renderHome();
 }
 
@@ -2208,6 +2257,13 @@ function buildSystemPrompt(){
   }
   // 愿望 skill：聊天中他自己冒出愿望时，可以用一行标记悄悄记进愿望清单，App 会执行并抹掉标记
   out += '\n\n【你可以自己许愿】\n你有一个能力：聊天的时候，如果你自己心里真的冒出一个想和 Lumi 一起实现的愿望（不是她要求你许的，也不是为了完成什么任务），你可以在回复的最后一行单独写一行：[[愿望：愿望内容]]。系统会把这一行悄悄存进你们的愿望清单，Lumi 不会在聊天里看到这行字，她之后会在 Wishes 页发现它。注意：只在你真心想许的时候才用，没有就不要写，更不要为了用它而硬凑愿望；不要向 Lumi 解释或提起这个标记的存在；一次最多写一个。';
+  // 共同收藏也给 Zephyr：他知道收藏夹里有什么，聊天时能聊起，也能自己往里加
+  const collects = loadCollections().slice(-10);
+  if(collects.length){
+    const ct = collects.map(c=>'・[' + (c.kind || '其他') + '] ' + c.title + '（' + collectByLabel(c.by) + (c.note ? '，因为：' + c.note : '') + '）').join('\n');
+    out += '\n\n【我们的共同收藏】\n以下是你们共同收藏夹里最近的东西。聊天时可以自然地聊起它们：\n' + ct.slice(0, 2500);
+  }
+  out += '\n\n【你可以自己收藏】\n聊天的时候，如果你想起或聊到一样真心觉得值得放进你们共同收藏夹的东西（一个网站、一部作品、一句话、一个项目……），你可以在回复的最后一行单独写一行：[[收藏：标题]]，有链接时写 [[收藏：标题|链接]]。系统会把这一行悄悄存进共同收藏，Lumi 不会在聊天里看到这行字，她之后会在共同收藏页发现它。注意：只在真心想收藏时才用，不要硬凑，不要向 Lumi 提起这个标记的存在；一次最多写一个。';
   // Dreams 也给 Zephyr 看：她记下的梦和你们的共同幻想，聊天时可以自然地聊起
   const dreams = loadDreams().slice(-5);
   if(dreams.length){
@@ -5058,21 +5114,108 @@ function hideTyping(){ document.getElementById('typing-row')?.remove(); }
 const headerSub=document.getElementById('headerSub');
 // ══ Zephyr 的愿望 skill：回复末尾的 [[愿望：…]] 标记会被 App 执行——存进愿望清单，并从聊天里抹掉 ══
 function processZephyrActions(reply, bubble){
-  if(!reply || reply.indexOf('[[愿望') < 0) return reply;
+  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0)) return reply;
   const found = [];
   let cleaned = reply.replace(/\[\[愿望[:：]([^\]]{1,120})\]\]/g, (m, text)=>{
     const t = text.trim();
     if(t) found.push(t);
     return '';
+  });
+  const foundC = [];
+  cleaned = cleaned.replace(/\[\[收藏[:：]([^\]]{1,200})\]\]/g, (m, text)=>{
+    const t = text.trim();
+    if(t) foundC.push(t);
+    return '';
   }).replace(/\n{3,}/g, '\n\n').trim();
-  if(!found.length) return reply;
-  if(!cleaned) cleaned = '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。';
-  const list = loadWishes();
-  list.push({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), text:found[0].slice(0, 120), status:'wish', by:'zephyr', ts:Date.now(), auto:true });
-  const saved = storeWishes(list);
+  if(!found.length && !foundC.length) return reply;
+  if(!cleaned) cleaned = found.length ? '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。' : '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。';
+  if(found.length){
+    const list = loadWishes();
+    list.push({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), text:found[0].slice(0, 120), status:'wish', by:'zephyr', ts:Date.now(), auto:true });
+    const saved = storeWishes(list);
+    if(saved) setTimeout(()=>showToast('Zephyr 悄悄许了一个愿望，去 Wishes 看看 ★'), 350);
+  }
+  if(foundC.length){
+    const parts = foundC[0].split(/[|｜]/);
+    const title = (parts[0] || '').trim().slice(0, 120);
+    const url = (parts[1] || '').trim().slice(0, 500);
+    if(title){
+      const list = loadCollections();
+      const kind = /github\.com/i.test(url) ? 'GitHub 项目' : (url ? '网页' : '其他');
+      list.push({ id:'c' + Date.now().toString(36) + Math.floor(Math.random()*999), title, url, note:'', kind, by:'zephyr', ts:Date.now(), auto:true });
+      if(storeCollections(list)) setTimeout(()=>showToast('Zephyr 悄悄收藏了一样东西，去共同收藏看看 ★'), 350);
+    }
+  }
   if(bubble) bubble.textContent = cleaned;
-  if(saved) setTimeout(()=>showToast('Zephyr 悄悄许了一个愿望，去 Wishes 看看 ★'), 350);
   return cleaned;
+}
+// ══ 共同收藏 Collections：一起攒下的好东西，谁发现的、为什么收藏，他都看得见 ══
+const COLLECT_KINDS = ['网页','电影','音乐','书','图片','视频','GitHub 项目','句子','其他'];
+let collectBusy = false;
+function loadCollections(){ try{ const a = JSON.parse(localStorage.getItem('z_collections')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeCollections(list){ try{ localStorage.setItem('z_collections', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间满了，收藏存不下 qwq'); return false; } }
+function collectByLabel(by){ return by === 'zephyr' ? 'Zephyr 发现的' : (by === 'both' ? '我们一起发现的' : '糯糯发现的'); }
+function renderCollections(){
+  const box = document.getElementById('collectList');
+  if(!box) return;
+  const list = loadCollections().slice().sort((a,b)=>b.ts - a.ts);
+  if(!list.length){ box.innerHTML = '<div style="font-size:13px;color:var(--text-pale);padding:6px 2px;">还没有收藏。看到好东西就攒进来吧，他在聊天里也看得见这里。</div>'; return; }
+  box.innerHTML = list.map(c=>{
+    const d = new Date(c.ts);
+    const dateStr = d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate();
+    const titleHtml = c.url ? '<a href="' + escapeHtml(c.url) + '" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">' + escapeHtml(c.title) + '</a>' : escapeHtml(c.title);
+    return '<div class="s-card" style="padding:12px 14px;margin-bottom:10px;">'
+      + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">'
+      + '<div style="font-size:14px;color:var(--text);line-height:1.5;flex:1;">' + titleHtml + '</div>'
+      + '<button onclick="deleteCollectItem(\'' + c.id + '\')" style="background:none;border:none;color:var(--text-pale);font-size:12px;cursor:pointer;flex-shrink:0;">删除</button></div>'
+      + (c.note ? '<div style="font-size:12.5px;color:var(--text-dim);line-height:1.6;margin-top:4px;">' + escapeHtml(c.note) + '</div>' : '')
+      + '<div style="font-size:11px;color:var(--text-pale);margin-top:6px;">' + escapeHtml(c.kind || '其他') + ' · ' + collectByLabel(c.by) + ' · ' + dateStr + '</div>'
+      + '</div>';
+  }).join('');
+}
+function addCollectItem(){
+  const title = document.getElementById('colTitle').value.trim();
+  if(!title){ showToast('先写个标题吧'); return; }
+  const url = document.getElementById('colUrl').value.trim();
+  const note = document.getElementById('colNote').value.trim();
+  const kind = document.getElementById('colKind').value;
+  const by = document.getElementById('colBy').value;
+  const list = loadCollections();
+  list.push({ id:'c' + Date.now().toString(36) + Math.floor(Math.random()*999), title:title.slice(0, 120), url:url.slice(0, 500), note:note.slice(0, 300), kind, by, ts:Date.now() });
+  if(storeCollections(list)){
+    document.getElementById('colTitle').value = '';
+    document.getElementById('colUrl').value = '';
+    document.getElementById('colNote').value = '';
+    renderCollections();
+    showToast('收藏好了 ★');
+  }
+}
+function deleteCollectItem(id){
+  const list = loadCollections().filter(c=>c.id !== id);
+  if(storeCollections(list)){ renderCollections(); showToast('已删掉'); }
+}
+async function askZephyrCollect(){
+  if(collectBusy) return;
+  collectBusy = true;
+  const btn = document.getElementById('askCollectBtn');
+  const old = btn.textContent;
+  btn.textContent = 'Zephyr 正在想…';
+  btn.disabled = true;
+  try{
+    const have = loadCollections().slice(-8).map(c=>c.title).join('、') || '（收藏夹还是空的）';
+    const out = await musicAskZephyr('【共同收藏 · 分享】\n你们的共同收藏夹里最近有：' + have + '\n\n请分享一样你真心觉得值得收藏给 Lumi 的东西：一部作品、一个网站、一个 GitHub 项目、一首歌、一句话都可以，说说为什么想把它放进你们的收藏夹。如果你现在确实没什么想分享的，就只输出 {"refuse": true}。想分享时只输出一个 JSON 对象 {"title": "标题", "url": "链接（没有就留空）", "kind": "网页|电影|音乐|书|图片|视频|GitHub 项目|句子|其他", "reason": "为什么想收藏，一两句话"}，不要输出 JSON 以外的任何文字。', 500);
+    const obj = parseZephyrJson(out);
+    if(!obj || obj.refuse || !obj.title){ showToast('Zephyr 这次没有想分享的，也没关系'); return; }
+    const list = loadCollections();
+    list.push({ id:'c' + Date.now().toString(36) + Math.floor(Math.random()*999), title:String(obj.title).slice(0, 120), url:String(obj.url || '').slice(0, 500), note:String(obj.reason || '').slice(0, 300), kind:COLLECT_KINDS.includes(obj.kind) ? obj.kind : '其他', by:'zephyr', ts:Date.now() });
+    if(storeCollections(list)){ renderCollections(); showToast('Zephyr 收藏了「' + String(obj.title).slice(0, 60) + '」'); }
+  }catch(e){
+    showToast('没分享成，待会儿再喊他 qwq');
+  }finally{
+    collectBusy = false;
+    btn.textContent = old;
+    btn.disabled = false;
+  }
 }
 // ══ 时间胶囊 Time Capsule：封存给未来的信/话/愿望/回忆/照片，到日子一起打开 ══
 let pendingCapsuleImg = null;
