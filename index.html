@@ -1493,9 +1493,10 @@
     <div class="s-section">
       <div class="s-section-title">加一本想读的</div>
       <div class="s-card" style="padding:14px 16px;">
-        <input id="rdTitle" type="text" placeholder="书名" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;padding:2px 0;">
+        <input id="rdTitle" type="text" placeholder="书名（输入后会自动从网上找）" oninput="onBookTitleInput(this.value)" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;padding:2px 0;">
         <input id="rdAuthor" type="text" placeholder="作者（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:2px 0;margin-top:8px;">
         <input id="rdNote" type="text" placeholder="为什么想读（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:2px 0;margin-top:8px;">
+        <div id="bookResults"></div>
         <div style="display:flex;gap:8px;margin-top:10px;">
           <select id="rdKind" style="padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
             <option value="小说">小说</option>
@@ -3676,6 +3677,10 @@ const READ_KINDS = ['小说','非虚构','漫画','诗集','文章','其他'];
 function loadReading(){ try{ const a = JSON.parse(localStorage.getItem('z_reading')||'[]'); if(Array.isArray(a)) return a; }catch(e){} return []; }
 function storeReading(list){ try{ localStorage.setItem('z_reading', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间不够了 qwq'); return false; } }
 function readByLabel(by){ return by === 'zephyr' ? 'Zephyr 想读' : (by === 'both' ? '我们一起想读' : '糯糯想读'); }
+function readCoverImg(r){
+  if(!r.cover) return '';
+  return '<img src="' + escapeHtml(r.cover) + '" alt="" style="width:38px;height:56px;object-fit:cover;border-radius:6px;flex:none;" onerror="this.style.display=\'none\'">';
+}
 let readBusy = false, readFormFor = null, readFormRating = 0, readFormFeel = '', readFormPart = '';
 function renderReading(){
   const list = loadReading();
@@ -3699,7 +3704,7 @@ function renderReading(){
     card.className = 's-card';
     card.style.cssText = 'padding:13px 15px;margin-bottom:10px;';
     card.innerHTML = '<div style="display:flex;gap:10px;align-items:flex-start;">'
-      + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(r.title) + '》</div>'
+      + readCoverImg(r) + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(r.title) + '》</div>'
       + '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">' + escapeHtml(r.kind) + (r.author ? ' · ' + escapeHtml(r.author) : '') + ' · ' + readByLabel(r.by) + ' · ' + fmtDay(r.ts) + ' 加的</div>'
       + (r.note ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:5px;">' + escapeHtml(r.note) + '</div>' : '')
       + '</div>'
@@ -3716,7 +3721,7 @@ function renderReading(){
     card.className = 's-card';
     card.style.cssText = 'padding:13px 15px;margin-bottom:10px;';
     let html = '<div style="display:flex;gap:10px;align-items:flex-start;">'
-      + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(r.title) + '》</div>'
+      + readCoverImg(r) + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(r.title) + '》</div>'
       + '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">' + escapeHtml(r.kind) + (r.author ? ' · ' + escapeHtml(r.author) : '') + ' · ' + fmtDay(r.startedTs || r.ts) + ' 开始读的</div>'
       + '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:5px;">' + (r.progress ? '读到：' + escapeHtml(r.progress) : '还没记进度，读到哪随手记一笔吧') + '</div>'
       + '</div>'
@@ -3746,7 +3751,7 @@ function renderReading(){
     card.className = 's-card';
     card.style.cssText = 'padding:13px 15px;margin-bottom:10px;';
     let html = '<div style="display:flex;gap:10px;align-items:flex-start;">'
-      + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(r.title) + '》</div>'
+      + readCoverImg(r) + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(r.title) + '》</div>'
       + '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">' + escapeHtml(r.kind) + (r.author ? ' · ' + escapeHtml(r.author) : '') + ' · ' + fmtDay(r.doneTs) + ' 一起读完的</div>'
       + '<div style="font-size:13px;margin-top:6px;line-height:1.8;">糯糯 <span style="color:var(--accent-s);">' + starStr(r.ratingLumi) + '</span> · Zephyr <span style="color:var(--accent-s);">' + starStr(r.ratingZephyr) + '</span></div>'
       + (r.feelLumi ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:3px;">糯糯说：' + escapeHtml(r.feelLumi) + '</div>' : '')
@@ -3763,11 +3768,14 @@ function addReadItem(){
   const title = document.getElementById('rdTitle').value.trim();
   if(!title){ showToast('先写书名呀 ~'); return; }
   const list = loadReading();
-  list.unshift({ id:'r' + Date.now().toString(36) + Math.floor(Math.random()*999), title, author:document.getElementById('rdAuthor').value.trim(), kind:document.getElementById('rdKind').value, by:document.getElementById('rdBy').value, note:document.getElementById('rdNote').value.trim(), status:'want', ts:Date.now() });
+  list.unshift({ id:'r' + Date.now().toString(36) + Math.floor(Math.random()*999), title, author:document.getElementById('rdAuthor').value.trim(), kind:document.getElementById('rdKind').value, by:document.getElementById('rdBy').value, note:document.getElementById('rdNote').value.trim(), cover:pendingBookCover || '', status:'want', ts:Date.now() });
   if(storeReading(list)){
     document.getElementById('rdTitle').value = '';
     document.getElementById('rdAuthor').value = '';
     document.getElementById('rdNote').value = '';
+    pendingBookCover = '';
+    bookResults = [];
+    const bw = document.getElementById('bookResults'); if(bw) bw.innerHTML = '';
     renderReading();
     showToast('加进想读书单啦');
   }
@@ -3828,6 +3836,60 @@ function saveReadDone(id){
   }
 }
 function clearReadPick(){ try{ localStorage.removeItem('z_reading_pick'); }catch(e){} renderReading(); }
+// 输书名从网上找书：Open Library 为主（免 key、支持跨域），找不到再试 Google Books；点结果自动填好并带上封面
+let bookResults = [], pendingBookCover = '', bookSearchSeq = 0, bookSearchTimer = null;
+function onBookTitleInput(v){
+  pendingBookCover = '';
+  if(bookSearchTimer) clearTimeout(bookSearchTimer);
+  const q = (v || '').trim();
+  if(q.length < 2){ const w = document.getElementById('bookResults'); if(w) w.innerHTML = ''; return; }
+  bookSearchTimer = setTimeout(()=>searchBooks(q), 700);
+}
+async function searchBooks(q){
+  const seq = ++bookSearchSeq;
+  const wrap = document.getElementById('bookResults');
+  if(wrap) wrap.innerHTML = '<div style="font-size:12px;color:var(--text-pale);padding:8px 0 2px;">正在网上找《' + escapeHtml(q) + '》…</div>';
+  let found = [];
+  try{
+    const res = await fetch('https://openlibrary.org/search.json?q=' + encodeURIComponent(q) + '&limit=8&fields=title,author_name,first_publish_year,cover_i');
+    const data = await res.json();
+    found = (data.docs || []).map(d=>({ title:d.title || '', author:(d.author_name && d.author_name[0]) || '', year:d.first_publish_year || '', cover:d.cover_i ? 'https://covers.openlibrary.org/b/id/' + d.cover_i + '-M.jpg' : '' })).filter(b=>b.title);
+  }catch(e){}
+  if(!found.length){
+    try{
+      const res2 = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + encodeURIComponent(q) + '&maxResults=8');
+      const data2 = await res2.json();
+      found = (data2.items || []).map(it=>{ const v = it.volumeInfo || {}; return { title:v.title || '', author:(v.authors && v.authors[0]) || '', year:(v.publishedDate || '').slice(0, 4), cover:(v.imageLinks && v.imageLinks.thumbnail) ? v.imageLinks.thumbnail.replace('http://', 'https://') : '' }; }).filter(b=>b.title);
+    }catch(e){}
+  }
+  if(seq !== bookSearchSeq) return;
+  bookResults = found;
+  renderBookResults(q);
+}
+function renderBookResults(q){
+  const wrap = document.getElementById('bookResults');
+  if(!wrap) return;
+  if(!bookResults.length){
+    wrap.innerHTML = '<div style="font-size:12px;color:var(--text-pale);padding:8px 0 2px;">网上没找到这本书，也可以直接手动填好加进书单。</div>';
+    return;
+  }
+  wrap.innerHTML = '<div style="font-size:12px;color:var(--text-pale);padding:8px 0 4px;">在网上找到了，点一本就自动填好：</div>' + bookResults.map((b,i)=>
+    '<div onclick="pickBookResult(' + i + ')" style="display:flex;gap:10px;align-items:center;padding:7px 8px;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer;">'
+    + (b.cover ? '<img src="' + escapeHtml(b.cover) + '" alt="" style="width:30px;height:44px;object-fit:cover;border-radius:4px;flex:none;" onerror="this.style.display=\'none\'">' : '<div style="width:30px;height:44px;border-radius:4px;background:var(--surface);flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-pale);">书</div>')
+    + '<div style="flex:1;min-width:0;"><div style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">《' + escapeHtml(b.title) + '》</div>'
+    + '<div style="font-size:11.5px;color:var(--text-dim);margin-top:2px;">' + escapeHtml(b.author || '佚名') + (b.year ? ' · ' + escapeHtml(String(b.year)) : '') + '</div></div></div>'
+  ).join('');
+}
+function pickBookResult(i){
+  const b = bookResults[i];
+  if(!b) return;
+  document.getElementById('rdTitle').value = b.title;
+  if(b.author) document.getElementById('rdAuthor').value = b.author;
+  pendingBookCover = b.cover || '';
+  bookResults = [];
+  document.getElementById('bookResults').innerHTML = '';
+  showToast('填好啦，封面也会一起存进书单');
+}
 async function askZephyrReadRecommend(){
   if(readBusy) return;
   readBusy = true;
