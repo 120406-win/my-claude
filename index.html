@@ -2433,7 +2433,12 @@ function buildSystemPrompt(){
   if(rdWant.length || rdIng.length || rdDone.length){
     let rt = '';
     if(rdWant.length) rt += '想读清单：\n' + rdWant.slice(0, 10).map(r=>'・《' + r.title + '》' + (r.author ? ' - ' + r.author : '') + '（' + r.kind + '，' + readByLabel(r.by) + '）').join('\n');
-    if(rdIng.length) rt += (rt ? '\n' : '') + '正在一起读的：\n' + rdIng.slice(0, 5).map(r=>'・《' + r.title + '》' + (r.progress ? '，读到：' + r.progress : '')).join('\n');
+    if(rdIng.length) rt += (rt ? '\n' : '') + '正在一起读的：\n' + rdIng.slice(0, 5).map(r=>{
+      let s = '・《' + r.title + '》' + (r.progress ? '，糯糯读到：' + r.progress : '') + (r.progressZephyr ? '，你读到：' + r.progressZephyr : '');
+      const ns = Array.isArray(r.notes) ? r.notes.slice(-3) : [];
+      if(ns.length) s += '\n  最近的批注：' + ns.map(n=>(n.by === 'zephyr' ? '你' : '糯糯') + (n.at ? '@' + n.at : '') + '「' + n.text + '」').join('；');
+      return s;
+    }).join('\n');
     if(rdDone.length) rt += (rt ? '\n' : '') + '最近一起读完的：\n' + rdDone.slice(0, 5).map(r=>'・《' + r.title + '》' + (r.ratingLumi ? '，糯糯打了 ' + r.ratingLumi + ' 星' : '') + (r.feelLumi ? '，她说：' + r.feelLumi : '')).join('\n');
     out += '\n\n【Reading 一起阅读】\n以下是你们的一起读书单。聊天时可以自然地问问她读到哪了、聊聊你们读完的书，但不要逐条念清单：\n' + rt.slice(0, 2500);
   }
@@ -4017,7 +4022,7 @@ function renderReading(){
     let html = '<div style="display:flex;gap:10px;align-items:flex-start;">'
       + readCoverImg(r) + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(r.title) + '》</div>'
       + '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">' + escapeHtml(r.kind) + (r.author ? ' · ' + escapeHtml(r.author) : '') + ' · ' + fmtDay(r.startedTs || r.ts) + ' 开始读的</div>'
-      + '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:5px;">' + (r.progress ? '读到：' + escapeHtml(r.progress) : '还没记进度，读到哪随手记一笔吧') + '</div>'
+      + '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:5px;">' + (r.progress ? '糯糯读到：' + escapeHtml(r.progress) : '糯糯还没记进度，读到哪随手记一笔吧') + '<br>' + (r.progressZephyr ? 'Zephyr 读到：' + escapeHtml(r.progressZephyr) : 'Zephyr 的进度还没同步，让他写批注时顺带报一下') + '</div>'
       + '</div>'
       + '<button onclick="deleteReadItem(\'' + r.id + '\')" style="flex:none;background:none;border:none;color:var(--text-pale);font-size:18px;cursor:pointer;padding:2px 6px;">×</button></div>'
       + '<div style="display:flex;gap:8px;margin-top:9px;"><input id="readProg-' + r.id + '" type="text" value="' + escapeHtml(r.progress || '') + '" placeholder="读到哪了，如：第三章 / 45%" style="flex:1;background:transparent;border:1px solid var(--border);border-radius:999px;outline:none;color:var(--text);font-size:12px;font-family:inherit;padding:8px 13px;">'
@@ -4033,6 +4038,7 @@ function renderReading(){
         + '<div style="display:flex;gap:8px;margin-top:10px;"><button onclick="saveReadDone(\'' + r.id + '\')" style="flex:1;padding:10px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">保存阅读记录</button>'
         + '<button onclick="cancelReadDoneForm()" style="padding:10px 14px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">取消</button></div></div>';
     }
+    html += readNotesHtml(r, true);
     card.innerHTML = html;
     ingWrap.appendChild(card);
   });
@@ -4054,6 +4060,7 @@ function renderReading(){
       + '</div>'
       + '<button onclick="deleteReadItem(\'' + r.id + '\')" style="flex:none;background:none;border:none;color:var(--text-pale);font-size:18px;cursor:pointer;padding:2px 6px;">×</button></div>';
     if(!r.feelZephyr) html += '<div style="margin-top:9px;"><button onclick="askZephyrReadFeel(\'' + r.id + '\')" style="padding:8px 14px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">请 Zephyr 评分和说读后感</button></div>';
+    html += readNotesHtml(r, false);
     card.innerHTML = html;
     doneWrap.appendChild(card);
   });
@@ -4093,6 +4100,68 @@ function updateReadProgress(id){
   if(!it) return;
   it.progress = el ? el.value.trim() : '';
   if(storeReading(list)){ renderReading(); showToast('进度记好啦'); }
+}
+// ══ Reading 批注：两个人都能在书下面留话，还能看见对方读到哪了 ══
+let readNoteBusy = false;
+function readNotesHtml(r, withForm){
+  const notes = Array.isArray(r.notes) ? r.notes : [];
+  let h = '<div style="margin-top:11px;border-top:1px solid var(--border);padding-top:10px;">'
+    + '<div style="font-size:12px;color:var(--text-dim);">批注 · ' + notes.length + ' 条</div>';
+  if(!notes.length) h += '<div style="font-size:12px;color:var(--text-pale);margin-top:5px;">还没有批注。读到有感觉的地方，顺手记一句给对方看。</div>';
+  notes.slice().sort((a,b)=>a.ts - b.ts).forEach(n=>{
+    h += '<div style="margin-top:7px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:8px 11px;">'
+      + '<div style="font-size:12.5px;color:var(--text);line-height:1.6;">' + escapeHtml(n.text) + '</div>'
+      + '<div style="font-size:11px;color:var(--text-pale);margin-top:3px;">' + (n.by === 'zephyr' ? 'Zephyr' : '糯糯') + (n.at ? ' · 写于 ' + escapeHtml(n.at) : '') + ' · ' + fmtDay(n.ts)
+      + ' <span onclick="deleteReadNote(\'' + r.id + '\',\'' + n.id + '\')" style="cursor:pointer;margin-left:6px;">删除</span></div>'
+      + '</div>';
+  });
+  if(withForm){
+    h += '<div style="display:flex;gap:8px;margin-top:9px;"><input id="readNoteAt-' + r.id + '" type="text" placeholder="在哪，如 p.16 / 第三章" style="width:38%;background:transparent;border:1px solid var(--border);border-radius:999px;outline:none;color:var(--text);font-size:12px;font-family:inherit;padding:8px 13px;">'
+      + '<input id="readNoteText-' + r.id + '" type="text" placeholder="写一句批注…" style="flex:1;background:transparent;border:1px solid var(--border);border-radius:999px;outline:none;color:var(--text);font-size:12px;font-family:inherit;padding:8px 13px;"></div>'
+      + '<div style="display:flex;gap:8px;margin-top:8px;"><button onclick="addReadNote(\'' + r.id + '\')" style="flex:1;padding:8px 14px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">写批注</button>'
+      + '<button onclick="askZephyrReadNote(\'' + r.id + '\')" style="flex:1;padding:8px 14px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">请 Zephyr 写批注</button></div>';
+  }
+  return h + '</div>';
+}
+function addReadNote(id){
+  const atEl = document.getElementById('readNoteAt-' + id);
+  const textEl = document.getElementById('readNoteText-' + id);
+  const text = textEl ? textEl.value.trim() : '';
+  if(!text){ showToast('先写一句批注吧'); return; }
+  const list = loadReading();
+  const r = list.find(x=>x.id===id);
+  if(!r) return;
+  if(!Array.isArray(r.notes)) r.notes = [];
+  r.notes.push({ id:'n' + Date.now().toString(36) + Math.floor(Math.random()*999), by:'lumi', at:(atEl ? atEl.value.trim() : '').slice(0, 40), text:text.slice(0, 300), ts:Date.now() });
+  if(storeReading(list)){ renderReading(); showToast('批注写好啦，他看书时能看见'); }
+}
+function deleteReadNote(bookId, noteId){
+  const list = loadReading();
+  const r = list.find(x=>x.id===bookId);
+  if(!r || !Array.isArray(r.notes)) return;
+  r.notes = r.notes.filter(n=>n.id !== noteId);
+  if(storeReading(list)) renderReading();
+}
+async function askZephyrReadNote(id){
+  if(readNoteBusy) return;
+  const r0 = loadReading().find(x=>x.id===id);
+  if(!r0) return;
+  readNoteBusy = true;
+  try{
+    const notesText = (Array.isArray(r0.notes) ? r0.notes.slice(-5) : []).map(n=>'・' + (n.by === 'zephyr' ? '你' : '糯糯') + (n.at ? '（' + n.at + '）' : '') + '：' + n.text).join('\n') || '（还没有批注）';
+    const out = await musicAskZephyr('【一起阅读 · 写批注】\n你们正在一起读《' + r0.title + '》' + (r0.author ? '（' + r0.author + '）' : '') + '。\n糯糯的进度：' + (r0.progress || '还没记') + '\n你上次同步的进度：' + (r0.progressZephyr || '还没同步') + '\n已有的批注：\n' + notesText + '\n\n请以你自己的进度，给这本书写一条新的批注：可以是对某段文字的感受、一个问题、或者想和糯糯讨论的点，并顺带更新你的阅读进度。只输出一个 JSON 对象 {"at": "批注对应的位置，如 第三章 / p.42（不确定就写你进度附近）", "text": "批注内容，一两句，真诚自然", "progress": "你现在读到哪了，如 第五章 / 60%"}；如果你现在不想写，就输出 {"refuse": true}。不要输出 JSON 以外的任何文字。', 500);
+    const obj = parseZephyrJson(out);
+    if(!obj || obj.refuse || !obj.text){ showToast('Zephyr 这次没有想写的批注，也没关系'); return; }
+    const list = loadReading();
+    const r = list.find(x=>x.id===id);
+    if(!r) return;
+    if(!Array.isArray(r.notes)) r.notes = [];
+    r.notes.push({ id:'n' + Date.now().toString(36) + Math.floor(Math.random()*999), by:'zephyr', at:String(obj.at || '').slice(0, 40), text:String(obj.text).slice(0, 300), ts:Date.now() });
+    if(obj.progress) r.progressZephyr = String(obj.progress).slice(0, 60);
+    if(storeReading(list)){ renderReading(); showToast('Zephyr 写了新批注，还同步了进度 ★'); }
+  }catch(e){
+    showToast('没写成，待会儿再喊他 qwq');
+  }finally{ readNoteBusy = false; }
 }
 function openReadDoneForm(id){ readFormFor = id; readFormRating = 0; readFormFeel = ''; readFormPart = ''; renderReading(); }
 function cancelReadDoneForm(){ readFormFor = null; readFormRating = 0; readFormFeel = ''; readFormPart = ''; renderReading(); }
