@@ -4760,10 +4760,15 @@ async function searchOnlineFilms(){
 }
 function pickVideoFiles(files){
   if(!Array.isArray(files)) return { videos: [], subs: [] };
-  const vids = files.filter(f=>f && f.name && /\.(mp4|m4v|webm|ogv|mov)$/i.test(f.name) && !/sample|preview|trailer/i.test(f.name));
-  const orig = vids.filter(f=>f.source === 'original');
-  const videos = (orig.length ? orig : vids).slice(0, 8).map(f=>({ name: f.name, title: fixMojibake(String(f.title || f.name.replace(/\.[^.]+$/, '').replace(/_/g, ' '))).slice(0, 120), size: +(f.size || 0) }));
-  const subs = files.filter(f=>f && f.name && /\.(srt|vtt)$/i.test(f.name)).slice(0, 6).map(f=>({ name: f.name }));
+  const rank = f=>{
+    const fmt = String(f.format || ''), nm = String(f.name || '');
+    if(/h\.264/i.test(fmt) || /\.ia\.mp4$/i.test(nm) || /512Kb/i.test(fmt) || /_512kb/i.test(nm)) return 0;
+    if(f.source === 'original') return 1;
+    return 2;
+  };
+  const vids = files.filter(f=>f && f.name && f.private !== 'true' && f.private !== true && /\.(mp4|m4v)$/i.test(f.name) && !/sample|preview|trailer/i.test(f.name));
+  const videos = vids.slice().sort((a, b)=>rank(a) - rank(b)).slice(0, 8).map(f=>({ name: f.name, title: fixMojibake(String(f.title || f.name.replace(/\.[^.]+$/, '').replace(/_/g, ' '))).slice(0, 120), size: +(f.size || 0), format: String(f.format || ''), web: rank(f) === 0 }));
+  const subs = files.filter(f=>f && f.name && f.private !== 'true' && f.private !== true && /\.(srt|vtt)$/i.test(f.name)).slice(0, 6).map(f=>({ name: f.name }));
   return { videos, subs };
 }
 async function expandOnlineFilm(i, btn){
@@ -4782,7 +4787,7 @@ async function expandOnlineFilm(i, btn){
     holder.dataset.done = '1';
     if(!got.videos.length){ holder.innerHTML = '<div style="font-size:12px;color:var(--text-pale);padding:6px 0;">这个条目里没有能直接播的视频文件</div>'; return; }
     holder.innerHTML = got.videos.map((f, fi)=>'<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px dashed var(--border);">'
-      + '<div style="flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(f.title) + (f.size ? ' · ' + fmtFileSize(f.size) : '') + '</div>'
+      + '<div style="flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(f.title) + (f.size ? ' · ' + fmtFileSize(f.size) : '') + (f.web ? ' · 网页版（好播）' : (f.format ? ' · ' + escapeHtml(f.format) : '')) + '</div>'
       + '<button onclick="addOnlineFilm(' + i + ', ' + fi + ')" style="flex:none;padding:6px 11px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">加进想看</button></div>').join('')
       + (got.subs.length ? '<div style="font-size:12px;color:var(--text-pale);padding:4px 0 2px;">带字幕文件，进观影室会自动挂上</div>' : '');
   }catch(e){
@@ -10255,17 +10260,17 @@ async function openCinemaUrl(url, title, subUrl){
 async function attachOnlineSub(subUrl, recId){
   try{
     const r = await fetch(subUrl);
-    if(!r.ok) return;
+    if(!r.ok) throw new Error('sub http');
     const text = await readTextFileSmart(await r.blob());
     const cues = parseSubtitles(text);
-    if(!cues.length) return;
+    if(!cues.length) throw new Error('sub empty');
     cinemaState.cues = cues;
     const recs = loadCinemaRecords();
     const rec = recs.find(x=>x.id === recId);
     if(rec){ rec.subName = decodeURIComponent(subUrl.split('/').pop() || ''); storeCinemaRecords(recs); }
     renderCinemaInfo();
     showToast('字幕自动挂上啦，共 ' + cues.length + ' 句');
-  }catch(e){}
+  }catch(e){ showToast('字幕没自动取到（源站限制），想配字幕可以手动选文件'); }
 }
 async function onCinemaSubChosen(input){
   const f = input.files && input.files[0];
@@ -10967,6 +10972,16 @@ async function askZephyrScheme(){
 // ══ 初始化 ══
 loadSettings();
 convStorePrepare().then(()=>mediaStorePrepare()).then(()=>loadChatHistory()).catch(()=>loadChatHistory());
+(function(){
+  const v = document.getElementById('cinemaVideo');
+  if(!v) return;
+  v.addEventListener('error', ()=>{
+    if(!cinemaState.title || v.src !== cinemaState.url) return;
+    showToast('这部片子播不了，多半是编码不支持，换个片源试试');
+    const el = document.getElementById('cinemaInfo');
+    if(el) el.textContent = '《' + cinemaState.title + '》这个文件播不了（多半是编码不支持），换个片源或换一部试试。';
+  });
+})();
 // 头像上传：这两个函数之前只定义、从未调用，所以点上传一直没反应，必须在初始化时注册
 setupAvatarUpload('avatarZephyrInput', 'avatarZephyrPreview', 'avatarZephyr', 'z_avatarZephyr');
 setupAvatarUpload('avatarUserInput', 'avatarUserPreview', 'avatarUser', 'z_avatarUser');
