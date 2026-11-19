@@ -7778,7 +7778,7 @@ async function speakText(text){
     try { callRecognition?.stop(); } catch(e) {}
     callSTTRunning = false;
   }
-  const finishSpeak = () => { if (inCall) { callTtsSpeaking = false; scheduleCallSTT(600); } };
+  const finishSpeak = () => { if (inCall) { callTtsSpeaking = false; scheduleCallSTT(1200); } };
   const ttsUrl = cfg.ttsUrl || '';
   if(ttsUrl) {
     try {
@@ -8144,6 +8144,7 @@ let callSTTRestartTimer = null;
 let callTtsSpeaking = false;
 let callSTTGen = 0;
 let callSTTErrToastAt = 0;
+let callSTTWatchdog = null;
 
 // 识别的重启动一入口：去重 + 延迟。旧版只在 onresult/onerror 里立刻重启，
 // 识别自然结束（onend，没结果也没报错）时没人管，麦克风就永久哑了；
@@ -8168,6 +8169,7 @@ function startCallSTT() {
   rec.interimResults = false;
   rec.onresult = async (e) => {
     if (gen !== callSTTGen) return;
+    clearTimeout(callSTTWatchdog);
     callSTTRunning = false;
     const text = e.results[0][0].transcript;
     if (!text) { scheduleCallSTT(500); return; }
@@ -8185,6 +8187,7 @@ function startCallSTT() {
   };
   rec.onerror = (e) => {
     if (gen !== callSTTGen) return;
+    clearTimeout(callSTTWatchdog);
     callSTTRunning = false;
     if (!isCalling || !callMicActive) return;
     const err = e && e.error;
@@ -8194,11 +8197,23 @@ function startCallSTT() {
   };
   rec.onend = () => {
     if (gen !== callSTTGen) return;
+    clearTimeout(callSTTWatchdog);
     callSTTRunning = false;
     if (isCalling && callMicActive && !callTtsSpeaking) scheduleCallSTT(500);
   };
   callSTTRunning = true;
   try { rec.start(); } catch(e) { callSTTRunning = false; scheduleCallSTT(600); }
+  // 看门狗：iOS 上识别会被上一个会话的拆解拖成假死——麦克风指示亮着，
+  // 但 20 秒没有任何结果/结束/报错。这种会话留着只会堵住后面所有话，
+  // 到点就强行回收重开一个。
+  clearTimeout(callSTTWatchdog);
+  callSTTWatchdog = setTimeout(() => {
+    if (gen !== callSTTGen || !callSTTRunning) return;
+    callSTTGen++;
+    callSTTRunning = false;
+    try { rec.stop(); } catch(e) {}
+    scheduleCallSTT(800);
+  }, 20000);
 }
 
 document.getElementById('callBtn').addEventListener('click',async()=>{
@@ -8215,7 +8230,7 @@ document.getElementById('callBtn').addEventListener('click',async()=>{
 });
 document.getElementById('callHangBtn').addEventListener('click',()=>{
   isCalling=false; callMicActive=false; stopCallHeartbeat();
-  clearTimeout(callSTTRestartTimer); callTtsSpeaking = false; callSTTRunning = false;
+  clearTimeout(callSTTRestartTimer); clearTimeout(callSTTWatchdog); callTtsSpeaking = false; callSTTRunning = false;
   callRecognition?.stop();
   clearInterval(callInterval); speechSynthesis?.cancel(); try{ getTtsAudio().pause(); }catch(e){}
   document.getElementById('callModal').classList.remove('show');
