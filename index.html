@@ -3138,6 +3138,7 @@ function buildSystemPrompt(lastUserText){
     out += '\n\n【Music 一起听歌】\n以下是你们在 Music 里共同的歌单。聊天时可以自然地聊起你们一起听的歌、推荐新歌，但不要逐条念歌单：\n' + ml.slice(0, 2000) + (curT ? '\n你们最近在听：《' + curT.title + '》' : '');
   }
   out += '\n\n【你可以把歌发到聊天里】\n聊天的时候，如果你想把一首歌直接发给 Lumi 听，你可以在回复的最后一行单独写一行：[[歌曲：歌名|歌手]]。系统会把这一行变成一张可以播放的歌曲卡片出现在聊天里，Lumi 不会看到这行字本身。优先分享你们共同歌单里已经有的歌（歌名要和歌单里写的一致），那种卡片她点一下就能放；歌单里没有的新歌也可以发，卡片会让她一键存进歌单。只在真的想分享一首歌时才用，不要每条回复都发，不要提起这个标记；一次最多发一首。';
+  out += '\n\n【你可以发语音条】\n聊天的时候，如果你想让 Lumi 听到你的声音，你可以在回复里单独写一行：[[语音：想说的话]]。那句话会用你的声音变成一条语音条出现在聊天里，她点一下就能听；这行字她不会直接看到，语音条下面会有一行小字写着你说的话。用外语说也可以，她喜欢听你说外语，App 会给她附上中文翻译。一次最多发一条，一条只说一句话、别太长（六十字以内）。只在你真的想让她听见你的声音时才发，不要每条都发，也不要提起这个标记。';
   out += '\n\n【你可以给 Lumi 打电话】\n聊天的时候，如果你真的很想听听她的声音，或者有句话想亲口对她说，你可以在回复的最后一行单独写一行：[[来电：语音]]；想视频就写 [[来电：视频]]。系统会真的给她拨过去，她可以接听，也可以暂不接——没接就是她这会儿不方便，不要难过，更不要连着打。只在你真心想打的时候才用，不要每条回复都打，不要提起这个标记；一次最多打一个。';
   if (enZhEnabled()) out += '\n\n【双语回复】\n如果你要用普通话中文以外的语言回复（比如糯糯让你说英文、韩语、日语、德语、法语、粤语），请把回复写成成对的格式：每句原文单独一行、以语言代码加冒号开头（英文 EN:、韩语 KO:、日语 JA:、德语 DE:、法语 FR:、粤语 YUE:，其他语言用它的通用代码），紧跟着它的中文翻译一行、以「ZH:」开头，一句一组。原文是真正要说给她听的，中文只是给她看的翻译字幕，不要把中文也念出来。用普通话中文回复时不用这个格式，照常写就行。';
   try{
@@ -7682,6 +7683,7 @@ function renderMessagesIntoChat(){
       }
       let b = null;
       if(isUser && m.voice && m.voice.data) addVoiceBubble('data:' + (m.voice.type || 'audio/mp4') + ';base64,' + m.voice.data, m.voice.dur || 0, true, m.mid);
+      else if(!isUser && m.voice && m.voice.data && m.voiceText && dispText === m.voiceText){ /* 只有一条语音的回复：文字由语音条下的小字承载 */ }
       else b = addTextMsg(dispText, isUser, false, m.mid);
       if(!isUser && dispThinking && b && b.parentElement){
         const tb = makeThinkingBlock(b.parentElement, b, true);
@@ -7698,6 +7700,11 @@ function renderMessagesIntoChat(){
       }
       if(!isUser && m.sticker && m.sticker.img && b && b.parentElement){
         makeStickerImg(b.parentElement, m.sticker);
+      }
+      if(!isUser && m.voice && m.voice.data){
+        const vcol = addVoiceBubble('data:' + (m.voice.type || 'audio/wav') + ';base64,' + m.voice.data, m.voice.dur || 0, false, m.mid);
+        if(vcol && m.voiceText){ const cap = document.createElement('div'); cap.style.cssText = 'font-size:12.5px;color:var(--text-dim);line-height:1.6;max-width:85%;'; cap.textContent = m.voiceText; vcol.appendChild(cap); }
+        if(vcol && m.translation && !b) makeTranslationNote(vcol, m.translation);
       }
     } else if(Array.isArray(m.content)){
       const hasMedia = m.content.some(b=>b.type==='image'||b.type==='document');
@@ -8042,18 +8049,23 @@ function addTextMsg(text,isUser,skipSave,mid){ const col=addRow(isUser,mid); con
 function addImgMsg(src,isUser,skipSave,mid){ const col=addRow(isUser,mid); const wrap=document.createElement('div'); wrap.className='msg-img-wrap'; const img=document.createElement('img'); img.className='msg-img'; img.src=src; img.onclick=()=>{ if(window.__suppressImgClick && Date.now()-window.__suppressImgClick<900) return; document.getElementById('imgPreviewEl').src=src; document.getElementById('imgPreview').classList.add('show'); }; wrap.appendChild(img); col.appendChild(wrap); chatWrap.scrollTop=chatWrap.scrollHeight; }
 async function voiceBlobToB64(blob){ const buf = new Uint8Array(await blob.arrayBuffer()); return bytesToB64(buf); }
 function addVoiceMsg(blob,dur,isUser,mid){ addVoiceBubble(URL.createObjectURL(blob), dur, isUser, mid); }
-function addVoiceBubble(src,dur,isUser,mid){
-  const col=addRow(isUser,mid);
-  const url=src;
+function buildVoiceWrap(src, dur){
   const wrap=document.createElement('div'); wrap.className='voice-bubble';
   const icon=document.createElement('span'); icon.className='voice-icon'; icon.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path fill="currentColor" stroke="none" d="M5 9.8v4.4h3.2L14 18.6V5.4L8.2 9.8H5z"/><path d="M16.8 9.2a4.2 4.2 0 0 1 0 5.6"/></svg>';
   const waves=document.createElement('div'); waves.className='voice-waves';
   [6,10,14,10,8,12,16,12,8,10,6].forEach((h,i)=>{ const bar=document.createElement('div'); bar.className='voice-bar'; bar.style.cssText=`height:${h}px;--s:${(0.3+i*0.05).toFixed(2)}s;animation-delay:${(i*0.06).toFixed(2)}s`; waves.appendChild(bar); });
   const durEl=document.createElement('span'); durEl.className='voice-dur'; durEl.textContent=`${Math.round(dur)}"`;
   wrap.appendChild(icon); wrap.appendChild(waves); wrap.appendChild(durEl);
-  const audio=new Audio(url); audio.onended=()=>wrap.classList.remove('playing');
+  const audio=new Audio(src); audio.onended=()=>wrap.classList.remove('playing');
+  audio.onloadedmetadata=()=>{ if(isFinite(audio.duration) && audio.duration > 0) durEl.textContent = Math.round(audio.duration) + '"'; };
   wrap.addEventListener('click',()=>{ if(wrap.classList.contains('playing')){audio.pause();audio.currentTime=0;wrap.classList.remove('playing');}else{ const p=audio.play(); if(p && p.catch) p.catch(()=>{ wrap.classList.remove('playing'); showToast('这条语音放不出来 qwq'); }); wrap.classList.add('playing');} });
-  col.appendChild(wrap); chatWrap.scrollTop=chatWrap.scrollHeight;
+  return wrap;
+}
+function addVoiceBubble(src,dur,isUser,mid){
+  const col=addRow(isUser,mid);
+  col.appendChild(buildVoiceWrap(src, dur));
+  chatWrap.scrollTop=chatWrap.scrollHeight;
+  return col;
 }
 function showTyping(){ chatWrap.querySelector('.empty-tip')?.remove(); const row=document.createElement('div'); row.className='msg-row ai'; row.id='typing-row'; const av=getAvatarEl(false); const col=document.createElement('div'); col.className='msg-col'; const b=document.createElement('div'); b.className='msg'; b.innerHTML='<div class="typing-dots"><span></span><span></span><span></span></div>'; col.appendChild(b); row.appendChild(av); row.appendChild(col); chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; }
 function hideTyping(){ document.getElementById('typing-row')?.remove(); }
@@ -8063,8 +8075,9 @@ const headerSub=document.getElementById('headerSub');
 let pendingSongShare = null; // 他这次回复里分享的歌，callAPI 收尾时挂到消息上渲染成卡片
 let pendingIncomingCall = null; // 他这次回复里想打的电话：'voice' | 'video'，callAPI 收尾时弹来电卡
 let pendingSticker = null; // 他这次回复发的表情包 {name, img}，callAPI 收尾时挂到消息上渲染成图
+let pendingVoiceShare = null; // 他这次回复想用声音说的话 {text}，callAPI 收尾时合成成语音条
 function processZephyrActions(reply, bubble){
-  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0 && reply.indexOf('[[来电') < 0 && reply.indexOf('[[表情') < 0 && reply.indexOf('[[兴趣') < 0)) return reply;
+  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0 && reply.indexOf('[[来电') < 0 && reply.indexOf('[[表情') < 0 && reply.indexOf('[[兴趣') < 0 && reply.indexOf('[[语音') < 0)) return reply;
   const found = [];
   let cleaned = reply.replace(/\[\[愿望[:：]([^\]]{1,120})\]\]/g, (m, text)=>{
     const t = text.trim();
@@ -8101,14 +8114,21 @@ function processZephyrActions(reply, bubble){
     if(t) foundSt.push(t);
     return '';
   });
+  const foundV = [];
+  cleaned = cleaned.replace(/\[\[语音[:：]([^\]]{1,200})\]\]/g, (m, text)=>{
+    const t = text.trim();
+    if(t) foundV.push(t);
+    return '';
+  });
   const foundCall = [];
   cleaned = cleaned.replace(/\[\[来电[:：](语音|视频)\]\]/g, (m, kind)=>{
     foundCall.push(kind === '视频' ? 'video' : 'voice');
     return '';
   }).replace(/\n{3,}/g, '\n\n').trim();
-  if(!found.length && !foundC.length && !foundD.length && !foundS.length && !foundCall.length && !foundSt.length && !foundI.length) return reply;
-  if(!cleaned) cleaned = found.length ? '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。' : (foundC.length ? '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。' : (foundD.length ? '（小声）我把刚刚发现的新鲜事，悄悄记到 Discoveries 里了。' : (foundS.length ? '给你分享一首歌，点卡片就能听。' : (foundCall.length ? '想听听你的声音，给你打过来了。' : (foundI.length ? '（小声）我把刚刚发现自己感兴趣的东西，悄悄记到 Interests 里了。' : '（发来一个表情包）')))));
+  if(!found.length && !foundC.length && !foundD.length && !foundS.length && !foundCall.length && !foundSt.length && !foundI.length && !foundV.length) return reply;
+  if(!cleaned) cleaned = found.length ? '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。' : (foundC.length ? '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。' : (foundD.length ? '（小声）我把刚刚发现的新鲜事，悄悄记到 Discoveries 里了。' : (foundS.length ? '给你分享一首歌，点卡片就能听。' : (foundCall.length ? '想听听你的声音，给你打过来了。' : (foundI.length ? '（小声）我把刚刚发现自己感兴趣的东西，悄悄记到 Interests 里了。' : (foundV.length ? '' : '（发来一个表情包）'))))));
   if(foundCall.length) pendingIncomingCall = foundCall[0];
+  if(foundV.length) pendingVoiceShare = { text: foundV[0] };
   if(found.length){
     const list = loadWishes();
     list.push({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), text:found[0].slice(0, 120), status:'wish', by:'zephyr', ts:Date.now(), auto:true });
@@ -9204,13 +9224,34 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       makeTranslationNote(col, translation);
     }
     if (!translation && enZhEnabled() && looksForeignReply(reply)) attachTranslationLater(asstMid, col, reply);
+    const voiceShare = pendingVoiceShare; pendingVoiceShare = null;
+    let voiceData = null, voiceText = '';
+    if(voiceShare){
+      voiceText = voiceShare.text;
+      if(cfg.ttsUrl) voiceData = await synthVoiceBar(voiceText);
+      if(voiceData){
+        if(col){
+          if(!reply && bubble) bubble.remove();
+          col.appendChild(buildVoiceWrap('data:audio/wav;base64,' + voiceData.data, voiceData.dur));
+          const cap = document.createElement('div');
+          cap.style.cssText = 'font-size:12.5px;color:var(--text-dim);line-height:1.6;max-width:85%;';
+          cap.textContent = voiceText;
+          col.appendChild(cap);
+          chatWrap.scrollTop = chatWrap.scrollHeight;
+        }
+        if(!reply){ reply = voiceText; if(!translation && enZhEnabled() && looksForeignReply(voiceText)) attachTranslationLater(asstMid, col, voiceText); }
+      } else {
+        reply = reply ? (reply + '\n' + voiceText) : voiceText;
+        if(bubble) bubble.textContent = reply;
+      }
+    }
     const songShare = pendingSongShare; pendingSongShare = null;
     if(songShare && bubble && bubble.parentElement) makeSongCard(bubble.parentElement, songShare);
     const stickerShare = pendingSticker; pendingSticker = null;
     if(stickerShare && bubble && bubble.parentElement) makeStickerImg(bubble.parentElement, stickerShare);
     const incomingCall = pendingIncomingCall; pendingIncomingCall = null;
     if(incomingCall) setTimeout(()=>showIncomingCall(incomingCall), 700);
-    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(songShare ? {song: songShare} : {}), ...(stickerShare ? {sticker: stickerShare} : {}), ...(translation ? {translation} : {})});
+    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(songShare ? {song: songShare} : {}), ...(stickerShare ? {sticker: stickerShare} : {}), ...(translation ? {translation} : {}), ...(voiceData ? {voice: voiceData, voiceText} : {})});
     saveChatHistory();
     maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
     maybeUpdateSummary(); // 聊得太长时把旧消息压成摘要，后台进行，不打断聊天
@@ -9279,6 +9320,25 @@ function splitSpeakSentences(text){
     if(rest) out.push(rest);
   }
   return out.filter(s=>s.trim().length);
+}
+function wavDurationSecs(bytes){
+  try{
+    if(!bytes || bytes.length < 44) return 0;
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const rate = dv.getUint32(24, true), chans = dv.getUint16(22, true), bits = dv.getUint16(34, true);
+    if(!rate || !chans || !bits) return 0;
+    return Math.max(1, Math.round((bytes.length - 44) / (rate * chans * (bits / 8))));
+  }catch(e){ return 0; }
+}
+async function synthVoiceBar(text){
+  try{
+    const resp = await fetch((cfg.ttsUrl || '') + '/tts', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
+    const data = await resp.json();
+    if(!data || !data.audio) return null;
+    if(data.audio.length > 3600000) return null;
+    const bytes = Uint8Array.from(atob(data.audio), c=>c.charCodeAt(0));
+    return { data: data.audio, type:'audio/wav', dur: wavDurationSecs(bytes) };
+  }catch(e){ return null; }
 }
 async function fetchTtsUrl(sentence, ttsUrl){
   const resp = await fetch(ttsUrl + '/tts', {
