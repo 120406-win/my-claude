@@ -7774,10 +7774,11 @@ async function speakText(text){
   if (inCall) {
     callTtsSpeaking = true;
     clearTimeout(callSTTRestartTimer);
+    callSTTGen++; // 被停掉的那个识别器迟到的 onend/onerror 全部作废，别让它动共享状态
     try { callRecognition?.stop(); } catch(e) {}
     callSTTRunning = false;
   }
-  const finishSpeak = () => { if (inCall) { callTtsSpeaking = false; scheduleCallSTT(300); } };
+  const finishSpeak = () => { if (inCall) { callTtsSpeaking = false; scheduleCallSTT(600); } };
   const ttsUrl = cfg.ttsUrl || '';
   if(ttsUrl) {
     try {
@@ -8141,6 +8142,8 @@ let callMicActive = false;
 let callSTTRunning = false;
 let callSTTRestartTimer = null;
 let callTtsSpeaking = false;
+let callSTTGen = 0;
+let callSTTErrToastAt = 0;
 
 // 识别的重启动一入口：去重 + 延迟。旧版只在 onresult/onerror 里立刻重启，
 // 识别自然结束（onend，没结果也没报错）时没人管，麦克风就永久哑了；
@@ -8157,15 +8160,17 @@ function startCallSTT() {
   if (!SR) { showToast('浏览器不支持语音识别'); return; }
   if (callSTTRunning) return;
   try { callRecognition?.stop(); } catch(e) {}
+  const gen = ++callSTTGen;
   const rec = new SR();
   callRecognition = rec;
   rec.lang = 'zh-CN';
   rec.continuous = false;
   rec.interimResults = false;
   rec.onresult = async (e) => {
+    if (gen !== callSTTGen) return;
     callSTTRunning = false;
     const text = e.results[0][0].transcript;
-    if (!text) { scheduleCallSTT(250); return; }
+    if (!text) { scheduleCallSTT(500); return; }
     const sttMid = genMsgId(); pendingUserMid = sttMid;
     addTextMsg(text, true, false, sttMid);
     callLastActivity = Date.now(); callHeartbeatCount = 0; callBusy = true;
@@ -8176,17 +8181,21 @@ function startCallSTT() {
     callBusy = false; callLastActivity = Date.now();
     if (reply) { await speakText(reply); }
     // 他说完（speakText 内部也会接一次）再继续监听
-    if (isCalling && callMicActive) scheduleCallSTT(250);
+    if (isCalling && callMicActive) scheduleCallSTT(500);
   };
   rec.onerror = (e) => {
+    if (gen !== callSTTGen) return;
     callSTTRunning = false;
     if (!isCalling || !callMicActive) return;
     const err = e && e.error;
-    scheduleCallSTT(err === 'not-allowed' || err === 'service-not-allowed' ? 1500 : 400);
+    const now = Date.now();
+    if (err && now - callSTTErrToastAt > 8000) { callSTTErrToastAt = now; showToast('语音识别出错：' + err); }
+    scheduleCallSTT(err === 'not-allowed' || err === 'service-not-allowed' ? 2000 : 500);
   };
   rec.onend = () => {
+    if (gen !== callSTTGen) return;
     callSTTRunning = false;
-    if (isCalling && callMicActive && !callTtsSpeaking) scheduleCallSTT(300);
+    if (isCalling && callMicActive && !callTtsSpeaking) scheduleCallSTT(500);
   };
   callSTTRunning = true;
   try { rec.start(); } catch(e) { callSTTRunning = false; scheduleCallSTT(600); }
