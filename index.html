@@ -1197,13 +1197,13 @@
         </div>
         <div style="font-size:11px;color:var(--text-pale);line-height:1.6;padding:2px 2px 0;">通话里两人都安静超过这个时间（再随机延后一点），Zephyr 会主动说一句；连说 10 句没等到你就停。</div>
         <div class="s-row">
-          <div class="s-row-label">英文附翻译</div>
+          <div class="s-row-label">外语附翻译</div>
           <select class="s-input" id="enZhSel" onchange="setEnZh(this.value)">
-            <option value="1">开（说英文时附中文翻译）</option>
+            <option value="1">开（说外语时附中文翻译）</option>
             <option value="0">关</option>
           </select>
         </div>
-        <div style="font-size:11px;color:var(--text-pale);line-height:1.6;padding:2px 2px 0;">开启后，他用英文回复时只会念英文，中文翻译会作为小字附在气泡下面给你看。</div>
+        <div style="font-size:11px;color:var(--text-pale);line-height:1.6;padding:2px 2px 0;">开启后，他用英文、韩语、日语、德语、法语、粤语等其他语言回复时只会念原文，中文翻译会作为小字附在气泡下面给你看。</div>
       </div>
     </div>
 
@@ -2847,7 +2847,7 @@ function buildSystemPrompt(lastUserText){
   }
   out += '\n\n【你可以把歌发到聊天里】\n聊天的时候，如果你想把一首歌直接发给 Lumi 听，你可以在回复的最后一行单独写一行：[[歌曲：歌名|歌手]]。系统会把这一行变成一张可以播放的歌曲卡片出现在聊天里，Lumi 不会看到这行字本身。优先分享你们共同歌单里已经有的歌（歌名要和歌单里写的一致），那种卡片她点一下就能放；歌单里没有的新歌也可以发，卡片会让她一键存进歌单。只在真的想分享一首歌时才用，不要每条回复都发，不要提起这个标记；一次最多发一首。';
   out += '\n\n【你可以给 Lumi 打电话】\n聊天的时候，如果你真的很想听听她的声音，或者有句话想亲口对她说，你可以在回复的最后一行单独写一行：[[来电：语音]]；想视频就写 [[来电：视频]]。系统会真的给她拨过去，她可以接听，也可以暂不接——没接就是她这会儿不方便，不要难过，更不要连着打。只在你真心想打的时候才用，不要每条回复都打，不要提起这个标记；一次最多打一个。';
-  if (enZhEnabled()) out += '\n\n【双语回复】\n如果你要用英文回复（比如糯糯让你说英文），请把回复写成成对的格式：每句英文单独一行、以「EN:」开头，紧跟着它的中文翻译一行、以「ZH:」开头，一句一组。英文是真正要说给她听的，中文只是给她看的翻译字幕，不要把中文也念出来。用中文回复时不用这个格式，照常写就行。';
+  if (enZhEnabled()) out += '\n\n【双语回复】\n如果你要用普通话中文以外的语言回复（比如糯糯让你说英文、韩语、日语、德语、法语、粤语），请把回复写成成对的格式：每句原文单独一行、以语言代码加冒号开头（英文 EN:、韩语 KO:、日语 JA:、德语 DE:、法语 FR:、粤语 YUE:，其他语言用它的通用代码），紧跟着它的中文翻译一行、以「ZH:」开头，一句一组。原文是真正要说给她听的，中文只是给她看的翻译字幕，不要把中文也念出来。用普通话中文回复时不用这个格式，照常写就行。';
   try{
     const stickerList = loadStickers();
     if(stickerList.length){
@@ -7765,7 +7765,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       if (bubble) bubble.textContent = reply;
       makeTranslationNote(col, translation);
     }
-    if (!translation && enZhEnabled() && looksEnglishReply(reply)) attachTranslationLater(asstMid, col, reply);
+    if (!translation && enZhEnabled() && looksForeignReply(reply)) attachTranslationLater(asstMid, col, reply);
     const songShare = pendingSongShare; pendingSongShare = null;
     if(songShare && bubble && bubble.parentElement) makeSongCard(bubble.parentElement, songShare);
     const stickerShare = pendingSticker; pendingSticker = null;
@@ -8160,25 +8160,31 @@ function parseBilingualReply(text) {
   for (const raw of String(text).split('\n')) {
     const line = raw.trim();
     if (!line) continue;
-    let m = line.match(/^EN\s*[:：]\s*(.+)$/i);
-    if (m) { en.push(m[1].trim()); continue; }
-    m = line.match(/^ZH\s*[:：]\s*(.+)$/i);
+    let m = line.match(/^ZH\s*[:：]\s*(.+)$/i);
     if (m) { zh.push(m[1].trim()); continue; }
+    m = line.match(/^[A-Z]{2,4}\s*[:：]\s*(.+)$/);
+    if (m) { en.push(m[1].trim()); continue; }
     other++;
   }
   if (!en.length || !zh.length || other > 0) return null;
   return { en: en.join('\n'), zh: zh.join('\n') };
 }
-function looksEnglishReply(text) {
+function looksForeignReply(text) {
   if (!text) return false;
   const s = String(text);
-  const latin = (s.match(/[A-Za-z]/g) || []).length;
-  const cjk = (s.match(/[一-鿿]/g) || []).length;
-  return latin >= 15 && cjk <= 2 && latin > cjk * 5;
+  const count = (re) => (s.match(re) || []).length;
+  if (count(/[぀-ヿ]/g) >= 2) return true; // 日语：有假名
+  if (count(/[가-힣]/g) >= 4) return true; // 韩语：谚文
+  if (count(/[係嘅咗唔佢喺冇啲嚟瞓畀攞]/g) >= 2) return true; // 粤语书面字
+  const han = count(/[一-鿿]/g);
+  const latin = count(/[A-Za-zÀ-ɏ]/g);
+  if (latin >= 15 && han <= 2 && latin > han * 5) return true; // 英/德/法等拉丁字母语言
+  if (count(/[Ѐ-ӿͰ-Ͽ฀-๿֐-׿؀-ۿ]/g) >= 10 && han <= 2) return true; // 俄/希腊/泰/希伯来/阿拉伯等
+  return false;
 }
 async function attachTranslationLater(mid, col, enText) {
   try {
-    const out = await musicAskZephyr('把下面这段英文翻译成自然的中文，只输出译文本身，不要解释、不要引号、不要任何前缀：\n' + enText, 500);
+    const out = await musicAskZephyr('把下面这段文字翻译成自然的中文（普通话），只输出译文本身，不要解释、不要引号、不要任何前缀：\n' + enText, 500);
     let t = (out || '').trim().replace(/^ZH\s*[:：]\s*/i, '');
     if (!t) return;
     const m = messages.find(x => x.mid === mid);
