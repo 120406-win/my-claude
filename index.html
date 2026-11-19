@@ -8157,6 +8157,7 @@ function scheduleCallSTT(delay) {
 }
 
 function startCallSTT() {
+  if (callListenMode === 'asr') return;
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { showToast('浏览器不支持语音识别'); return; }
   if (callSTTRunning) return;
@@ -8216,22 +8217,159 @@ function startCallSTT() {
   }, 20000);
 }
 
+// ══ 通话录音识别（MiMo ASR）：通话不再用浏览器自带识别 ══
+// iOS Safari 的 webkitSpeechRecognition 会话反复开关会被系统弄成假死
+// （麦克风亮着却不出结果），补丁救不回来。改成 StarHub 式的可替换识别层：
+// getUserMedia 持续录音 -> 能量检测自动断句 -> 拼成 16k WAV 发给 Worker
+// 的 /asr（MiMo 识别）转文字。他说话/思考期间输入门关着（半双工轮流说话）；
+// 拿不到麦克风或录音起不来时，自动回退到上面的浏览器识别。
+let callListenMode = '';   // '' | 'asr' | 'sr'
+let callRec = null;        // { ctx, stream, src, proc, chunks, pre, speaking, silenceMs, speechMs, busy }
+let callAsrErrAt = 0;
+
+function callInputOpen() {
+  return isCalling && callMicActive && !callTtsSpeaking && !callBusy;
+}
+function resampleTo16k(input, fromRate) {
+  if (fromRate === 16000) return input;
+  const ratio = fromRate / 16000;
+  const outLen = Math.max(1, Math.floor(input.length / ratio));
+  const out = new Float32Array(outLen);
+  for (let i = 0; i < outLen; i++) {
+    const pos = i * ratio, i0 = Math.floor(pos), frac = pos - i0;
+    const a = input[i0] || 0, b = (i0 + 1 < input.length) ? input[i0 + 1] : a;
+    out[i] = a + (b - a) * frac;
+  }
+  return out;
+}
+function encodeWav16k(samples) {
+  const n = samples.length, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  const wstr = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  wstr(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); wstr(8, 'WAVE'); wstr(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, 16000, true); v.setUint32(28, 32000, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  wstr(36, 'data'); v.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) { const s = Math.max(-1, Math.min(1, samples[i])); v.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true); }
+  return new Uint8Array(buf);
+}
+function bytesToB64(bytes) {
+  let bin = ''; const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return btoa(bin);
+}
+async function startCallListen() {
+  if (callListenMode) return callListenMode === 'asr';
+  let ctx = null;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) { ctx = new AC(); if (ctx.state === 'suspended') ctx.resume(); }
+  } catch(e) { ctx = null; }
+  try {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('no gum');
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    if (!isCalling) { stream.getTracks().forEach(t => t.stop()); if (ctx) { try { ctx.close(); } catch(e) {} } return false; }
+    if (!ctx) throw new Error('no ac');
+    if (ctx.state === 'suspended') { try { await ctx.resume(); } catch(e) {} }
+    const src = ctx.createMediaStreamSource(stream);
+    const proc = ctx.createScriptProcessor(4096, 1, 1);
+    const R = { ctx, stream, src, proc, chunks: [], pre: [], speaking: false, silenceMs: 0, speechMs: 0, busy: false };
+    proc.onaudioprocess = (e) => { callRecOnAudio(R, e.inputBuffer.getChannelData(0), ctx.sampleRate); };
+    src.connect(proc); proc.connect(ctx.destination);
+    callRec = R; callListenMode = 'asr';
+    setTimeout(() => {
+      if (callRec === R && R.ctx.state !== 'running') {
+        stopCallListen(); callListenMode = 'sr';
+        if (isCalling && callMicActive) { showToast('录音没启动起来，先用浏览器识别'); startCallSTT(); }
+      }
+    }, 800);
+    return true;
+  } catch(e) {
+    if (ctx) { try { ctx.close(); } catch(e2) {} }
+    callListenMode = 'sr';
+    return false;
+  }
+}
+function stopCallListen() {
+  if (callRec) {
+    try { callRec.proc.disconnect(); } catch(e) {}
+    try { callRec.src.disconnect(); } catch(e) {}
+    try { callRec.stream.getTracks().forEach(t => t.stop()); } catch(e) {}
+    try { callRec.ctx.close(); } catch(e) {}
+    callRec = null;
+  }
+  callListenMode = '';
+}
+function callRecOnAudio(R, data, rate) {
+  if (callRec !== R) return;
+  const buf = new Float32Array(data.length); buf.set(data);
+  const chunkMs = data.length / rate * 1000;
+  if (!callInputOpen() || R.busy) { R.speaking = false; R.chunks = []; R.pre = []; R.silenceMs = 0; R.speechMs = 0; return; }
+  let sum = 0; for (let i = 0; i < buf.length; i += 4) sum += buf[i] * buf[i];
+  const rms = Math.sqrt(sum / Math.max(1, buf.length / 4));
+  const TH = 0.02;
+  if (!R.speaking) {
+    R.pre.push(buf);
+    const maxPre = Math.max(2, Math.ceil(rate * 0.35 / buf.length));
+    while (R.pre.length > maxPre) R.pre.shift();
+    if (rms > TH) { R.speaking = true; R.chunks = R.pre.slice(); R.pre = []; R.speechMs = chunkMs; R.silenceMs = 0; }
+    return;
+  }
+  R.chunks.push(buf);
+  if (rms > TH) { R.speechMs += chunkMs; R.silenceMs = 0; } else { R.silenceMs += chunkMs; }
+  const totalMs = R.chunks.length * chunkMs;
+  if (totalMs >= 30000 || R.silenceMs >= 1100) {
+    const chunks = R.chunks, ok = R.speechMs >= 350;
+    R.chunks = []; R.speaking = false; R.silenceMs = 0; R.speechMs = 0;
+    if (ok) callRecSend(R, chunks, rate);
+  }
+}
+async function callRecSend(R, chunks, rate) {
+  R.busy = true; callBusy = true; callLastActivity = Date.now(); callHeartbeatCount = 0;
+  try {
+    let total = 0; for (const c of chunks) total += c.length;
+    const all = new Float32Array(total); let off = 0;
+    for (const c of chunks) { all.set(c, off); off += c.length; }
+    const wav = encodeWav16k(resampleTo16k(all, rate));
+    const url = (cfg.ttsUrl || '').replace(/\/+$/, '');
+    if (!url) throw new Error('no tts url');
+    const res = await fetch(url + '/asr', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: bytesToB64(wav), language: 'zh' }) });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
+    const text = data && data.text ? String(data.text).trim() : '';
+    if (text && isCalling) {
+      addTextMsg('user', text);
+      messages.push({ role: 'user', content: text, mid: genMid(), ts: Date.now() });
+      saveChatHistory();
+      const reply = await callAPI(text);
+      if (reply && isCalling) await speakText(reply);
+    }
+  } catch(e) {
+    const now = Date.now();
+    if (now - callAsrErrAt > 15000) { callAsrErrAt = now; showToast('语音识别失败：' + ((e && e.message) || e)); }
+  } finally {
+    R.busy = false; callBusy = false; callLastActivity = Date.now();
+  }
+}
+
 document.getElementById('callBtn').addEventListener('click',async()=>{
   unlockTtsAudio();
+  const listenReadyP = startCallListen();
   isCalling=true; document.getElementById('callModal').classList.add('show');
   callSeconds=0; callInterval=setInterval(()=>{callSeconds++;const m=String(Math.floor(callSeconds/60)).padStart(2,'0'),s=String(callSeconds%60).padStart(2,'0');document.getElementById('callTimer').textContent=`${m}:${s}`;},1000);
   callBusy = true;
   showTyping(); const reply=await callAPI('（糯糯拨打了语音通话，温柔打个招呼，简短一点）'); hideTyping();
   callBusy = false; callLastActivity = Date.now(); armCallHeartbeat();
   if(reply){ await speakText(reply); }
-  // 自动开启 STT（等他问候说完再开，识别和播放同时开会互相打死）
+  // 等他问候说完再开输入门（识别和播放同时开会互相打死）；
+  // 录音识别就绪就用它，没就绪才回退浏览器识别
   callMicActive = true;
-  startCallSTT();
+  const okAsr = await listenReadyP;
+  if (!okAsr && isCalling) startCallSTT();
 });
 document.getElementById('callHangBtn').addEventListener('click',()=>{
   isCalling=false; callMicActive=false; stopCallHeartbeat();
   clearTimeout(callSTTRestartTimer); clearTimeout(callSTTWatchdog); callTtsSpeaking = false; callSTTRunning = false;
-  callRecognition?.stop();
+  callRecognition?.stop(); stopCallListen();
   clearInterval(callInterval); speechSynthesis?.cancel(); try{ getTtsAudio().pause(); }catch(e){}
   document.getElementById('callModal').classList.remove('show');
   showToast(`通话结束 ${document.getElementById('callTimer').textContent}`);
@@ -8239,7 +8377,7 @@ document.getElementById('callHangBtn').addEventListener('click',()=>{
 // 通话中麦克风按钮 - 切换静音
 document.getElementById('callMicBtn').addEventListener('click',()=>{
   callMicActive = !callMicActive;
-  if(callMicActive){ startCallSTT(); document.getElementById('callMicBtn').innerHTML=ICON_MIC; }
+  if(callMicActive){ if (callListenMode !== 'asr') startCallSTT(); document.getElementById('callMicBtn').innerHTML=ICON_MIC; }
   else { callRecognition?.stop(); document.getElementById('callMicBtn').innerHTML=ICON_MIC_OFF; }
 });
 
