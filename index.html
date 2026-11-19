@@ -1686,6 +1686,19 @@
       <div style="font-size:11.5px;color:var(--text-pale);line-height:1.7;margin-top:7px;">书只存在你这台设备里（和本地歌曲一样），不会上传到任何地方；换设备需要重新导入。</div>
     </div>
     <div class="s-section">
+      <div class="s-section-title">在线书库 · 公版书</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <div style="font-size:12.5px;color:var(--text-dim);line-height:1.7;">没有文件也不怕：这里是互联网档案馆（archive.org）的公共版权书，点一下就下载进阅读器。版权期内的新书这里没有哦。</div>
+        <div id="libShelf" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <input id="libQuery" type="text" placeholder="搜书名或作者，如 红楼梦 / 鲁迅" style="flex:1;background:transparent;border:1px solid var(--border);border-radius:10px;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:10px 12px;">
+          <button onclick="searchLibrary()" style="padding:10px 16px;border-radius:10px;background:var(--accent);color:#fff;border:none;font-size:13px;cursor:pointer;">搜书库</button>
+        </div>
+        <div id="libStatus" style="font-size:12px;color:var(--text-pale);margin-top:8px;"></div>
+        <div id="libResults" style="margin-top:4px;"></div>
+      </div>
+    </div>
+    <div class="s-section">
       <div class="s-section-title">加一本想读的</div>
       <div class="s-card" style="padding:14px 16px;">
         <input id="rdTitle" type="text" placeholder="书名（输入后会自动从网上找）" oninput="onBookTitleInput(this.value)" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;padding:2px 0;">
@@ -4009,6 +4022,7 @@ function readCoverImg(r){
 }
 let readBusy = false, readFormFor = null, readFormRating = 0, readFormFeel = '', readFormPart = '';
 function renderReading(){
+  renderLibShelf();
   const list = loadReading();
   const pickWrap = document.getElementById('readPick');
   let pick = null;
@@ -4281,11 +4295,7 @@ async function onBookFileChosen(input){
       chapters = r.chapters; meta = r.meta;
     } else {
       kind = 'txt';
-      const buf = await file.arrayBuffer();
-      let text;
-      try{ text = new TextDecoder('utf-8', { fatal:true }).decode(buf); }
-      catch(e){ text = new TextDecoder('gbk').decode(buf); }
-      chapters = parseTxtToChapters(text);
+      chapters = parseTxtToChapters(parseTxtBuffer(await file.arrayBuffer()));
     }
     if(!chapters || !chapters.length) throw new Error('empty');
     const list = loadReading();
@@ -4307,6 +4317,122 @@ async function onBookFileChosen(input){
     showToast('这本书没搬进来 qwq 换个文件试试（支持 TXT / EPUB）');
   }
   bookAttachId = null;
+}
+function parseTxtBuffer(buf){
+  try{ return new TextDecoder('utf-8', { fatal:true }).decode(buf); }
+  catch(e){ return new TextDecoder('gbk').decode(buf); }
+}
+// ══ 在线书库：archive.org 公版书，搜一下点一下就进阅读器 ══
+const LIB_SHELF = [
+  { title:'朝花夕拾', author:'鲁迅', id:'pgcommunitytexts25271gut' },
+  { title:'红楼梦', author:'曹雪芹', id:'20210205_20210205_1123' },
+  { title:'西游记（上）', author:'吴承恩', id:'1980_20240422_202404' },
+  { title:'三国演义（上）', author:'罗贯中', id:'20240422_20240422_0535' },
+  { title:'三国演义（下）', author:'罗贯中', id:'20240422_20240422_0543' },
+  { title:'儒林外史', author:'吴敬梓', id:'pgcommunitytexts24032gut' }
+];
+let libResults = [];
+let libBusy = false;
+function pickBookFile(files){
+  const names = (files || []).map(f=>f && f.name).filter(Boolean);
+  const epub = names.find(n=>/\.epub$/i.test(n) && !/lending/i.test(n) && n.charAt(0) !== '_');
+  if(epub) return { name: epub, kind: 'epub' };
+  const djvu = names.find(n=>/_djvu\.txt$/i.test(n));
+  if(djvu) return { name: djvu, kind: 'txt' };
+  const txt = names.find(n=>/\.txt$/i.test(n) && n.charAt(0) !== '_' && !/_meta\.|_files\.|_scandata\./i.test(n));
+  if(txt) return { name: txt, kind: 'txt' };
+  return null;
+}
+function renderLibShelf(){
+  const box = document.getElementById('libShelf');
+  if(!box) return;
+  box.innerHTML = '';
+  LIB_SHELF.forEach(b=>{
+    const btn = document.createElement('button');
+    btn.style.cssText = 'padding:8px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12.5px;cursor:pointer;';
+    btn.textContent = '《' + b.title + '》' + (b.author ? ' · ' + b.author : '');
+    btn.onclick = ()=>libDownload(b.id, b.title, b.author, btn);
+    box.appendChild(btn);
+  });
+}
+async function libDownload(ident, title, author, btn){
+  if(libBusy) return;
+  const dup = loadReading().find(x=>x.title === title && x.local);
+  if(dup){ showToast('《' + title + '》已经在书架上啦，点开就能读'); return; }
+  libBusy = true;
+  const oldText = btn ? btn.textContent : '';
+  if(btn){ btn.textContent = '下载中…'; btn.disabled = true; }
+  try{
+    const metaRes = await fetch('https://archive.org/metadata/' + encodeURIComponent(ident));
+    if(!metaRes.ok) throw new Error('meta');
+    const meta = await metaRes.json();
+    const pick = pickBookFile(meta.files || []);
+    if(!pick){ showToast('这本在档案馆是借阅版，下不了全文 qwq 换一本试试'); return; }
+    const dlRes = await fetch('https://archive.org/download/' + encodeURIComponent(ident) + '/' + encodeURIComponent(pick.name));
+    if(!dlRes.ok) throw new Error('dl');
+    const buf = await dlRes.arrayBuffer();
+    let chapters, metaTitle = '', metaAuthor = '';
+    if(pick.kind === 'epub'){
+      const r = await parseEpubBuffer(buf);
+      chapters = r.chapters; metaTitle = r.meta.title || ''; metaAuthor = r.meta.author || '';
+    } else {
+      chapters = parseTxtToChapters(parseTxtBuffer(buf));
+    }
+    if(!chapters || !chapters.length) throw new Error('empty');
+    const list = loadReading();
+    const entry = { id:'r' + Date.now().toString(36) + Math.floor(Math.random()*999), title:(metaTitle || title || '未命名').slice(0, 80), author:metaAuthor || author || '', kind:'其他', by:'lumi', note:'从在线书库下载', cover:'https://archive.org/services/img/' + ident, status:'reading', ts:Date.now(), startedTs:Date.now(), local:true, fileKind:pick.kind, notes:[] };
+    list.unshift(entry);
+    await bookPut(entry.id, { chapters, kind:pick.kind, fileName:pick.name });
+    if(!storeReading(list)){ showToast('书下好了，但书单存不下 qwq'); return; }
+    renderReading();
+    showToast('《' + entry.title + '》下好啦，点开就能读');
+  }catch(e){
+    showToast('下载失败 qwq 网不太顺，待会儿再试一次');
+  }finally{
+    libBusy = false;
+    if(btn){ btn.textContent = oldText; btn.disabled = false; }
+  }
+}
+async function searchLibrary(){
+  const input = document.getElementById('libQuery');
+  const status = document.getElementById('libStatus');
+  const box = document.getElementById('libResults');
+  const q = (input.value || '').trim();
+  if(!q){ status.textContent = '先告诉我想找哪本书 ~'; return; }
+  status.textContent = '正在书库里翻找…';
+  box.innerHTML = '';
+  try{
+    const query = '(title:(' + q + ') OR creator:(' + q + ')) AND mediatype:texts';
+    const url = 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent(query) + '&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=creator&rows=20&output=json';
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('search');
+    const data = await res.json();
+    const docs = ((data.response && data.response.docs) || []).filter(d=>d.identifier && !/annas|fanqie/i.test(d.identifier));
+    libResults = docs;
+    if(!docs.length){ status.textContent = '书库里没找到这本 —— 它只收公共版权的书哦。'; return; }
+    status.textContent = '找到 ' + docs.length + ' 本，点「下载这本」就能读：';
+    docs.forEach((d, i)=>{
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);';
+      const info = document.createElement('div');
+      info.style.cssText = 'flex:1;min-width:0;';
+      const t = document.createElement('div');
+      t.style.cssText = 'font-size:13.5px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+      t.textContent = d.title || d.identifier;
+      const a = document.createElement('div');
+      a.style.cssText = 'font-size:11.5px;color:var(--text-pale);margin-top:2px;';
+      a.textContent = (Array.isArray(d.creator) ? d.creator.join('、') : (d.creator || '')) || '佚名';
+      info.appendChild(t); info.appendChild(a);
+      const btn = document.createElement('button');
+      btn.style.cssText = 'padding:7px 12px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;white-space:nowrap;';
+      btn.textContent = '下载这本';
+      btn.onclick = ()=>libDownload(d.identifier, d.title || '', Array.isArray(d.creator) ? d.creator[0] : (d.creator || ''), btn);
+      row.appendChild(info); row.appendChild(btn);
+      box.appendChild(row);
+    });
+  }catch(e){
+    status.textContent = '没连上书库 qwq 网不太顺，待会儿再试。';
+  }
 }
 // ══ 阅读器：按节读，进度自动记，点段落写批注 ══
 let readerState = null;
