@@ -928,13 +928,29 @@
           <input type="checkbox" id="webSearchToggle" onchange="toggleWebSearch(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
         </div>
         <div class="s-row">
+          <div class="s-row-label">搜索通道<div class="s-row-sub">Tavily 偏全球内容；博查（Bocha）是国内的 AI 搜索，中文和国内资讯更强。两个 Key 各填各的，随时切换。百度千帆的接口不允许网页直连（跨域限制），所以没法直接用百度，博查就是它的平替。</div></div>
+          <select id="searchProviderSel" onchange="setSearchProvider(this.value)" style="flex-shrink:0;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);font-size:13px;">
+            <option value="tavily">Tavily</option>
+            <option value="bocha">博查 Bocha</option>
+          </select>
+        </div>
+        <div class="s-row">
           <div>
-            <div class="s-row-label">搜索 API Key（Tavily）</div>
-            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;line-height:1.6;">去 tavily.com 免费注册就有一个（每月 1000 次，不用绑卡），或者把你在 Kelivo 里配过的 Tavily Key 填进来也行。只存在这台设备上，不进备份导出。</div>
+            <div class="s-row-label">Tavily Key</div>
+            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;line-height:1.6;">tavily.com 免费注册就有（每月 1000 次，不用绑卡）。只存在这台设备上，不进备份导出。</div>
           </div>
         </div>
         <div style="padding:0 16px 14px;">
           <input class="s-input" type="password" id="searchKey" placeholder="tvly-..." onchange="saveSearchKey(this.value)" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div class="s-row">
+          <div>
+            <div class="s-row-label">博查 Key</div>
+            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;line-height:1.6;">去 bochaai.com 开放平台用手机号注册，在控制台创建 API Key 填进来。注册有免费体验额度，之后按量计费也很便宜。</div>
+          </div>
+        </div>
+        <div style="padding:0 16px 14px;">
+          <input class="s-input" type="password" id="bochaKey" placeholder="sk-..." onchange="saveBochaKey(this.value)" style="width:100%;box-sizing:border-box;">
         </div>
       </div>
     </div>
@@ -1972,6 +1988,10 @@ function loadSettings(){
   if(wt) wt.checked = webSearchEnabled();
   const sk=document.getElementById('searchKey');
   if(sk) sk.value = localStorage.getItem('z_searchKey') || '';
+  const bk=document.getElementById('bochaKey');
+  if(bk) bk.value = localStorage.getItem('z_bochaKey') || '';
+  const sp=document.getElementById('searchProviderSel');
+  if(sp) sp.value = searchProvider();
 
   applyTheme(cfg.theme);
 }
@@ -2830,7 +2850,7 @@ function exportData(){
   const data = {};
   for(let i = 0; i < localStorage.length; i++){
     const k = localStorage.key(i);
-    if(k && k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey') data[k] = localStorage.getItem(k);
+    if(k && k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey' && k !== 'z_bochaKey') data[k] = localStorage.getItem(k);
   }
   const payload = JSON.stringify({ app:'zephyr', version:1, exportedAt:new Date().toISOString(), data }, null, 2);
   const blob = new Blob([payload], { type:'application/json' });
@@ -2854,7 +2874,7 @@ function importDataFile(input){
       const obj = JSON.parse(reader.result);
       if(!obj || obj.app !== 'zephyr' || !obj.data || typeof obj.data !== 'object') throw new Error('bad file');
       if(!confirm('导入会用备份覆盖当前全部数据（对话、记忆、日记、愿望、信件、设置），确定继续吗？')) return;
-      Object.keys(obj.data).forEach(k=>{ if(k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey') localStorage.setItem(k, obj.data[k]); });
+      Object.keys(obj.data).forEach(k=>{ if(k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey' && k !== 'z_bochaKey') localStorage.setItem(k, obj.data[k]); });
       showToast('恢复完成，正在刷新 ~');
       setTimeout(()=>location.reload(), 600);
     }catch(e){
@@ -5327,11 +5347,12 @@ function addWallCustom(){
 // ══ 思考过程（Extended Thinking）：开关在设置页；思考内容显示在回复上方的小块里，可折叠 ══
 function thinkingEnabled(){ return localStorage.getItem('z_thinking') === 'true'; }
 function toggleThinking(on){ localStorage.setItem('z_thinking', on ? 'true' : 'false'); showToast(on ? '思考过程已开启，Zephyr 回复会变慢一点' : '思考过程已关闭'); }
-// ══ 联网搜索（官方 web_search 工具）：开关在设置页；搜索在接口服务端执行，回复下方附来源 ══
+// ══ 联网搜索（客户端 search_web 工具）：开关在设置页；App 执行搜索（Tavily / 博查）再回喂，回复下方附来源 ══
 function webSearchEnabled(){ return localStorage.getItem('z_webSearch') === 'true'; }
 function toggleWebSearch(on){
   localStorage.setItem('z_webSearch', on ? 'true' : 'false');
-  if(on && !(localStorage.getItem('z_searchKey') || '').trim()) showToast('联网搜索已开启，还差一个 Tavily 的 Key，填在下面就能搜啦');
+  const activeKey = searchProvider() === 'bocha' ? (localStorage.getItem('z_bochaKey') || '') : (localStorage.getItem('z_searchKey') || '');
+  if(on && !activeKey.trim()) showToast('联网搜索已开启，还差当前通道的 Key，填在下面就能搜啦');
   else showToast(on ? '联网搜索已开启，Zephyr 可以上网查东西啦' : '联网搜索已关闭');
 }
 function saveSearchKey(v){
@@ -5344,20 +5365,44 @@ const SEARCH_WEB_TOOL = {
   description:'联网搜索：查最新消息、实时信息和你不确定的事实。需要核实、或想了解近期发生的事时调用它；查询词用简洁的关键词，可以多次调用、换关键词或换一种语言再搜。',
   input_schema:{ type:'object', properties:{ query:{ type:'string', description:'搜索关键词' } }, required:['query'] }
 };
+function searchProvider(){ return localStorage.getItem('z_searchProvider') === 'bocha' ? 'bocha' : 'tavily'; }
+function setSearchProvider(p){
+  localStorage.setItem('z_searchProvider', p === 'bocha' ? 'bocha' : 'tavily');
+  showToast(p === 'bocha' ? '搜索通道已切换到博查（国内内容更强）' : '搜索通道已切换到 Tavily');
+}
+function saveBochaKey(v){
+  localStorage.setItem('z_bochaKey', (v || '').trim());
+  showToast('博查 Key 已保存，只存在这台设备上');
+}
 async function executeWebSearch(query){
   const q = String(query || '').trim();
   if(!q) return { error:'查询词是空的', items:[] };
-  const key = (localStorage.getItem('z_searchKey') || '').trim();
-  if(!key) return { error:'搜索服务还没配置 Key', items:[] };
   try{
-    const res = await fetch('https://api.tavily.com/search', {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + key },
-      body: JSON.stringify({ query:q, max_results:5, search_depth:'basic' })
-    });
-    if(!res.ok) return { error:'搜索服务返回了 ' + res.status, items:[] };
-    const data = await res.json();
-    const items = (data.results || []).slice(0, 5).map((r,i)=>({ index:i + 1, title:String(r.title || '').slice(0, 120), url:r.url || '', text:String(r.content || '').slice(0, 600) }));
+    let items = [];
+    if(searchProvider() === 'bocha'){
+      const key = (localStorage.getItem('z_bochaKey') || '').trim();
+      if(!key) return { error:'博查的 Key 还没配置', items:[] };
+      const res = await fetch('https://api.bochaai.com/v1/web-search', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + key },
+        body: JSON.stringify({ query:q, summary:true, count:5, freshness:'noLimit' })
+      });
+      if(!res.ok) return { error:'博查返回了 ' + res.status, items:[] };
+      const data = await res.json();
+      const list = (data && data.data && data.data.webPages && Array.isArray(data.data.webPages.value)) ? data.data.webPages.value : [];
+      items = list.slice(0, 5).map((r,i)=>({ index:i + 1, title:String(r.name || '').slice(0, 120), url:r.url || '', text:String(r.summary || r.snippet || '').slice(0, 600) }));
+    } else {
+      const key = (localStorage.getItem('z_searchKey') || '').trim();
+      if(!key) return { error:'Tavily 的 Key 还没配置', items:[] };
+      const res = await fetch('https://api.tavily.com/search', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + key },
+        body: JSON.stringify({ query:q, max_results:5, search_depth:'basic' })
+      });
+      if(!res.ok) return { error:'Tavily 返回了 ' + res.status, items:[] };
+      const data = await res.json();
+      items = (data.results || []).slice(0, 5).map((r,i)=>({ index:i + 1, title:String(r.title || '').slice(0, 120), url:r.url || '', text:String(r.content || '').slice(0, 600) }));
+    }
     if(!items.length) return { error:'没有搜到结果', items:[] };
     return { items };
   }catch(e){
