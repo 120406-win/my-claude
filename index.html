@@ -620,7 +620,7 @@
     .img-preview img { max-width:95vw; max-height:95vh; border-radius:8px; }
 
     /* Toast */
-    .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(82,84,212,0.9); color:white; padding:8px 20px; border-radius:20px; font-size:14px; z-index:500; pointer-events:none; white-space:nowrap; }
+    .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:var(--accent); background:color-mix(in srgb, var(--accent) 92%, transparent); color:white; padding:8px 20px; border-radius:20px; font-size:14px; z-index:500; pointer-events:none; white-space:nowrap; box-shadow:0 8px 24px color-mix(in srgb, var(--accent) 35%, transparent); }
     /* ══ Home 首页：星空 App 首页，配色全部跟随主题（星星是主题色的小星尘） ══ */
     #homePage { background:linear-gradient(180deg, color-mix(in srgb, var(--bg) 84%, var(--accent) 16%) 0%, var(--bg) 55%, color-mix(in srgb, var(--bg) 90%, var(--accent) 10%) 100%); color:var(--text); }
     .home-stars { position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:0; opacity:.5; }
