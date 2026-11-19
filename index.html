@@ -8746,7 +8746,7 @@ async function speakText(text){
   }
   // 通话里是半双工：他开口前先把语音识别停掉。iOS 上识别和扬声器播放抢
   // 同一个音频会话，两边同时开识别会直接死掉；他说完再由 finishSpeak 接回来。
-  const inCall = !!isCalling;
+  const inCall = !!(isCalling || isVideo); // 视频通话同样半双工：他出声时先关输入门，免得扬声器把他的声音录回去
   if (inCall) {
     callTtsSpeaking = true;
     clearTimeout(callSTTRestartTimer);
@@ -9255,7 +9255,10 @@ let callRec = null;        // { ctx, stream, src, proc, chunks, pre, speaking, s
 let callAsrErrAt = 0;
 
 function callInputOpen() {
-  return isCalling && callMicActive && !callTtsSpeaking && !callBusy;
+  if (callTtsSpeaking || callBusy) return false;
+  if (isCalling) return callMicActive;
+  if (isVideo) return vMicOn;
+  return false;
 }
 function resampleTo16k(input, fromRate) {
   if (fromRate === 16000) return input;
@@ -9293,26 +9296,30 @@ async function startCallListen() {
   } catch(e) { ctx = null; }
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('no gum');
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
-    if (!isCalling) { stream.getTracks().forEach(t => t.stop()); if (ctx) { try { ctx.close(); } catch(e) {} } return false; }
+    // 视频通话直接借摄像头那路流里的麦克风（borrowed），不再另开一个麦克风
+    let stream = null, borrowed = false;
+    if (isVideo && localStream && localStream.getAudioTracks && localStream.getAudioTracks().length) { stream = localStream; borrowed = true; }
+    else stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    if (!isCalling && !isVideo) { if (!borrowed) stream.getTracks().forEach(t => t.stop()); if (ctx) { try { ctx.close(); } catch(e) {} } return false; }
     if (!ctx) throw new Error('no ac');
     if (ctx.state === 'suspended') { try { await ctx.resume(); } catch(e) {} }
     const src = ctx.createMediaStreamSource(stream);
     const proc = ctx.createScriptProcessor(4096, 1, 1);
-    const R = { ctx, stream, src, proc, chunks: [], pre: [], speaking: false, silenceMs: 0, speechMs: 0, busy: false };
+    const R = { ctx, stream, src, proc, chunks: [], pre: [], speaking: false, silenceMs: 0, speechMs: 0, busy: false, borrowed };
     proc.onaudioprocess = (e) => { callRecOnAudio(R, e.inputBuffer.getChannelData(0), ctx.sampleRate); };
     src.connect(proc); proc.connect(ctx.destination);
     callRec = R; callListenMode = 'asr';
     setTimeout(() => {
       if (callRec === R && R.ctx.state !== 'running') {
-        stopCallListen(); callListenMode = 'sr';
-        if (isCalling && callMicActive) { showToast('录音没启动起来，先用浏览器识别'); startCallSTT(); }
+        stopCallListen();
+        if (isVideo) { showToast('录音没启动起来，视频里先听不见你说话'); }
+        else { callListenMode = 'sr'; if (isCalling && callMicActive) { showToast('录音没启动起来，先用浏览器识别'); startCallSTT(); } }
       }
     }, 800);
     return true;
   } catch(e) {
     if (ctx) { try { ctx.close(); } catch(e2) {} }
-    callListenMode = 'sr';
+    callListenMode = isVideo ? '' : 'sr';
     return false;
   }
 }
@@ -9320,7 +9327,7 @@ function stopCallListen() {
   if (callRec) {
     try { callRec.proc.disconnect(); } catch(e) {}
     try { callRec.src.disconnect(); } catch(e) {}
-    try { callRec.stream.getTracks().forEach(t => t.stop()); } catch(e) {}
+    try { if (!callRec.borrowed) callRec.stream.getTracks().forEach(t => t.stop()); } catch(e) {}
     try { callRec.ctx.close(); } catch(e) {}
     callRec = null;
   }
@@ -9363,7 +9370,7 @@ async function callRecSend(R, chunks, rate) {
     const data = await res.json().catch(() => null);
     if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
     const text = data && data.text ? String(data.text).trim() : '';
-    if (text && isCalling) {
+    if (text && (isCalling || isVideo)) {
       // 与浏览器识别版 onresult 完全同款：callAPI 自己负责把这句存进对话，
       // 这里只管显示气泡（pendingUserMid 让 callAPI 用同一个 mid 存档）
       const sttMid = genMsgId(); pendingUserMid = sttMid;
@@ -9373,7 +9380,7 @@ async function callRecSend(R, chunks, rate) {
       let reply = null;
       try { reply = await callAPI(text); } catch(e2) {}
       hideTyping(); headerSub.textContent = '通话中';
-      if (reply && isCalling) await speakText(reply);
+      if (reply && (isCalling || isVideo)) await speakText(reply);
     }
   } catch(e) {
     const now = Date.now();
@@ -9515,15 +9522,19 @@ document.getElementById('videoBtn').addEventListener('click',async()=>{
   unlockTtsAudio();
   try { localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); document.getElementById('localVideo').srcObject=localStream; } catch(e){ showToast('无法访问摄像头'); }
   isVideo=true; videoConnected=false; document.getElementById('videoModal').classList.add('show');
+  const listenReadyP = startCallListen();
   videoSeconds=0; videoInterval=setInterval(()=>{videoSeconds++;const m=String(Math.floor(videoSeconds/60)).padStart(2,'0'),s=String(videoSeconds%60).padStart(2,'0');document.getElementById('videoTimer').textContent=`${m}:${s}`;document.getElementById('videoMiniTimer').textContent=`${m}:${s}`;},1000);
   callBusy = true;
   showTyping(); const reply=await callAPI('（糯糯拨打了视频通话，温柔打个招呼，简短）'); hideTyping();
   callBusy = false; callLastActivity = Date.now(); armCallHeartbeat();
+  if(reply){ await speakText(reply); }
+  // 问候说完才算接通；聆听就绪后他就能听见你说话（借摄像头那路麦克风做录音识别）
   videoConnected = true;
-  if(reply){speakText(reply);}
+  const okAsr = await listenReadyP;
+  if (!okAsr && isVideo) showToast('没能打开麦克风识别，视频里先听不见你说话');
 });
 document.getElementById('vHangBtn').addEventListener('click',()=>{
-  isVideo=false; stopCallHeartbeat(); clearInterval(videoInterval); speechSynthesis?.cancel(); try{ getTtsAudio().pause(); }catch(e){}
+  isVideo=false; stopCallHeartbeat(); clearTimeout(callSTTRestartTimer); callTtsSpeaking = false; callBusy = false; stopCallListen(); clearInterval(videoInterval); speechSynthesis?.cancel(); try{ getTtsAudio().pause(); }catch(e){}
   addCallRecord('video', videoSeconds, !videoConnected);
   hideCallMini('video'); videoConnected = false;
   localStream?.getTracks().forEach(t=>t.stop()); document.getElementById('localVideo').srcObject=null;
