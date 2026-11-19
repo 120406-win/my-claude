@@ -866,6 +866,9 @@
     <div class="nav-item" id="nav-discover" onclick="navTo('discover')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M15.5 8.5l-2.1 4.9-4.9 2.1 2.1-4.9z"/></svg></span> Discoveries
     </div>
+    <div class="nav-item" id="nav-games" onclick="navTo('games')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4.5h12l-2.5 3.8L17 12H5"/></svg></span> 一起玩
+    </div>
   </div>
 </div>
 
@@ -1594,6 +1597,48 @@
   </div>
 </div>
 
+<div class="settings-page" id="gamesPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="settings-topbar-title">一起玩</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">不用赶进度、没有每日对局，就是想玩的时候和他玩两把。输赢都会记在小本本上。</div>
+    <div class="s-section">
+      <div class="s-section-title">成语接龙</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <div id="chengyuStatus" style="font-size:13px;color:var(--text-dim);line-height:1.7;"></div>
+        <div id="chengyuChain" style="margin-top:10px;line-height:2;"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <input id="chengyuInput" type="text" placeholder="输入一个成语…" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:14px;font-family:inherit;outline:none;">
+          <button id="chengyuBtn" onclick="playChengyu()" style="padding:11px 18px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:14px;cursor:pointer;">接！</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button onclick="zephyrStartChengyu()" style="flex:1;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:12.5px;cursor:pointer;">让 Zephyr 先出</button>
+          <button onclick="giveUpChengyu()" style="flex:1;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:12.5px;cursor:pointer;">我认输</button>
+          <button onclick="resetChengyu()" style="flex:1;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:12.5px;cursor:pointer;">重新开始</button>
+        </div>
+        <div id="chengyuRecord" style="font-size:11.5px;color:var(--text-pale);margin-top:10px;"></div>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">数字炸弹</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <div id="bombStatus" style="font-size:13px;color:var(--text-dim);line-height:1.7;"></div>
+        <div id="bombLog" style="margin-top:8px;font-size:12.5px;color:var(--text-dim);line-height:1.9;"></div>
+        <div style="display:flex;gap:8px;margin-top:12px;">
+          <input id="bombInput" type="number" min="1" max="100" placeholder="猜一个数字…" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:14px;font-family:inherit;outline:none;">
+          <button id="bombBtn" onclick="playBomb()" style="padding:11px 18px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:14px;cursor:pointer;">猜！</button>
+        </div>
+        <div style="margin-top:10px;">
+          <button onclick="resetBomb()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:12.5px;cursor:pointer;">重新开始（换一颗炸弹）</button>
+        </div>
+        <div id="bombRecord" style="font-size:11.5px;color:var(--text-pale);margin-top:10px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="settings-page" id="readingPage">
   <div class="settings-topbar">
     <button class="back-btn" onclick="goBack()">←</button>
@@ -2136,6 +2181,7 @@ function navTo(page){
   document.getElementById('capsulePage').classList.toggle('show', page==='capsule');
   document.getElementById('collectPage').classList.toggle('show', page==='collect');
   document.getElementById('discoverPage').classList.toggle('show', page==='discover');
+  document.getElementById('gamesPage').classList.toggle('show', page==='games');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   if(page==='settings') loadSettings();
@@ -2155,6 +2201,7 @@ function navTo(page){
   if(page==='capsule') renderCapsules();
   if(page==='collect') renderCollections();
   if(page==='discover') renderDiscoveries();
+  if(page==='games') renderGames();
   if(page==='home') renderHome();
 }
 
@@ -5415,6 +5462,169 @@ async function askZephyrDiscovery(){
     btn.disabled = false;
   }
 }
+// ══ 一起玩 Games：成语接龙 + 数字炸弹，和 Zephyr 轮流玩，输赢记在小本本上 ══
+let gameBusy = false;
+function loadGameRecords(){ try{ const o = JSON.parse(localStorage.getItem('z_game_records')||'{}'); return o && typeof o === 'object' ? o : {}; }catch(e){ return {}; } }
+function saveGameRecords(r){ try{ localStorage.setItem('z_game_records', JSON.stringify(r)); }catch(e){} }
+function loadChengyu(){ try{ const o = JSON.parse(localStorage.getItem('z_chengyu_game')||'null'); return o && Array.isArray(o.chain) ? o : { chain:[], over:false, msg:'' }; }catch(e){ return { chain:[], over:false, msg:'' }; } }
+function saveChengyu(g){ try{ localStorage.setItem('z_chengyu_game', JSON.stringify(g)); }catch(e){} }
+function loadBomb(){ try{ const o = JSON.parse(localStorage.getItem('z_bomb_game')||'null'); return o && typeof o.bomb === 'number' ? o : null; }catch(e){ return null; } }
+function saveBomb(g){ try{ localStorage.setItem('z_bomb_game', JSON.stringify(g)); }catch(e){} }
+function newBombGame(){ return { bomb:1 + Math.floor(Math.random()*100), lo:1, hi:100, over:false, msg:'', log:[] }; }
+function renderGames(){ renderChengyu(); renderBomb(); }
+function renderChengyu(){
+  const st = document.getElementById('chengyuStatus');
+  if(!st) return;
+  const g = loadChengyu();
+  const rec = loadGameRecords();
+  const chainBox = document.getElementById('chengyuChain');
+  chainBox.innerHTML = g.chain.length ? g.chain.map((w,i)=>'<span style="display:inline-block;padding:3px 10px;margin:0 6px 6px 0;border-radius:999px;background:var(--surface);border:1px solid var(--border);font-size:13px;color:' + (i % 2 ? 'var(--accent-s)' : 'var(--text)') + ';">' + escapeHtml(w) + '</span>').join('') : '<span style="font-size:12.5px;color:var(--text-pale);">还没有开始，你先出一个成语，或者让他先出。</span>';
+  if(g.over) st.innerHTML = g.msg;
+  else if(!g.chain.length) st.textContent = '规则：后一个成语的第一个字，要接上一个成语的最后一个字。谁接不上谁输。';
+  else st.textContent = '轮到糯糯啦：用「' + g.chain[g.chain.length-1].slice(-1) + '」开头的成语接下去（已经接了 ' + g.chain.length + ' 个）。';
+  document.getElementById('chengyuRecord').textContent = '最佳纪录：一次接了 ' + (rec.chengyuBest || 0) + ' 个 · 糯糯赢 ' + (rec.chengyuLumiWin || 0) + ' 次 · Zephyr 赢 ' + (rec.chengyuZephyrWin || 0) + ' 次';
+}
+function chengyuWordOk(w, chain){
+  if(!w || w.length < 2 || w.length > 8) return '成语要 2 到 8 个字哦';
+  if(!/^[一-龥]+$/.test(w)) return '要用中文成语哦';
+  if(chain.includes(w)) return '这个成语已经用过啦';
+  if(chain.length && w[0] !== chain[chain.length-1].slice(-1)) return '要接上一个的最后一个字「' + chain[chain.length-1].slice(-1) + '」开头';
+  return '';
+}
+function finishChengyu(winner, msg){
+  const g = loadChengyu();
+  g.over = true; g.msg = msg;
+  saveChengyu(g);
+  const rec = loadGameRecords();
+  if(g.chain.length > (rec.chengyuBest || 0)) rec.chengyuBest = g.chain.length;
+  if(winner === 'lumi') rec.chengyuLumiWin = (rec.chengyuLumiWin || 0) + 1;
+  if(winner === 'zephyr') rec.chengyuZephyrWin = (rec.chengyuZephyrWin || 0) + 1;
+  saveGameRecords(rec);
+  renderChengyu();
+}
+async function zephyrChengyuTurn(){
+  const g = loadChengyu();
+  const need = g.chain[g.chain.length-1].slice(-1);
+  const out = await musicAskZephyr('【成语接龙】\n现在的接龙是：' + g.chain.join(' → ') + '\n\n轮到你了：请给出一个以「' + need + '」开头的成语，不能和链里已有的重复。只输出一个 JSON 对象 {"word": "成语"}；如果你实在想不出，就输出 {"giveup": true}。不要输出 JSON 以外的任何文字。', 200);
+  const obj = parseZephyrJson(out);
+  if(!obj || obj.giveup || !obj.word) return { ok:false, why:'giveup' };
+  const w = String(obj.word).trim();
+  const err = chengyuWordOk(w, g.chain);
+  if(err) return { ok:false, why:'invalid', word:w };
+  return { ok:true, word:w };
+}
+async function playChengyu(){
+  if(gameBusy) return;
+  const g = loadChengyu();
+  if(g.over){ showToast('这一局结束啦，点重新开始再来'); return; }
+  const input = document.getElementById('chengyuInput');
+  const w = input.value.trim();
+  const err = chengyuWordOk(w, g.chain);
+  if(err){ showToast(err); return; }
+  g.chain.push(w);
+  saveChengyu(g);
+  input.value = '';
+  renderChengyu();
+  gameBusy = true;
+  const btn = document.getElementById('chengyuBtn');
+  const old = btn.textContent; btn.textContent = '想…'; btn.disabled = true;
+  try{
+    const r = await zephyrChengyuTurn();
+    if(r.ok){
+      const g2 = loadChengyu();
+      g2.chain.push(r.word);
+      saveChengyu(g2);
+      renderChengyu();
+    } else {
+      finishChengyu('lumi', r.why === 'invalid' ? 'Zephyr 接的「' + escapeHtml(r.word || '') + '」不合规矩，这一局糯糯赢啦 ★' : 'Zephyr 挠头认输啦，这一局糯糯赢 ★ 一共接了 ' + loadChengyu().chain.length + ' 个。');
+    }
+  }catch(e){
+    showToast('Zephyr 那边卡了一下，你的词已经记上，再点一次接龙继续');
+  }finally{
+    gameBusy = false; btn.textContent = old; btn.disabled = false;
+  }
+}
+async function zephyrStartChengyu(){
+  if(gameBusy) return;
+  const g = loadChengyu();
+  if(g.chain.length && !g.over){ showToast('这一局已经开始啦'); return; }
+  gameBusy = true;
+  try{
+    const out = await musicAskZephyr('【成语接龙】\n新开一局成语接龙，你先出第一个成语。只输出一个 JSON 对象 {"word": "成语"}，不要输出 JSON 以外的任何文字。', 200);
+    const obj = parseZephyrJson(out);
+    const w = obj && obj.word ? String(obj.word).trim() : '';
+    if(!w || chengyuWordOk(w, [])){ showToast('Zephyr 没出好，再喊他一次'); return; }
+    saveChengyu({ chain:[w], over:false, msg:'' });
+    renderChengyu();
+  }catch(e){ showToast('没开成局，待会儿再试 qwq'); }
+  finally{ gameBusy = false; }
+}
+function giveUpChengyu(){
+  const g = loadChengyu();
+  if(g.over || !g.chain.length){ showToast('还没开始呢'); return; }
+  finishChengyu('zephyr', '糯糯认输啦，这一局 Zephyr 赢。一共接了 ' + g.chain.length + ' 个，已经很厉害了。');
+}
+function resetChengyu(){ saveChengyu({ chain:[], over:false, msg:'' }); renderChengyu(); showToast('新的一局，糯糯先出吧'); }
+function renderBomb(){
+  const st = document.getElementById('bombStatus');
+  if(!st) return;
+  let g = loadBomb();
+  if(!g){ g = newBombGame(); saveBomb(g); }
+  const rec = loadGameRecords();
+  document.getElementById('bombLog').innerHTML = g.log.map(l=>escapeHtml(l)).join('<br>');
+  if(g.over) st.innerHTML = g.msg || '';
+  else st.textContent = '1 到 100 之间藏着一颗炸弹，现在的范围是 ' + g.lo + ' – ' + g.hi + '。轮流猜，谁猜中谁输——糯糯先猜。';
+  document.getElementById('bombRecord').textContent = '战绩：糯糯赢 ' + (rec.bombLumiWin || 0) + ' 次 · Zephyr 赢 ' + (rec.bombZephyrWin || 0) + ' 次（赢 = 对方踩中炸弹）';
+}
+function bombNarrow(g, n){
+  if(n < g.bomb) g.lo = Math.max(g.lo, n + 1); else g.hi = Math.min(g.hi, n - 1);
+}
+function finishBomb(loser){
+  const g = loadBomb();
+  if(!g) return;
+  g.over = true;
+  g.msg = loser === 'lumi' ? '砰！糯糯猜中了 ' + g.bomb + '，炸弹在你手里爆炸啦，这一局 Zephyr 赢。' : '砰！Zephyr 猜中了 ' + g.bomb + '，炸弹在他那边爆炸啦，这一局糯糯赢 ★';
+  saveBomb(g);
+  const rec = loadGameRecords();
+  if(loser === 'lumi') rec.bombZephyrWin = (rec.bombZephyrWin || 0) + 1; else rec.bombLumiWin = (rec.bombLumiWin || 0) + 1;
+  saveGameRecords(rec);
+  renderBomb();
+}
+async function playBomb(){
+  if(gameBusy) return;
+  let g = loadBomb();
+  if(!g){ g = newBombGame(); saveBomb(g); }
+  if(g.over){ showToast('这一局结束啦，点重新开始换一颗炸弹'); return; }
+  const input = document.getElementById('bombInput');
+  const n = parseInt(input.value, 10);
+  if(!n || n < g.lo || n > g.hi){ showToast('在现在的范围 ' + g.lo + ' – ' + g.hi + ' 里猜一个数字哦'); return; }
+  input.value = '';
+  if(n === g.bomb){ g.log.push('糯糯猜了 ' + n + ' —— 砰！'); saveBomb(g); finishBomb('lumi'); return; }
+  bombNarrow(g, n);
+  g.log.push('糯糯猜了 ' + n + '，没中。范围缩小到 ' + g.lo + ' – ' + g.hi + '。');
+  saveBomb(g);
+  renderBomb();
+  gameBusy = true;
+  const btn = document.getElementById('bombBtn');
+  const old = btn.textContent; btn.textContent = '想…'; btn.disabled = true;
+  try{
+    const out = await musicAskZephyr('【数字炸弹】\n1 到 100 之间有一颗炸弹，现在的范围是 ' + g.lo + ' – ' + g.hi + '（炸弹一定在这个范围内）。猜中炸弹的人输。轮到你猜：只输出一个 JSON 对象 {"guess": 数字}，数字要在范围内。不要输出 JSON 以外的任何文字。', 200);
+    const obj = parseZephyrJson(out);
+    let zg = obj && typeof obj.guess === 'number' ? Math.round(obj.guess) : NaN;
+    if(!zg || zg < g.lo || zg > g.hi) zg = Math.floor((g.lo + g.hi) / 2);
+    const g2 = loadBomb();
+    if(zg === g2.bomb){ g2.log.push('Zephyr 猜了 ' + zg + ' —— 砰！'); saveBomb(g2); finishBomb('zephyr'); return; }
+    bombNarrow(g2, zg);
+    g2.log.push('Zephyr 猜了 ' + zg + '，没中。范围缩小到 ' + g2.lo + ' – ' + g2.hi + '。');
+    saveBomb(g2);
+    renderBomb();
+  }catch(e){
+    showToast('Zephyr 那边卡了一下，你的猜测已经记上，再猜一次继续');
+  }finally{
+    gameBusy = false; btn.textContent = old; btn.disabled = false;
+  }
+}
+function resetBomb(){ saveBomb(newBombGame()); renderBomb(); showToast('新炸弹埋好啦，糯糯先猜'); }
 // ══ 时间胶囊 Time Capsule：封存给未来的信/话/愿望/回忆/照片，到日子一起打开 ══
 let pendingCapsuleImg = null;
 function loadCapsules(){ try{ const a = JSON.parse(localStorage.getItem('z_capsules')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
