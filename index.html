@@ -3845,6 +3845,10 @@ function exportData(){
   }
   // 对话存在 IndexedDB 大仓库里，localStorage 里没有，单独带上，备份才完整
   try{ data['z_conversations'] = JSON.stringify(conversations); }catch(e){}
+  // 相册、表情包、时间胶囊也在大仓库里，同样单独带上
+  try{ data['z_gallery'] = JSON.stringify(loadGallery()); }catch(e){}
+  try{ data['z_stickers'] = JSON.stringify(loadStickers()); }catch(e){}
+  try{ data['z_capsules'] = JSON.stringify(loadCapsules()); }catch(e){}
   const payload = JSON.stringify({ app:'zephyr', version:1, exportedAt:new Date().toISOString(), data }, null, 2);
   const blob = new Blob([payload], { type:'application/json' });
   const a = document.createElement('a');
@@ -4022,8 +4026,8 @@ function addEvent(){
 
 // ══ Gallery：属于我们的相册。照片压缩后存本地，点开可看大图 ══
 let pendingGalleryImg = null;
-function loadGallery(){ try{ const a = JSON.parse(localStorage.getItem('z_gallery')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
-function storeGallery(list){ try{ localStorage.setItem('z_gallery', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间满了，这张存不下 qwq 先导出备份或删几张旧的'); return false; } }
+function loadGallery(){ try{ const a = JSON.parse(mediaGet('z_gallery')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeGallery(list){ return mediaSet('z_gallery', JSON.stringify(list), '存储空间满了，这张存不下 qwq 先导出备份或删几张旧的'); }
 function pickGalleryPhoto(input){
   const file = input.files && input.files[0];
   input.value = '';
@@ -7011,6 +7015,37 @@ function convStoreSave(json){
     catch(e) { showToast('存储空间已满，请删除一些旧对话'); }
   }
 }
+// ══ 媒体存储层：相册、表情包、时间胶囊都带照片，最占地方，也搬进同一个大仓库 ══
+// 规则与对话一致：启动时 localStorage 里还有旧数据（旧版数据或刚导入恢复的备份），以它为准，
+// 搬进 IDB 后删本地副本；平时读内存快照、写穿到 IDB；IDB 不可用时回退 localStorage。
+const MEDIA_KEYS = ['z_gallery', 'z_stickers', 'z_capsules'];
+let mediaSnapshot = {};
+async function mediaStorePrepare(){
+  if(!convDb) return;
+  for(const k of MEDIA_KEYS){
+    const legacy = localStorage.getItem(k);
+    if(legacy != null){
+      await convIdbPut(k, legacy);
+      mediaSnapshot[k] = legacy;
+      try{ localStorage.removeItem(k); }catch(e){}
+    } else {
+      mediaSnapshot[k] = await convIdbGet(k);
+    }
+  }
+}
+function mediaGet(key){
+  if(convDb && mediaSnapshot[key] != null) return mediaSnapshot[key];
+  try{ return localStorage.getItem(key); }catch(e){ return null; }
+}
+function mediaSet(key, json, failMsg){
+  if(convDb){
+    mediaSnapshot[key] = json;
+    convIdbPut(key, json).then(ok=>{ if(!ok) showToast('保存失败，请导出备份'); });
+    return true;
+  }
+  try{ localStorage.setItem(key, json); return true; }
+  catch(e){ showToast(failMsg); return false; }
+}
 function saveConversations(){
   convStoreSave(JSON.stringify(conversations));
   try { localStorage.setItem('z_activeConvId', activeConvId); } catch(e) {}
@@ -7920,8 +7955,8 @@ async function playBomb(){
 function resetBomb(){ saveBomb(newBombGame()); renderBomb(); showToast('新炸弹埋好啦，糯糯先猜'); }
 // ══ 时间胶囊 Time Capsule：封存给未来的信/话/愿望/回忆/照片，到日子一起打开 ══
 let pendingCapsuleImg = null;
-function loadCapsules(){ try{ const a = JSON.parse(localStorage.getItem('z_capsules')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
-function storeCapsules(list){ try{ localStorage.setItem('z_capsules', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间满了，这颗胶囊存不下 qwq'); return false; } }
+function loadCapsules(){ try{ const a = JSON.parse(mediaGet('z_capsules')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeCapsules(list){ return mediaSet('z_capsules', JSON.stringify(list), '存储空间满了，这颗胶囊存不下 qwq'); }
 function capsuleOpenTs(months){ const d = new Date(); d.setMonth(d.getMonth() + months); return d.getTime(); }
 function pickCapsulePhoto(input){
   const file = input.files && input.files[0];
@@ -9797,8 +9832,8 @@ function cinemaFinish(){
 
 // ══ 表情包：他那边看到的是名字与说明，发出来的是真图；她也能从输入框旁发给他 ══
 let pendingStickerImg = '';
-function loadStickers(){ try{ const a = JSON.parse(localStorage.getItem('z_stickers') || '[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
-function storeStickers(list){ try{ localStorage.setItem('z_stickers', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间满了，表情包存不下 qwq'); return false; } }
+function loadStickers(){ try{ const a = JSON.parse(mediaGet('z_stickers') || '[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeStickers(list){ return mediaSet('z_stickers', JSON.stringify(list), '存储空间满了，表情包存不下 qwq'); }
 // ══ 存储用量：让她在设置里看得见本机存了多少、什么最占地方 ══
 function fmtBytes(n){ return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
 function renderStorageInfo(){
@@ -9815,10 +9850,16 @@ function renderStorageInfo(){
   if(!sizes.some(([k])=>k === 'z_conversations')){
     try{ const n = JSON.stringify(conversations).length; total += n; sizes.push(['z_conversations', n]); }catch(e){}
   }
+  ['z_gallery', 'z_stickers', 'z_capsules'].forEach(k=>{
+    if(!sizes.some(([kk])=>kk === k)){
+      const raw = mediaGet(k);
+      if(raw){ total += raw.length; sizes.push([k, raw.length]); }
+    }
+  });
   sizes.sort((a,b)=>b[1] - a[1]);
   const NAMES = { z_conversations:'对话', z_gallery:'相册', z_stickers:'表情包', z_capsules:'时间胶囊', z_memories:'记忆' };
   const top = sizes.slice(0, 3).map(([k, n]) => (NAMES[k] || k) + ' ' + fmtBytes(n)).join(' · ');
-  el.textContent = '本机已存约 ' + fmtBytes(total) + (convDb ? '（对话已搬进大仓库，不占本地的 5 MB 小空间）' : '（浏览器给每个网站的本地空间约 5 MB，满了会存不下新消息）') + (top ? '。占得最多：' + top + '。' : '');
+  el.textContent = '本机已存约 ' + fmtBytes(total) + (convDb ? '（对话和相册已搬进大仓库，不占本地的 5 MB 小空间）' : '（浏览器给每个网站的本地空间约 5 MB，满了会存不下新消息）') + (top ? '。占得最多：' + top + '。' : '');
 }
 // ══ 聊天图片先压缩再存：原图动不动几 MB，是存储爆掉的元凶 ══
 function compressChatImage(dataUrl){
@@ -10307,7 +10348,7 @@ async function askZephyrScheme(){
 
 // ══ 初始化 ══
 loadSettings();
-convStorePrepare().then(()=>loadChatHistory()).catch(()=>loadChatHistory());
+convStorePrepare().then(()=>mediaStorePrepare()).then(()=>loadChatHistory()).catch(()=>loadChatHistory());
 // 头像上传：这两个函数之前只定义、从未调用，所以点上传一直没反应，必须在初始化时注册
 setupAvatarUpload('avatarZephyrInput', 'avatarZephyrPreview', 'avatarZephyr', 'z_avatarZephyr');
 setupAvatarUpload('avatarUserInput', 'avatarUserPreview', 'avatarUser', 'z_avatarUser');
