@@ -8625,8 +8625,105 @@ function waitTtsAudioEnd(a){
   });
 }
 
+// ══ 流式通话朗读：把回复切成句子，第一句合成好就先出声，后面的边播边合成、
+// 提前预取一句，一句接一句不断档。只用在语音通话里；失败时把没播的部分交回老路。══
+function splitSpeakSentences(text){
+  const cleaned = String(text || '').replace(/\s+/g, ' ').trim();
+  if(!cleaned) return [];
+  const raw = [];
+  let cur = '';
+  for(const ch of cleaned){
+    cur += ch;
+    if('。！？…；;.!?'.includes(ch)){ raw.push(cur); cur = ''; }
+  }
+  if(cur) raw.push(cur);
+  const merged = [];
+  for(const p of raw){
+    const t = p.trim();
+    if(!t) continue;
+    if(merged.length && (t.length < 6 || merged[merged.length - 1].length < 6)) merged[merged.length - 1] += t;
+    else merged.push(t);
+  }
+  const out = [];
+  for(const p of merged){
+    let rest = p;
+    while(rest.length > 90){
+      let cut = -1;
+      for(const sep of ['，','、','：',',',':']){
+        const i = rest.lastIndexOf(sep, 90);
+        if(i > 30){ cut = i + 1; break; }
+      }
+      if(cut < 0) cut = 90;
+      out.push(rest.slice(0, cut));
+      rest = rest.slice(cut);
+    }
+    if(rest) out.push(rest);
+  }
+  return out.filter(s=>s.trim().length);
+}
+async function fetchTtsUrl(sentence, ttsUrl){
+  const resp = await fetch(ttsUrl + '/tts', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ text: sentence })
+  });
+  const data = await resp.json();
+  if(!data || !data.audio) return null;
+  const bytes = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
+  return URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
+}
+// 全部播完返回 ''；中途失败返回还没播的文本（不收尾，交给 speakText 老路兜底）
+async function speakSentencesStreamed(sentences){
+  const ttsUrl = cfg.ttsUrl || '';
+  callTtsSpeaking = true;
+  clearTimeout(callSTTRestartTimer);
+  callSTTGen++;
+  try { callRecognition?.stop(); } catch(e) {}
+  callSTTRunning = false;
+  let i = 0;
+  try {
+    let nextFetch = fetchTtsUrl(sentences[0], ttsUrl);
+    for(i = 0; i < sentences.length; i++){
+      if(!isCalling){ // 中途挂断了就停嘴
+        callTtsSpeaking = false;
+        try { getTtsAudio().pause(); } catch(e) {}
+        return '';
+      }
+      const url = await nextFetch;
+      if(!url) throw new Error('tts empty');
+      if(i + 1 < sentences.length){
+        nextFetch = fetchTtsUrl(sentences[i + 1], ttsUrl);
+        nextFetch.catch(()=>{});
+      } else nextFetch = null;
+      const a = getTtsAudio();
+      a.src = url;
+      let played = false;
+      try { await a.play(); played = true; } catch(e) {}
+      if(!played) throw new Error('play blocked');
+      await waitTtsAudioEnd(a);
+      URL.revokeObjectURL(url);
+      callLastActivity = Date.now();
+    }
+    callTtsSpeaking = false;
+    scheduleCallSTT(1200);
+    return '';
+  } catch(e) {
+    console.log('streamed TTS failed at sentence ' + i + ', fallback', e);
+    return sentences.slice(i).join('');
+  }
+}
+
 async function speakText(text){
   callLastActivity = Date.now(); // 他开口说话也算通话里的动静，心跳从他说完重新计时（近似）
+  // 语音通话里优先走分句流式：不用等整段合成完，第一句好就先出声
+  if (isCalling && cfg.ttsUrl) {
+    const sents = splitSpeakSentences(text);
+    if (sents.length >= 2) {
+      const rest = await speakSentencesStreamed(sents);
+      if (!rest) return;
+      text = rest;
+    }
+  }
   // 通话里是半双工：他开口前先把语音识别停掉。iOS 上识别和扬声器播放抢
   // 同一个音频会话，两边同时开识别会直接死掉；他说完再由 finishSpeak 接回来。
   const inCall = !!isCalling;
