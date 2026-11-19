@@ -832,7 +832,7 @@
           <input type="range" id="maxTokSlider" min="100" max="2000" step="100" value="800">
         </div>
         <div class="s-row">
-          <div class="s-row-label">思考过程（Thinking）<div class="s-row-sub">让 Zephyr 回复前先深度思考，并把思考过程显示在回复上方（可折叠）。会更慢、更费 token；开启时 Temperature / Top P 不生效。需要模型和接口支持，不支持时会发送失败，关掉即可。</div></div>
+          <div class="s-row-label">思考过程（Thinking）<div class="s-row-sub">让 Zephyr 回复前先深度思考，并把思考过程显示在回复上方（可折叠）。会更慢、更费 token，开启时回复改为整段出现；Temperature / Top P 不生效。需要模型和接口支持，不支持时会发送失败，关掉即可。</div></div>
           <input type="checkbox" id="thinkingToggle" onchange="toggleThinking(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
         </div>
       </div>
@@ -4680,6 +4680,9 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       reqBody.max_tokens = Math.max(parseInt(cfg.maxTokens, 10) || 0, 3548);
       delete reqBody.temperature;
       delete reqBody.top_p;
+      // 走非流式：有些中转接口在流式里会把思考块和正文混成一股文本返回（开头带个 thinking 字样），前端分不开；
+      // 非流式返回分开的内容块，才能像官方那样把思考单独折叠
+      reqBody.stream = false;
     }
     const res=await fetch(base+'/messages',{
       method:'POST',
@@ -4688,9 +4691,6 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     });
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`HTTP ${res.status}`);}
 
-    // 流式解析 SSE
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
     let reply = '';
     let bubble = null;
     let thinking = '';
@@ -4705,6 +4705,23 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     bubble.textContent = '';
     col.appendChild(bubble);
 
+    if(thinkOn){
+      bubble.textContent = '思考中…';
+      const data = await res.json();
+      (data.content || []).forEach(b=>{
+        if(b.type === 'thinking') thinking += b.thinking || '';
+        else if(b.type === 'text') reply += b.text || '';
+      });
+      if(thinking){
+        thinkBox = makeThinkingBlock(col, bubble, true);
+        thinkBox.body.textContent = thinking;
+      }
+      bubble.textContent = reply;
+      chatWrap.scrollTop = chatWrap.scrollHeight;
+    } else {
+    // 流式解析 SSE
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
     let buffer = '';
     while(true){
       const {done, value} = await reader.read();
@@ -4734,6 +4751,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
           }
         } catch(e){}
       }
+    }
     }
 
     if(!reply && thinking) reply = '（想了很多，但没组织好语言……再问我一次好吗）';
