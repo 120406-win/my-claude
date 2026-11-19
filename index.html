@@ -4143,18 +4143,44 @@ function decodeEntities(s){
     return m;
   });
 }
+const BOOK_HEAD_RE = /^\s*第[0-9零一二三四五六七八九十百千]+[章回节卷部篇].{0,30}$/;
+function mergeWrappedLines(lines){
+  // 很多老 TXT 是硬换行的（一句话被拆成几行），把没说完的行接回去；诗行短，不会被误接
+  const out = [];
+  lines.forEach(line=>{
+    const t = line.replace(/\s+$/, '');
+    if(!t.trim()){ out.push(''); return; }
+    const prev = out.length ? out[out.length - 1] : '';
+    const prevTrim = prev.replace(/\s+$/, '');
+    if(prevTrim && prevTrim.length >= 25 && !/[。！？…」』）.!?]["'"」』]*$/.test(prevTrim) && !BOOK_HEAD_RE.test(t)){
+      out[out.length - 1] = prevTrim + t.trim();
+      return;
+    }
+    out.push(t);
+  });
+  return out;
+}
 function parseTxtToChapters(text){
-  const lines = String(text || '').split(/\r?\n/);
-  const headRe = /^\s*第[0-9零一二三四五六七八九十百千]+[章回节卷部篇].{0,30}$/;
+  const lines = mergeWrappedLines(String(text || '').split(/\r?\n/));
+  const headRe = BOOK_HEAD_RE;
   const chapters = [];
   let cur = { title:'开始', paras:[] };
   let buf = [];
   const flush = ()=>{ buf.forEach(l=>{ const t = l.trim(); if(t) cur.paras.push(t); }); buf = []; };
-  lines.forEach(line=>{
-    if(headRe.test(line) && line.trim().length <= 34){
+  lines.forEach((line, idx)=>{
+    const lt = line.trim();
+    // 散文集式标题：独立短行、内部无标点，前后至少一侧是空行（老版式排版不一），如《朝花夕拾》每篇的篇名
+    const prevT = idx > 0 ? lines[idx - 1].trim() : '';
+    const nextT = (lines[idx + 1] || '').trim();
+    const standaloneTitle = lt && lt.length <= 16 && /[一-鿿A-Za-z0-9]/.test(lt) && !/[，。！？；：、,.!?;:…""'']/.test(lt)
+      && (!prevT || !nextT)
+      && (nextT === '' || nextT.length >= 12)
+      && (prevT === '' || /[。！？”』」]$/.test(prevT))
+      && buf.some(l=>l.trim());
+    if((headRe.test(line) && lt.length <= 34) || standaloneTitle){
       flush();
       if(cur.paras.length) chapters.push(cur);
-      cur = { title: line.trim(), paras: [] };
+      cur = { title: lt, paras: [] };
     } else buf.push(line);
   });
   flush();
