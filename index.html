@@ -7681,6 +7681,7 @@ function renderMessagesIntoChat(){
         const sp = splitLeakedThinking(dispText);
         if(sp){ dispThinking = sp.thinking; dispText = sp.reply; }
       }
+      if(!isUser && m.voice && m.voice.data && m.voiceText && dispText.length > m.voiceText.length && dispText.endsWith('\n' + m.voiceText)) dispText = dispText.slice(0, dispText.length - m.voiceText.length - 1);
       let b = null;
       if(isUser && m.voice && m.voice.data) addVoiceBubble('data:' + (m.voice.type || 'audio/mp4') + ';base64,' + m.voice.data, m.voice.dur || 0, true, m.mid);
       else if(!isUser && m.voice && m.voice.data && m.voiceText && dispText === m.voiceText){ /* 只有一条语音的回复：文字由语音条下的小字承载 */ }
@@ -9225,25 +9226,13 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     }
     if (!translation && enZhEnabled() && looksForeignReply(reply)) attachTranslationLater(asstMid, col, reply);
     const voiceShare = pendingVoiceShare; pendingVoiceShare = null;
-    let voiceData = null, voiceText = '';
+    let voiceText = '';
     if(voiceShare){
       voiceText = voiceShare.text;
-      if(cfg.ttsUrl) voiceData = await synthVoiceBar(voiceText);
-      if(voiceData){
-        if(col){
-          if(!reply && bubble) bubble.remove();
-          col.appendChild(buildVoiceWrap('data:audio/wav;base64,' + voiceData.data, voiceData.dur));
-          const cap = document.createElement('div');
-          cap.style.cssText = 'font-size:12.5px;color:var(--text-dim);line-height:1.6;max-width:85%;';
-          cap.textContent = voiceText;
-          col.appendChild(cap);
-          chatWrap.scrollTop = chatWrap.scrollHeight;
-        }
-        if(!reply){ reply = voiceText; if(!translation && enZhEnabled() && looksForeignReply(voiceText)) attachTranslationLater(asstMid, col, voiceText); }
-      } else {
-        reply = reply ? (reply + '\n' + voiceText) : voiceText;
-        if(bubble) bubble.textContent = reply;
-      }
+      const voiceOnly = !reply;
+      reply = voiceOnly ? voiceText : (reply + '\n' + voiceText);
+      if(cfg.ttsUrl) attachVoiceBarLater(asstMid, col, bubble, voiceText, voiceOnly);
+      if(voiceOnly && !translation && enZhEnabled() && looksForeignReply(voiceText)) attachTranslationLater(asstMid, col, voiceText);
     }
     const songShare = pendingSongShare; pendingSongShare = null;
     if(songShare && bubble && bubble.parentElement) makeSongCard(bubble.parentElement, songShare);
@@ -9251,7 +9240,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     if(stickerShare && bubble && bubble.parentElement) makeStickerImg(bubble.parentElement, stickerShare);
     const incomingCall = pendingIncomingCall; pendingIncomingCall = null;
     if(incomingCall) setTimeout(()=>showIncomingCall(incomingCall), 700);
-    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(songShare ? {song: songShare} : {}), ...(stickerShare ? {sticker: stickerShare} : {}), ...(translation ? {translation} : {}), ...(voiceData ? {voice: voiceData, voiceText} : {})});
+    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(songShare ? {song: songShare} : {}), ...(stickerShare ? {sticker: stickerShare} : {}), ...(translation ? {translation} : {}), ...(voiceText ? {voiceText} : {})});
     saveChatHistory();
     maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
     maybeUpdateSummary(); // 聊得太长时把旧消息压成摘要，后台进行，不打断聊天
@@ -9339,6 +9328,21 @@ async function synthVoiceBar(text){
     const bytes = Uint8Array.from(atob(data.audio), c=>c.charCodeAt(0));
     return { data: data.audio, type:'audio/wav', dur: wavDurationSecs(bytes) };
   }catch(e){ return null; }
+}
+async function attachVoiceBarLater(mid, col, bubble, voiceText, voiceOnly){
+  const data = await synthVoiceBar(voiceText);
+  if(!data) return;
+  const m = messages.find(x=>x.mid === mid);
+  if(m){ m.voice = data; saveChatHistory(); }
+  if(col && document.body && document.body.contains(col)){
+    if(voiceOnly && bubble && bubble.parentElement) bubble.remove();
+    col.appendChild(buildVoiceWrap('data:audio/wav;base64,' + data.data, data.dur));
+    const cap = document.createElement('div');
+    cap.style.cssText = 'font-size:12.5px;color:var(--text-dim);line-height:1.6;max-width:85%;';
+    cap.textContent = voiceText;
+    col.appendChild(cap);
+    chatWrap.scrollTop = chatWrap.scrollHeight;
+  }
 }
 async function fetchTtsUrl(sentence, ttsUrl){
   const resp = await fetch(ttsUrl + '/tts', {
