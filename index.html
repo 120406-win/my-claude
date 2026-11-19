@@ -1635,6 +1635,10 @@
           <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-pale);margin-top:4px;"><span id="npCur">0:00</span><span id="npDur">0:00</span></div>
         </div>
         <div style="display:flex;gap:8px;margin-top:10px;">
+          <button id="musicModeBtn" onclick="cycleMusicMode()" style="flex:1;padding:9px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">播放：顺序</button>
+          <button id="musicSleepBtn" onclick="cycleSleepTimer()" style="flex:1;padding:9px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">定时：关</button>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
           <button id="pickBtn" onclick="askZephyrPick()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">请 Zephyr 点一首</button>
           <button id="commentBtn" onclick="askZephyrComment()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">听听 Zephyr 怎么说</button>
         </div>
@@ -6327,7 +6331,7 @@ function bindMusicAudio(){
     if(c) c.textContent = fmtTime(a.currentTime);
     if(du) du.textContent = fmtTime(a.duration);
   });
-  a.addEventListener('ended', ()=>playStep(1));
+  a.addEventListener('ended', ()=>onMusicEnded());
   a.addEventListener('play', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PAUSE_ICON; updateSongCards(); haloSync(); });
   a.addEventListener('pause', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PLAY_ICON; updateSongCards(); haloSync(); });
   a.addEventListener('ended', ()=>haloSync());
@@ -6444,6 +6448,7 @@ function haloFrame(){
 function renderMusic(){
   bindMusicAudio();
   haloDrawStart();
+  renderMusicModeBtn();
   const d = loadMusic();
   const cur = currentTrack();
   const a = musicAudioEl();
@@ -6514,8 +6519,62 @@ function playStep(step){
   const playable = d.tracks.filter(t=>hasPlayable(t));
   if(!playable.length) return;
   let idx = playable.findIndex(t=>t.id===d.lastId);
+  if(step > 0 && getMusicMode() === 'shuffle' && playable.length > 1){
+    let n = idx;
+    while(n === idx) n = Math.floor(Math.random() * playable.length);
+    playTrack(playable[n].id);
+    return;
+  }
   idx = idx < 0 ? 0 : (idx + step + playable.length) % playable.length;
   playTrack(playable[idx].id);
+}
+// ══ 播放模式与睡眠定时：顺序/随机/单曲循环；定时只活在本次打开里，关掉页面就散 ══
+function getMusicMode(){ try{ const m = localStorage.getItem('z_musicMode'); return (m === 'shuffle' || m === 'one') ? m : 'seq'; }catch(e){ return 'seq'; } }
+function musicModeLabel(){ const m = getMusicMode(); return m === 'shuffle' ? '随机' : (m === 'one' ? '单曲循环' : '顺序'); }
+function cycleMusicMode(){
+  const order = ['seq', 'shuffle', 'one'];
+  const next = order[(order.indexOf(getMusicMode()) + 1) % order.length];
+  try{ localStorage.setItem('z_musicMode', next); }catch(e){}
+  renderMusicModeBtn();
+  showToast(next === 'seq' ? '顺序播放' : (next === 'shuffle' ? '随机播放' : '单曲循环'));
+}
+let musicSleepOpt = 0, musicSleepTimer = 0, musicSleepDeadline = 0, musicSleepAfterTrack = false;
+function sleepBtnLabel(){
+  if(musicSleepAfterTrack) return '定时：播完这首';
+  if(musicSleepDeadline) return '定时：还剩 ' + Math.max(1, Math.round((musicSleepDeadline - Date.now()) / 60000)) + ' 分';
+  return '定时：关';
+}
+function renderMusicModeBtn(){
+  const b = document.getElementById('musicModeBtn'); if(b) b.textContent = '播放：' + musicModeLabel();
+  const s = document.getElementById('musicSleepBtn'); if(s) s.textContent = sleepBtnLabel();
+}
+function cycleSleepTimer(){
+  const order = [0, 15, 30, 60, -1];
+  setSleepOpt(order[(order.indexOf(musicSleepOpt) + 1) % order.length]);
+}
+function setSleepOpt(v){
+  musicSleepOpt = v;
+  if(musicSleepTimer){ clearTimeout(musicSleepTimer); musicSleepTimer = 0; }
+  musicSleepDeadline = 0; musicSleepAfterTrack = false;
+  if(v > 0){
+    musicSleepDeadline = Date.now() + v * 60000;
+    musicSleepTimer = setTimeout(()=>{
+      musicSleepTimer = 0; musicSleepDeadline = 0; musicSleepOpt = 0;
+      const a = musicAudioEl(); if(a) a.pause();
+      renderMusicModeBtn();
+      showToast('定时到了，先停下来休息啦 ~');
+    }, v * 60000);
+    showToast('定时 ' + v + ' 分钟后停');
+  } else if(v === -1){
+    musicSleepAfterTrack = true;
+    showToast('播完这一首就停');
+  } else showToast('定时关掉啦');
+  renderMusicModeBtn();
+}
+function onMusicEnded(){
+  if(musicSleepAfterTrack){ musicSleepAfterTrack = false; musicSleepOpt = 0; renderMusicModeBtn(); showToast('这一首放完啦，晚安 ~'); return; }
+  if(getMusicMode() === 'one'){ const a = musicAudioEl(); if(a){ try{ a.currentTime = 0; }catch(e){} a.play().catch(()=>{}); } return; }
+  playStep(1);
 }
 function seekMusic(e){
   const a = musicAudioEl();
