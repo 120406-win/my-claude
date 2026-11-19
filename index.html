@@ -7755,9 +7755,29 @@ function unlockTtsAudio(){
     const p = a.play(); if(p && p.catch) p.catch(()=>{});
   } catch(e) {}
 }
+function waitTtsAudioEnd(a){
+  return new Promise(res => {
+    if (a.ended) return res();
+    let done = false;
+    const fin = () => { if (done) return; done = true; a.removeEventListener('ended', fin); a.removeEventListener('error', fin); res(); };
+    a.addEventListener('ended', fin); a.addEventListener('error', fin);
+    const d = a.duration;
+    setTimeout(fin, (isFinite(d) && d > 0 ? d * 1000 : 15000) + 2000);
+  });
+}
 
 async function speakText(text){
   callLastActivity = Date.now(); // 他开口说话也算通话里的动静，心跳从他说完重新计时（近似）
+  // 通话里是半双工：他开口前先把语音识别停掉。iOS 上识别和扬声器播放抢
+  // 同一个音频会话，两边同时开识别会直接死掉；他说完再由 finishSpeak 接回来。
+  const inCall = !!isCalling;
+  if (inCall) {
+    callTtsSpeaking = true;
+    clearTimeout(callSTTRestartTimer);
+    try { callRecognition?.stop(); } catch(e) {}
+    callSTTRunning = false;
+  }
+  const finishSpeak = () => { if (inCall) { callTtsSpeaking = false; scheduleCallSTT(300); } };
   const ttsUrl = cfg.ttsUrl || '';
   if(ttsUrl) {
     try {
@@ -7773,15 +7793,24 @@ async function speakText(text){
         const url = URL.createObjectURL(blob);
         const a = getTtsAudio();
         a.src = url;
-        try { await a.play(); return; }
+        let played = false;
+        try { await a.play(); played = true; }
         catch(e) { console.log('TTS play blocked, fallback to system voice', e); }
+        if (played) { await waitTtsAudioEnd(a); finishSpeak(); return; }
       }
     } catch(e) { console.log('MiMo TTS failed, fallback to system voice', e); }
   }
-  if(!window.speechSynthesis) return;
+  if(!window.speechSynthesis) { finishSpeak(); return; }
   speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(text); u.lang='zh-CN'; u.rate=0.95;
-  speechSynthesis.speak(u);
+  await new Promise(res => {
+    let done = false;
+    const fin = () => { if (!done) { done = true; res(); } };
+    u.onend = fin; u.onerror = fin;
+    try { speechSynthesis.speak(u); } catch(e) { fin(); }
+    setTimeout(fin, Math.min(60000, Math.max(4000, text.length * 450)));
+  });
+  finishSpeak();
 }
 
 // ══ 语音朗读开关 ══
@@ -8090,6 +8119,7 @@ async function callHeartbeatTick(){
   if(!(isCalling || isVideo) || callBusy) return;
   const base = callHeartbeatBase();
   if(!base) return;
+  if(callTtsSpeaking) return;
   if(window.speechSynthesis && speechSynthesis.speaking) return;
   if(Date.now() - callLastActivity < callNextGap * 1000) return;
   if(callHeartbeatCount >= 10){ stopCallHeartbeat(); return; }
@@ -8108,17 +8138,34 @@ async function callHeartbeatTick(){
 // ══ 语音通话 ══
 let callRecognition = null;
 let callMicActive = false;
+let callSTTRunning = false;
+let callSTTRestartTimer = null;
+let callTtsSpeaking = false;
+
+// 识别的重启动一入口：去重 + 延迟。旧版只在 onresult/onerror 里立刻重启，
+// 识别自然结束（onend，没结果也没报错）时没人管，麦克风就永久哑了；
+// 出错时立刻重启又会撞上 iOS 的快速重启限制，越撞越死。
+function scheduleCallSTT(delay) {
+  clearTimeout(callSTTRestartTimer);
+  callSTTRestartTimer = setTimeout(() => {
+    if (isCalling && callMicActive && !callTtsSpeaking) startCallSTT();
+  }, delay || 300);
+}
 
 function startCallSTT() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { showToast('浏览器不支持语音识别'); return; }
-  callRecognition = new SR();
-  callRecognition.lang = 'zh-CN';
-  callRecognition.continuous = false;
-  callRecognition.interimResults = false;
-  callRecognition.onresult = async (e) => {
+  if (callSTTRunning) return;
+  try { callRecognition?.stop(); } catch(e) {}
+  const rec = new SR();
+  callRecognition = rec;
+  rec.lang = 'zh-CN';
+  rec.continuous = false;
+  rec.interimResults = false;
+  rec.onresult = async (e) => {
+    callSTTRunning = false;
     const text = e.results[0][0].transcript;
-    if (!text) return;
+    if (!text) { scheduleCallSTT(250); return; }
     const sttMid = genMsgId(); pendingUserMid = sttMid;
     addTextMsg(text, true, false, sttMid);
     callLastActivity = Date.now(); callHeartbeatCount = 0; callBusy = true;
@@ -8127,12 +8174,22 @@ function startCallSTT() {
     const reply = await callAPI(text);
     hideTyping(); headerSub.textContent = '通话中';
     callBusy = false; callLastActivity = Date.now();
-    if (reply) { speakText(reply); }
-    // 自动继续监听
-    if (isCalling && callMicActive) startCallSTT();
+    if (reply) { await speakText(reply); }
+    // 他说完（speakText 内部也会接一次）再继续监听
+    if (isCalling && callMicActive) scheduleCallSTT(250);
   };
-  callRecognition.onerror = () => { if (isCalling && callMicActive) startCallSTT(); };
-  callRecognition.start();
+  rec.onerror = (e) => {
+    callSTTRunning = false;
+    if (!isCalling || !callMicActive) return;
+    const err = e && e.error;
+    scheduleCallSTT(err === 'not-allowed' || err === 'service-not-allowed' ? 1500 : 400);
+  };
+  rec.onend = () => {
+    callSTTRunning = false;
+    if (isCalling && callMicActive && !callTtsSpeaking) scheduleCallSTT(300);
+  };
+  callSTTRunning = true;
+  try { rec.start(); } catch(e) { callSTTRunning = false; scheduleCallSTT(600); }
 }
 
 document.getElementById('callBtn').addEventListener('click',async()=>{
@@ -8142,13 +8199,14 @@ document.getElementById('callBtn').addEventListener('click',async()=>{
   callBusy = true;
   showTyping(); const reply=await callAPI('（糯糯拨打了语音通话，温柔打个招呼，简短一点）'); hideTyping();
   callBusy = false; callLastActivity = Date.now(); armCallHeartbeat();
-  if(reply){speakText(reply);}
-  // 自动开启 STT
+  if(reply){ await speakText(reply); }
+  // 自动开启 STT（等他问候说完再开，识别和播放同时开会互相打死）
   callMicActive = true;
   startCallSTT();
 });
 document.getElementById('callHangBtn').addEventListener('click',()=>{
   isCalling=false; callMicActive=false; stopCallHeartbeat();
+  clearTimeout(callSTTRestartTimer); callTtsSpeaking = false; callSTTRunning = false;
   callRecognition?.stop();
   clearInterval(callInterval); speechSynthesis?.cancel(); try{ getTtsAudio().pause(); }catch(e){}
   document.getElementById('callModal').classList.remove('show');
