@@ -3700,6 +3700,8 @@ function exportData(){
     const k = localStorage.key(i);
     if(k && k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey' && k !== 'z_bochaKey') data[k] = localStorage.getItem(k);
   }
+  // 对话存在 IndexedDB 大仓库里，localStorage 里没有，单独带上，备份才完整
+  try{ data['z_conversations'] = JSON.stringify(conversations); }catch(e){}
   const payload = JSON.stringify({ app:'zephyr', version:1, exportedAt:new Date().toISOString(), data }, null, 2);
   const blob = new Blob([payload], { type:'application/json' });
   const a = document.createElement('a');
@@ -6506,19 +6508,70 @@ let activeConvId = null;
 
 function genConvId(){ return 'conv_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
 
-function saveConversations(){
-  try {
-    localStorage.setItem('z_conversations', JSON.stringify(conversations));
-    localStorage.setItem('z_activeConvId', activeConvId);
-  } catch(e) {
-    // 存储已满：不自动删除任何历史，只提示用户自行清理旧对话
-    showToast('存储空间已满，请删除一些旧对话');
+// ══ 对话存储层：对话搬进 IndexedDB（容量几百 MB），localStorage 只留小数据 ══
+// 规则：启动时若 localStorage 里还有 z_conversations（旧版数据或刚导入恢复的备份），以它为准，搬进 IDB 后删掉本地副本腾空间；
+// 平时读写都走 IDB；IDB 不可用时全程回退 localStorage，老行为不变。备份导出会把对话单独带上，不受影响。
+let convDb = null;
+let convSnapshot = null;
+function convDbOpen(){
+  return new Promise(res=>{
+    if(!('indexedDB' in window)) return res(null);
+    let rq;
+    try{ rq = indexedDB.open('zephyr-store', 1); }catch(e){ return res(null); }
+    rq.onupgradeneeded = ()=>{ try{ rq.result.createObjectStore('kv'); }catch(e){} };
+    rq.onsuccess = ()=>res(rq.result);
+    rq.onerror = ()=>res(null);
+  });
+}
+function convIdbGet(key){
+  return new Promise(res=>{
+    if(!convDb) return res(null);
+    try{
+      const rq = convDb.transaction('kv', 'readonly').objectStore('kv').get(key);
+      rq.onsuccess = ()=>res(rq.result != null ? rq.result : null);
+      rq.onerror = ()=>res(null);
+    }catch(e){ res(null); }
+  });
+}
+function convIdbPut(key, val){
+  return new Promise(res=>{
+    if(!convDb) return res(false);
+    try{
+      const rq = convDb.transaction('kv', 'readwrite').objectStore('kv').put(val, key);
+      rq.onsuccess = ()=>res(true);
+      rq.onerror = ()=>res(false);
+    }catch(e){ res(false); }
+  });
+}
+async function convStorePrepare(){
+  convDb = await convDbOpen();
+  if(!convDb) return;
+  const legacy = localStorage.getItem('z_conversations');
+  if(legacy){
+    await convIdbPut('z_conversations', legacy);
+    convSnapshot = legacy;
+    try{ localStorage.removeItem('z_conversations'); }catch(e){}
+  } else {
+    convSnapshot = await convIdbGet('z_conversations');
   }
+}
+function convStoreSave(json){
+  if(convDb){
+    convSnapshot = json;
+    convIdbPut('z_conversations', json).then(ok=>{ if(!ok) showToast('对话保存失败，请导出备份'); });
+  } else {
+    try { localStorage.setItem('z_conversations', json); }
+    catch(e) { showToast('存储空间已满，请删除一些旧对话'); }
+  }
+}
+function saveConversations(){
+  convStoreSave(JSON.stringify(conversations));
+  try { localStorage.setItem('z_activeConvId', activeConvId); } catch(e) {}
 }
 
 function loadConversations(){
   try {
-    const saved = localStorage.getItem('z_conversations');
+    const saved = convSnapshot != null ? convSnapshot : localStorage.getItem('z_conversations');
     const savedActive = localStorage.getItem('z_activeConvId');
     if(saved){
       conversations = JSON.parse(saved);
@@ -9199,10 +9252,13 @@ function renderStorageInfo(){
     const n = (localStorage.getItem(k) || '').length;
     total += n; sizes.push([k, n]);
   }
+  if(!sizes.some(([k])=>k === 'z_conversations')){
+    try{ const n = JSON.stringify(conversations).length; total += n; sizes.push(['z_conversations', n]); }catch(e){}
+  }
   sizes.sort((a,b)=>b[1] - a[1]);
   const NAMES = { z_conversations:'对话', z_gallery:'相册', z_stickers:'表情包', z_capsules:'时间胶囊', z_memories:'记忆' };
   const top = sizes.slice(0, 3).map(([k, n]) => (NAMES[k] || k) + ' ' + fmtBytes(n)).join(' · ');
-  el.textContent = '本机已存约 ' + fmtBytes(total) + '（浏览器给每个网站的本地空间约 5 MB，满了会存不下新消息）' + (top ? '。占得最多：' + top + '。' : '');
+  el.textContent = '本机已存约 ' + fmtBytes(total) + (convDb ? '（对话已搬进大仓库，不占本地的 5 MB 小空间）' : '（浏览器给每个网站的本地空间约 5 MB，满了会存不下新消息）') + (top ? '。占得最多：' + top + '。' : '');
 }
 // ══ 聊天图片先压缩再存：原图动不动几 MB，是存储爆掉的元凶 ══
 function compressChatImage(dataUrl){
@@ -9691,7 +9747,7 @@ async function askZephyrScheme(){
 
 // ══ 初始化 ══
 loadSettings();
-loadChatHistory();
+convStorePrepare().then(()=>loadChatHistory()).catch(()=>loadChatHistory());
 // 头像上传：这两个函数之前只定义、从未调用，所以点上传一直没反应，必须在初始化时注册
 setupAvatarUpload('avatarZephyrInput', 'avatarZephyrPreview', 'avatarZephyr', 'z_avatarZephyr');
 setupAvatarUpload('avatarUserInput', 'avatarUserPreview', 'avatarUser', 'z_avatarUser');
