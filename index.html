@@ -1114,6 +1114,18 @@
           <div class="s-row-label">音色 ID</div>
           <input class="s-input" type="text" id="ttsVoiceId" placeholder="voice_xxx">
         </div>
+        <div class="s-row">
+          <div class="s-row-label">通话心跳</div>
+          <select class="s-input" id="callHeartbeatSel" onchange="setCallHeartbeat(this.value)">
+            <option value="0">关</option>
+            <option value="30">安静 30 秒他找话头</option>
+            <option value="45">安静 45 秒他找话头</option>
+            <option value="60">安静 60 秒他找话头</option>
+            <option value="90">安静 90 秒他找话头</option>
+            <option value="120">安静 120 秒他找话头</option>
+          </select>
+        </div>
+        <div style="font-size:11px;color:var(--text-pale);line-height:1.6;padding:2px 2px 0;">通话里两人都安静超过这个时间（再随机延后一点），Zephyr 会主动说一句；连说 10 句没等到你就停。</div>
       </div>
     </div>
 
@@ -1864,6 +1876,17 @@
   </div>
 </div>
 
+<!-- Zephyr 主动来电 -->
+<div class="call-modal" id="incomingCallModal">
+  <div class="call-avatar-big" id="incomingCallAvatar"><svg viewBox="0 0 24 24" width="52" height="52"><path fill="#ffd97a" d="M20 13.5A8.5 8.5 0 1 1 10.5 4a7 7 0 0 0 9.5 9.5z"/></svg></div>
+  <div class="call-name">Zephyr</div>
+  <div class="call-timer" id="incomingCallText">想和你语音通话</div>
+  <div class="call-btns">
+    <button class="call-btn btn-hang" id="incomingDeclineBtn" title="暂不接"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(135 12 12)"><path d="M5.2 4h3l1.5 4-2 1.5a12 12 0 0 0 5.8 5.8l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A19.5 19.5 0 0 1 3.2 6.2 2 2 0 0 1 5.2 4z"/></g></svg></button>
+    <button class="call-btn" id="incomingAcceptBtn" title="接听" style="background:#22c55e;color:#fff;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5.2 4h3l1.5 4-2 1.5a12 12 0 0 0 5.8 5.8l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A19.5 19.5 0 0 1 3.2 6.2 2 2 0 0 1 5.2 4z"/></svg></button>
+  </div>
+</div>
+
 <!-- 图片预览 -->
 <div class="img-preview" id="imgPreview">
   <img id="imgPreviewEl" src="" alt="">
@@ -2455,6 +2478,7 @@ function buildSystemPrompt(){
     out += '\n\n【Music 一起听歌】\n以下是你们在 Music 里共同的歌单。聊天时可以自然地聊起你们一起听的歌、推荐新歌，但不要逐条念歌单：\n' + ml.slice(0, 2000) + (curT ? '\n你们最近在听：《' + curT.title + '》' : '');
   }
   out += '\n\n【你可以把歌发到聊天里】\n聊天的时候，如果你想把一首歌直接发给 Lumi 听，你可以在回复的最后一行单独写一行：[[歌曲：歌名|歌手]]。系统会把这一行变成一张可以播放的歌曲卡片出现在聊天里，Lumi 不会看到这行字本身。优先分享你们共同歌单里已经有的歌（歌名要和歌单里写的一致），那种卡片她点一下就能放；歌单里没有的新歌也可以发，卡片会让她一键存进歌单。只在真的想分享一首歌时才用，不要每条回复都发，不要提起这个标记；一次最多发一首。';
+  out += '\n\n【你可以给 Lumi 打电话】\n聊天的时候，如果你真的很想听听她的声音，或者有句话想亲口对她说，你可以在回复的最后一行单独写一行：[[来电：语音]]；想视频就写 [[来电：视频]]。系统会真的给她拨过去，她可以接听，也可以暂不接——没接就是她这会儿不方便，不要难过，更不要连着打。只在你真心想打的时候才用，不要每条回复都打，不要提起这个标记；一次最多打一个。';
   // Watchlist 也给 Zephyr：想看清单和观影记录，聊天时能提议一起看、聊看过的
   const watchData = loadWatchlist();
   const wlWant = watchData.filter(w=>w.status === 'want');
@@ -5640,6 +5664,18 @@ function renderMessagesIntoChat(){
       chatWrap.appendChild(note);
       return;
     }
+    if(m.sysnote){
+      const note = document.createElement('div');
+      note.className = 'msg-row';
+      note.dataset.mid = m.mid;
+      note.style.cssText = 'justify-content:center;';
+      const span = document.createElement('span');
+      span.style.cssText = 'font-size:11px;color:var(--text-pale);padding:2px 10px;';
+      span.textContent = m.display || '';
+      note.appendChild(span);
+      chatWrap.appendChild(note);
+      return;
+    }
     if(typeof m.content === 'string'){
       let dispText = m.content;
       let dispThinking = m.thinking || '';
@@ -5891,8 +5927,9 @@ function hideTyping(){ document.getElementById('typing-row')?.remove(); }
 const headerSub=document.getElementById('headerSub');
 // ══ Zephyr 的愿望 skill：回复末尾的 [[愿望：…]] 标记会被 App 执行——存进愿望清单，并从聊天里抹掉 ══
 let pendingSongShare = null; // 他这次回复里分享的歌，callAPI 收尾时挂到消息上渲染成卡片
+let pendingIncomingCall = null; // 他这次回复里想打的电话：'voice' | 'video'，callAPI 收尾时弹来电卡
 function processZephyrActions(reply, bubble){
-  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0)) return reply;
+  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0 && reply.indexOf('[[来电') < 0)) return reply;
   const found = [];
   let cleaned = reply.replace(/\[\[愿望[:：]([^\]]{1,120})\]\]/g, (m, text)=>{
     const t = text.trim();
@@ -5916,9 +5953,15 @@ function processZephyrActions(reply, bubble){
     const t = text.trim();
     if(t) foundS.push(t);
     return '';
+  });
+  const foundCall = [];
+  cleaned = cleaned.replace(/\[\[来电[:：](语音|视频)\]\]/g, (m, kind)=>{
+    foundCall.push(kind === '视频' ? 'video' : 'voice');
+    return '';
   }).replace(/\n{3,}/g, '\n\n').trim();
-  if(!found.length && !foundC.length && !foundD.length && !foundS.length) return reply;
-  if(!cleaned) cleaned = found.length ? '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。' : (foundC.length ? '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。' : (foundD.length ? '（小声）我把刚刚发现的新鲜事，悄悄记到 Discoveries 里了。' : '给你分享一首歌，点卡片就能听。'));
+  if(!found.length && !foundC.length && !foundD.length && !foundS.length && !foundCall.length) return reply;
+  if(!cleaned) cleaned = found.length ? '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。' : (foundC.length ? '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。' : (foundD.length ? '（小声）我把刚刚发现的新鲜事，悄悄记到 Discoveries 里了。' : (foundS.length ? '给你分享一首歌，点卡片就能听。' : '想听听你的声音，给你打过来了。')));
+  if(foundCall.length) pendingIncomingCall = foundCall[0];
   if(found.length){
     const list = loadWishes();
     list.push({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), text:found[0].slice(0, 120), status:'wish', by:'zephyr', ts:Date.now(), auto:true });
@@ -6896,6 +6939,8 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     reply = processZephyrActions(reply, bubble); // 他悄悄许的愿望在这里被 App 执行并抹掉标记
     const songShare = pendingSongShare; pendingSongShare = null;
     if(songShare && bubble && bubble.parentElement) makeSongCard(bubble.parentElement, songShare);
+    const incomingCall = pendingIncomingCall; pendingIncomingCall = null;
+    if(incomingCall) setTimeout(()=>showIncomingCall(incomingCall), 700);
     messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(songShare ? {song: songShare} : {})});
     saveChatHistory();
     maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
@@ -6905,6 +6950,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
 }
 
 async function speakText(text){
+  callLastActivity = Date.now(); // 他开口说话也算通话里的动静，心跳从他说完重新计时（近似）
   const ttsUrl = cfg.ttsUrl || '';
   if(ttsUrl) {
     try {
@@ -6942,7 +6988,7 @@ const ICON_MOON_BIG = '<svg viewBox="0 0 24 24" width="52" height="52"><path fil
 // 通话/视频页的大头像：有自定义头像就用图片，没有就用小月亮，和聊天头像保持一致
 function syncCallAvatars(){
   const src = localStorage.getItem('z_avatarZephyr');
-  ['callAvatarBig','videoAvatarBig'].forEach(id=>{
+  ['callAvatarBig','videoAvatarBig','incomingCallAvatar'].forEach(id=>{
     const el = document.getElementById(id);
     if(!el) return;
     el.innerHTML = (src && src.startsWith('data:'))
@@ -7180,6 +7226,75 @@ document.getElementById('recCancelBtn').addEventListener('click',()=>{
   if(recUiState==='recording'){ stopRecording(true); recUiState='idle'; }
 });
 
+// ══ Zephyr 主动来电：他用 [[来电：语音/视频]] 标记拨过来，她接听或暂不接 ══
+let incomingCallKind = null;
+function showIncomingCall(kind){
+  if(isCalling || isVideo) return;
+  incomingCallKind = kind;
+  document.getElementById('incomingCallText').textContent = kind === 'video' ? '想和你视频通话' : '想和你语音通话';
+  document.getElementById('incomingCallModal').classList.add('show');
+}
+function hideIncomingCall(){
+  document.getElementById('incomingCallModal').classList.remove('show');
+  incomingCallKind = null;
+}
+document.getElementById('incomingAcceptBtn').addEventListener('click', ()=>{
+  const kind = incomingCallKind;
+  hideIncomingCall();
+  if(kind === 'video') document.getElementById('videoBtn').click();
+  else document.getElementById('callBtn').click();
+});
+document.getElementById('incomingDeclineBtn').addEventListener('click', ()=>{
+  const kind = incomingCallKind || 'voice';
+  hideIncomingCall();
+  // 婉拒要让他知道：存一条系统提示（聊天里只显示一行小字，内容随下一次请求发给他）
+  messages.push({ role:'user', mid:genMsgId(), sysnote:true,
+    display:'Zephyr 的' + (kind === 'video' ? '视频' : '语音') + '来电未接通',
+    content:'（系统提示：你刚才给糯糯打的电话她没有接，她这会儿可能在忙。不用再打，也不用难过，等她回来就好。）' });
+  saveChatHistory();
+  renderMessagesIntoChat();
+  chatWrap.scrollTop = chatWrap.scrollHeight;
+});
+
+// ══ 通话心跳：两人都安静太久，他主动找个话头；连说 10 句没人理就停 ══
+let callLastActivity = Date.now();
+let callHeartbeatCount = 0;
+let callHeartbeatTimer = null;
+let callBusy = false;
+let callNextGap = 45;
+function callHeartbeatBase(){
+  const n = parseInt(localStorage.getItem('z_callHeartbeatSec') || '45', 10);
+  return [30, 45, 60, 90, 120].includes(n) ? n : 0;
+}
+function setCallHeartbeat(v){ localStorage.setItem('z_callHeartbeatSec', String(v)); showToast(parseInt(v, 10) > 0 ? '通话心跳已开启' : '通话心跳已关'); }
+function initCallHeartbeatSel(){ const el = document.getElementById('callHeartbeatSel'); if(el) el.value = localStorage.getItem('z_callHeartbeatSec') || '45'; }
+function armCallHeartbeat(){
+  stopCallHeartbeat();
+  callLastActivity = Date.now();
+  callHeartbeatCount = 0;
+  callNextGap = (callHeartbeatBase() || 45) + Math.floor(Math.random() * 30);
+  callHeartbeatTimer = setInterval(callHeartbeatTick, 5000);
+}
+function stopCallHeartbeat(){ if(callHeartbeatTimer){ clearInterval(callHeartbeatTimer); callHeartbeatTimer = null; } }
+async function callHeartbeatTick(){
+  if(!(isCalling || isVideo) || callBusy) return;
+  const base = callHeartbeatBase();
+  if(!base) return;
+  if(window.speechSynthesis && speechSynthesis.speaking) return;
+  if(Date.now() - callLastActivity < callNextGap * 1000) return;
+  if(callHeartbeatCount >= 10){ stopCallHeartbeat(); return; }
+  callHeartbeatCount++;
+  callLastActivity = Date.now();
+  callNextGap = base + Math.floor(Math.random() * 30);
+  callBusy = true;
+  try {
+    const reply = await callAPI('（通话里安静了一会儿，你主动找个轻松的话头，简短一句就好）');
+    if(reply) speakText(reply);
+  } catch(e) { /* 心跳失败就安静待着 */ }
+  callBusy = false;
+  callLastActivity = Date.now();
+}
+
 // ══ 语音通话 ══
 let callRecognition = null;
 let callMicActive = false;
@@ -7196,10 +7311,12 @@ function startCallSTT() {
     if (!text) return;
     const sttMid = genMsgId(); pendingUserMid = sttMid;
     addTextMsg(text, true, false, sttMid);
+    callLastActivity = Date.now(); callHeartbeatCount = 0; callBusy = true;
     headerSub.textContent = '正在回复…';
     showTyping();
     const reply = await callAPI(text);
     hideTyping(); headerSub.textContent = '通话中';
+    callBusy = false; callLastActivity = Date.now();
     if (reply) { speakText(reply); }
     // 自动继续监听
     if (isCalling && callMicActive) startCallSTT();
@@ -7211,14 +7328,16 @@ function startCallSTT() {
 document.getElementById('callBtn').addEventListener('click',async()=>{
   isCalling=true; document.getElementById('callModal').classList.add('show');
   callSeconds=0; callInterval=setInterval(()=>{callSeconds++;const m=String(Math.floor(callSeconds/60)).padStart(2,'0'),s=String(callSeconds%60).padStart(2,'0');document.getElementById('callTimer').textContent=`${m}:${s}`;},1000);
+  callBusy = true;
   showTyping(); const reply=await callAPI('（糯糯拨打了语音通话，温柔打个招呼，简短一点）'); hideTyping();
+  callBusy = false; callLastActivity = Date.now(); armCallHeartbeat();
   if(reply){speakText(reply);}
   // 自动开启 STT
   callMicActive = true;
   startCallSTT();
 });
 document.getElementById('callHangBtn').addEventListener('click',()=>{
-  isCalling=false; callMicActive=false;
+  isCalling=false; callMicActive=false; stopCallHeartbeat();
   callRecognition?.stop();
   clearInterval(callInterval); speechSynthesis?.cancel();
   document.getElementById('callModal').classList.remove('show');
@@ -7236,11 +7355,13 @@ document.getElementById('videoBtn').addEventListener('click',async()=>{
   try { localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); document.getElementById('localVideo').srcObject=localStream; } catch(e){ showToast('无法访问摄像头'); }
   isVideo=true; document.getElementById('videoModal').classList.add('show');
   videoSeconds=0; videoInterval=setInterval(()=>{videoSeconds++;const m=String(Math.floor(videoSeconds/60)).padStart(2,'0'),s=String(videoSeconds%60).padStart(2,'0');document.getElementById('videoTimer').textContent=`${m}:${s}`;},1000);
+  callBusy = true;
   showTyping(); const reply=await callAPI('（糯糯拨打了视频通话，温柔打个招呼，简短）'); hideTyping();
+  callBusy = false; callLastActivity = Date.now(); armCallHeartbeat();
   if(reply){speakText(reply);}
 });
 document.getElementById('vHangBtn').addEventListener('click',()=>{
-  isVideo=false; clearInterval(videoInterval); speechSynthesis?.cancel();
+  isVideo=false; stopCallHeartbeat(); clearInterval(videoInterval); speechSynthesis?.cancel();
   localStream?.getTracks().forEach(t=>t.stop()); document.getElementById('localVideo').srcObject=null;
   document.getElementById('videoModal').classList.remove('show');
   showToast(`视频通话结束 ${document.getElementById('videoTimer').textContent}`);
@@ -7260,6 +7381,7 @@ syncCallAvatars();
 // 聊天背景：注册控件并应用已保存的背景（模式/颜色/图片都和主题独立）
 setupBgControls();
 applyBackground();
+initCallHeartbeatSel();
 </script>
 </body>
 </html>
