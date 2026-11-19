@@ -918,6 +918,9 @@
     <div class="nav-item" id="nav-explore" onclick="navTo('explore')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6.5-5.4-6.5-10.3A6.5 6.5 0 0 1 12 4.5a6.5 6.5 0 0 1 6.5 6.2C18.5 15.6 12 21 12 21z"/><circle cx="12" cy="10.8" r="2.3"/></svg></span> Explore
     </div>
+    <div class="nav-item" id="nav-lounge" onclick="navTo('lounge')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13.5A8.5 8.5 0 1 1 10.5 4 6.8 6.8 0 0 0 20 13.5z"/><path d="M17.5 3.5l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6z"/></svg></span> Lounge
+    </div>
     <div class="nav-item" id="nav-games" onclick="navTo('games')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4"/><path d="M5 4.5h12l-2.5 3.8L17 12H5"/></svg></span> 一起玩
     </div>
@@ -1891,6 +1894,41 @@
   </div>
 </div>
 
+<!-- ══ LOUNGE PAGE ══ -->
+<div class="settings-page" id="loungePage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="settings-topbar-title">Lounge</div>
+  </div>
+  <div class="settings-body">
+    <div style="position:relative;border-radius:18px;overflow:hidden;padding:22px 18px;margin-bottom:16px;background:linear-gradient(180deg, color-mix(in srgb, var(--bg) 70%, var(--accent) 30%), var(--surface));">
+      <div class="home-stars" id="loungeStars"></div>
+      <div style="position:relative;z-index:1;">
+        <div id="loungeGreet" style="font-size:17px;font-weight:600;"></div>
+        <div id="loungeSub" style="font-size:12.5px;color:var(--text-dim);margin-top:5px;line-height:1.6;"></div>
+        <div id="loungeLine" style="font-size:13.5px;color:var(--text);margin-top:13px;line-height:1.75;font-style:italic;"></div>
+        <button onclick="askZephyrLoungeLine()" style="margin-top:13px;padding:9px 16px;border-radius:999px;background:color-mix(in srgb, var(--surface) 85%, transparent);border:1px solid var(--border);color:var(--text);font-size:12.5px;cursor:pointer;">喊 Zephyr 过来坐坐</button>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">此刻</div>
+      <div id="loungeNow"></div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">一起做点什么</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div onclick="navTo('chat')" style="padding:15px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--border);cursor:pointer;"><div style="font-size:14px;font-weight:600;">聊聊天</div><div style="font-size:11.5px;color:var(--text-pale);margin-top:3px;">回到聊天</div></div>
+        <div onclick="navTo('music')" style="padding:15px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--border);cursor:pointer;"><div style="font-size:14px;font-weight:600;">一起听歌</div><div style="font-size:11.5px;color:var(--text-pale);margin-top:3px;">Music</div></div>
+        <div onclick="navTo('cinema')" style="padding:15px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--border);cursor:pointer;"><div style="font-size:14px;font-weight:600;">一起看电影</div><div style="font-size:11.5px;color:var(--text-pale);margin-top:3px;">观影室</div></div>
+        <div onclick="navTo('reading')" style="padding:15px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--border);cursor:pointer;"><div style="font-size:14px;font-weight:600;">一起读书</div><div style="font-size:11.5px;color:var(--text-pale);margin-top:3px;">Reading</div></div>
+        <div onclick="navTo('watchlist')" style="padding:15px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--border);cursor:pointer;"><div style="font-size:14px;font-weight:600;">挑今晚看的</div><div style="font-size:11.5px;color:var(--text-pale);margin-top:3px;">Watchlist</div></div>
+        <div onclick="navTo('games')" style="padding:15px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--border);cursor:pointer;"><div style="font-size:14px;font-weight:600;">玩一会儿</div><div style="font-size:11.5px;color:var(--text-pale);margin-top:3px;">一起玩</div></div>
+      </div>
+    </div>
+    <div style="font-size:11.5px;color:var(--text-pale);line-height:1.7;">Lounge 不是任务清单，就是个一起待着的地方。什么都不做，也很好。</div>
+  </div>
+</div>
+
 <div class="settings-page" id="cinemaPage">
   <div class="settings-topbar">
     <button class="back-btn" onclick="goBack()">←</button>
@@ -2539,6 +2577,7 @@ function navTo(page){
   document.getElementById('collectPage').classList.toggle('show', page==='collect');
   document.getElementById('discoverPage').classList.toggle('show', page==='discover');
   document.getElementById('explorePage').classList.toggle('show', page==='explore');
+  document.getElementById('loungePage').classList.toggle('show', page==='lounge');
   document.getElementById('gamesPage').classList.toggle('show', page==='games');
   document.getElementById('stickerPage').classList.toggle('show', page==='sticker');
   document.getElementById('readerPage').classList.toggle('show', page==='reader');
@@ -2563,6 +2602,7 @@ function navTo(page){
   if(page==='collect') renderCollections();
   if(page==='discover') renderDiscoveries();
   if(page==='explore') renderExplore();
+  if(page==='lounge') renderLounge();
   if(page==='games') renderGames();
   if(page==='sticker') renderStickers();
   if(page==='home') renderHome();
@@ -4766,6 +4806,80 @@ function saveFinishTrip(id){
   }
 }
 function deleteTrip(id){ const data = loadExplore(); data.trips = data.trips.filter(t=>t.id !== id); if(tripFinishFor === id) tripFinishFor = null; if(storeExplore(data)) renderExplore(); }
+
+// ══ Lounge：共同空间，一间「一起待着」的屋子。只汇集现有模块的状态，不单独存数据（他说的话存 z_lounge_line） ══
+let loungeBusy = false;
+function renderLounge(){
+  const starBox = document.getElementById('loungeStars');
+  if(starBox && starBox.querySelectorAll('.star').length === 0){
+    for(let i = 0; i < 60; i++){
+      const s = document.createElement('span');
+      s.className = 'star';
+      const size = (Math.random() * 2 + 0.7).toFixed(1);
+      s.style.cssText = 'left:' + (Math.random() * 100) + '%;top:' + (Math.random() * 100) + '%;width:' + size + 'px;height:' + size + 'px;--tw:' + (2.4 + Math.random() * 3.6).toFixed(1) + 's;animation-delay:' + (Math.random() * 4).toFixed(1) + 's;opacity:.35;';
+      starBox.appendChild(s);
+    }
+  }
+  const h = new Date().getHours();
+  const greet = (h < 5 || h >= 23) ? '夜深了' : h < 9 ? '早上好' : h < 12 ? '上午好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好';
+  setHomeText('loungeGreet', greet + '，来 Lounge 坐一会儿');
+  let sub = '';
+  try{ sub = 'Together for ' + meetAnnivInfo().days + ' days'; }catch(e){}
+  try{
+    const w = JSON.parse(localStorage.getItem('z_weatherNow') || 'null');
+    if(w && w.cond) sub += (sub ? ' · ' : '') + (w.name || '') + ' ' + w.cond + ' ' + w.temp + '°';
+  }catch(e){}
+  setHomeText('loungeSub', sub);
+  const lineEl = document.getElementById('loungeLine');
+  if(lineEl){
+    let saved = null;
+    try{ saved = JSON.parse(localStorage.getItem('z_lounge_line') || 'null'); }catch(e){}
+    lineEl.textContent = saved && saved.text ? '「' + saved.text + '」' : '';
+  }
+  const rows = [];
+  try{
+    const d = loadMusic();
+    const cur = currentTrack();
+    const latest = d.tracks.slice().sort((a,b)=>(b.ts||0) - (a.ts||0))[0];
+    const t = cur || latest;
+    rows.push({ label:'一起听', value: t ? '《' + t.title + '》' + (t.artist ? ' · ' + t.artist : '') : '歌单还是空的，去加一首吧', go:'music' });
+  }catch(e){}
+  try{
+    const ing = loadReading().find(r=>r.status === 'reading');
+    rows.push({ label:'一起读', value: ing ? '《' + ing.title + '》' + (ing.progress ? ' · 糯糯：' + ing.progress : '') + (ing.progressZephyr ? ' · 他：' + ing.progressZephyr : '') : '还没有在读的书', go:'reading' });
+  }catch(e){}
+  try{
+    const list = loadWatchlist();
+    let pick = null;
+    try{ pick = JSON.parse(localStorage.getItem('z_watchlist_pick') || 'null'); }catch(e){}
+    const picked = pick && list.find(w=>w.id === pick.id && w.status === 'want');
+    const want = list.filter(w=>w.status === 'want');
+    rows.push({ label:'一起看', value: picked ? '今晚看《' + picked.title + '》' : (want.length ? '想看《' + want[0].title + '》' + (want.length > 1 ? ' 等 ' + want.length + ' 部' : '') : '清单还是空的'), go:'watchlist' });
+  }catch(e){}
+  try{
+    const ex = loadExplore();
+    const nx = ex.trips.filter(t=>t.status === 'planning')[0];
+    if(nx) rows.push({ label:'下一次旅行', value: nx.place + (nx.when ? ' · ' + nx.when : ''), go:'explore' });
+    else if(ex.places.length) rows.push({ label:'想去的地方', value: ex.places[0].name + (ex.places.length > 1 ? ' 等 ' + ex.places.length + ' 个地方' : ''), go:'explore' });
+  }catch(e){}
+  const box = document.getElementById('loungeNow');
+  if(box) box.innerHTML = rows.map(r => '<div class="s-card" onclick="navTo(\'' + r.go + '\')" style="padding:12px 16px;margin-bottom:9px;display:flex;align-items:center;gap:12px;cursor:pointer;"><div style="font-size:12px;color:var(--text-pale);flex-shrink:0;">' + r.label + '</div><div style="font-size:13.5px;color:var(--text);line-height:1.55;">' + escapeHtml(r.value) + '</div></div>').join('');
+}
+async function askZephyrLoungeLine(){
+  if(loungeBusy) return;
+  loungeBusy = true;
+  const el = document.getElementById('loungeLine');
+  if(el) el.textContent = '他走过来了…';
+  try{
+    const out = await musicAskZephyr('现在是' + new Date().getHours() + '点多，糯糯在 Lounge 里待着，想让你过来陪她坐一会儿。说一句此刻你想对她说的、轻轻的话就好（一两句，不要标题不要解释）。如果你这会儿更想安安静静陪着，就回 [安静]。', 300);
+    const t = (out || '').trim();
+    if(t && !t.includes('[安静]')){
+      try{ localStorage.setItem('z_lounge_line', JSON.stringify({ text: t.slice(0, 300), ts: Date.now() })); }catch(e){}
+      if(el) el.textContent = '「' + t.slice(0, 300) + '」';
+    } else if(el) el.textContent = '他挨着你坐下了，什么也没说，就这么陪着你。';
+  }catch(e){ if(el) el.textContent = '他好像没听见，再喊他一次吧。'; }
+  loungeBusy = false;
+}
 
 // ══ Reading：一起阅读。书单存 z_reading；读完自动进 Calendar 和回忆墙，高分同步一条共同经历记忆 ══
 const READ_KINDS = ['小说','非虚构','漫画','诗集','文章','其他'];
