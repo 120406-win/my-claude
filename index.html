@@ -616,6 +616,16 @@
     .vcbtn-mic{background:var(--accent);} .vcbtn-cam{background:var(--accent); background:color-mix(in srgb, var(--accent) 62%, var(--surface));} .vcbtn-hang{background:#e05252;}
     .video-timer { color:var(--text); font-size:14px; position:absolute; top:16px; left:50%; transform:translateX(-50%); z-index:10; }
 
+    .call-min-btn { position:absolute; top:calc(14px + env(safe-area-inset-top)); left:16px; width:40px; height:40px; border-radius:50%; border:1px solid var(--border); background:color-mix(in srgb, var(--surface) 82%, transparent); color:var(--text); display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:6; }
+    .call-rec-bubble { display:flex; align-items:center; gap:7px; }
+    .call-rec-bubble svg { flex-shrink:0; }
+    .call-mini { position:fixed; right:14px; top:110px; z-index:190; display:none; align-items:center; gap:8px; padding:9px 14px; border-radius:999px; background:color-mix(in srgb, var(--surface) 88%, transparent); border:1px solid var(--border); box-shadow:0 10px 28px rgba(0,0,0,0.25); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); color:var(--text); font-size:13px; cursor:pointer; touch-action:none; user-select:none; -webkit-user-select:none; }
+    .call-mini.show { display:flex; }
+    .call-mini-dot { width:8px; height:8px; border-radius:50%; background:#3ecf6e; animation:pulse 2s ease-in-out infinite; flex-shrink:0; }
+    .call-mini-video { width:96px; height:136px; padding:0; border-radius:14px; overflow:hidden; }
+    #localVideo.mini-vid { position:absolute; inset:0; width:100%; height:100%; border:none; border-radius:14px; z-index:1; }
+    .call-mini-bar { position:absolute; left:0; right:0; bottom:0; z-index:2; display:flex; align-items:center; gap:6px; padding:6px 9px; background:linear-gradient(to top, rgba(0,0,0,0.55), transparent); color:#fff; font-size:12px; }
+
     /* 图片预览 */
     .img-preview { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.92); display:none; align-items:center; justify-content:center; }
     .img-preview.show { display:flex; }
@@ -2050,6 +2060,7 @@
 
 <!-- 语音通话 -->
 <div class="call-modal" id="callModal">
+  <button class="call-min-btn" id="callMinBtn" title="收起"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="12" height="12" rx="2.5"/><path d="M9 20.5h9a2.5 2.5 0 0 0 2.5-2.5v-9"/></svg></button>
   <div class="call-avatar-big" id="callAvatarBig"><svg viewBox="0 0 24 24" width="52" height="52"><path fill="#ffd97a" d="M20 13.5A8.5 8.5 0 1 1 10.5 4a7 7 0 0 0 9.5 9.5z"/></svg></div>
   <div class="call-name">Zephyr</div>
   <div class="call-timer" id="callTimer">00:00</div>
@@ -2061,6 +2072,7 @@
 
 <!-- 视频通话 -->
 <div class="video-modal" id="videoModal">
+  <button class="call-min-btn" id="videoMinBtn" title="收起"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="12" height="12" rx="2.5"/><path d="M9 20.5h9a2.5 2.5 0 0 0 2.5-2.5v-9"/></svg></button>
   <div class="video-timer" id="videoTimer">00:00</div>
   <div class="video-remote">
     <div class="video-remote-avatar" id="videoAvatarBig"><svg viewBox="0 0 24 24" width="54" height="54"><path fill="#ffd97a" d="M20 13.5A8.5 8.5 0 1 1 10.5 4a7 7 0 0 0 9.5 9.5z"/></svg></div>
@@ -2073,6 +2085,10 @@
     <button class="vcbtn vcbtn-hang" id="vHangBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><g transform="rotate(135 12 12)"><path d="M5.2 4h3l1.5 4-2 1.5a12 12 0 0 0 5.8 5.8l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A19.5 19.5 0 0 1 3.2 6.2 2 2 0 0 1 5.2 4z"/></g></svg></button>
   </div>
 </div>
+
+<!-- 通话收起后的悬浮小窗 -->
+<div id="callMini" class="call-mini"><span class="call-mini-dot"></span><span>通话中</span><span id="callMiniTimer">00:00</span></div>
+<div id="videoMini" class="call-mini call-mini-video"><div id="videoMiniSlot" style="position:absolute;inset:0;"></div><div class="call-mini-bar"><span class="call-mini-dot"></span><span id="videoMiniTimer">00:00</span></div></div>
 
 <!-- Zephyr 主动来电 -->
 <div class="call-modal" id="incomingCallModal">
@@ -6304,6 +6320,10 @@ function renderMessagesIntoChat(){
       chatWrap.appendChild(note);
       return;
     }
+    if(m.callrec){
+      appendCallRecRow(m);
+      return;
+    }
     if(typeof m.content === 'string'){
       let dispText = m.content;
       let dispThinking = m.thinking || '';
@@ -8359,8 +8379,8 @@ async function callRecSend(R, chunks, rate) {
 document.getElementById('callBtn').addEventListener('click',async()=>{
   unlockTtsAudio();
   const listenReadyP = startCallListen();
-  isCalling=true; document.getElementById('callModal').classList.add('show');
-  callSeconds=0; callInterval=setInterval(()=>{callSeconds++;const m=String(Math.floor(callSeconds/60)).padStart(2,'0'),s=String(callSeconds%60).padStart(2,'0');document.getElementById('callTimer').textContent=`${m}:${s}`;},1000);
+  isCalling=true; callConnected=false; document.getElementById('callModal').classList.add('show');
+  callSeconds=0; callInterval=setInterval(()=>{callSeconds++;const m=String(Math.floor(callSeconds/60)).padStart(2,'0'),s=String(callSeconds%60).padStart(2,'0');document.getElementById('callTimer').textContent=`${m}:${s}`;document.getElementById('callMiniTimer').textContent=`${m}:${s}`;},1000);
   callBusy = true;
   showTyping(); const reply=await callAPI('（糯糯拨打了语音通话，温柔打个招呼，简短一点）'); hideTyping();
   callBusy = false; callLastActivity = Date.now(); armCallHeartbeat();
@@ -8368,17 +8388,114 @@ document.getElementById('callBtn').addEventListener('click',async()=>{
   // 等他问候说完再开输入门（识别和播放同时开会互相打死）；
   // 录音识别就绪就用它，没就绪才回退浏览器识别
   callMicActive = true;
+  callConnected = true;
   const okAsr = await listenReadyP;
   if (!okAsr && isCalling) startCallSTT();
 });
 document.getElementById('callHangBtn').addEventListener('click',()=>{
   isCalling=false; callMicActive=false; stopCallHeartbeat();
+  addCallRecord('voice', callSeconds, !callConnected);
+  hideCallMini('voice'); callConnected = false;
   clearTimeout(callSTTRestartTimer); clearTimeout(callSTTWatchdog); callTtsSpeaking = false; callSTTRunning = false;
   callRecognition?.stop(); stopCallListen();
   clearInterval(callInterval); speechSynthesis?.cancel(); try{ getTtsAudio().pause(); }catch(e){}
   document.getElementById('callModal').classList.remove('show');
   showToast(`通话结束 ${document.getElementById('callTimer').textContent}`);
 });
+// ══ 通话记录气泡 + 通话界面收起（仿微信）══
+let callConnected = false, videoConnected = false;
+function fmtCallDur(sec) {
+  sec = Math.max(0, sec | 0);
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60;
+  const mm = String(m).padStart(2, '0'), ss = String(s).padStart(2, '0');
+  return h > 0 ? h + ':' + mm + ':' + ss : mm + ':' + ss;
+}
+const CALLREC_PHONE_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5.2 4h3l1.5 4-2 1.5a12 12 0 0 0 5.8 5.8l1.5-2 4 1.5v3a2 2 0 0 1-2.2 2A19.5 19.5 0 0 1 3.2 6.2 2 2 0 0 1 5.2 4z"/></svg>';
+const CALLREC_VIDEO_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7.5" width="12.5" height="9.5" rx="3"/><path d="M15.5 10.8l5-2.8v8.5l-5-2.8"/></svg>';
+function callRecLabel(m) {
+  if (!m || !m.callrec) return '';
+  return m.callrec.cancelled ? '已取消' : '通话时长 ' + fmtCallDur(m.callrec.dur || 0);
+}
+function appendCallRecRow(m) {
+  const col = addRow(true, m.mid);
+  const b = document.createElement('div');
+  b.className = 'msg call-rec-bubble';
+  b.innerHTML = (m.callrec.kind === 'video' ? CALLREC_VIDEO_SVG : CALLREC_PHONE_SVG) + '<span></span>';
+  b.querySelector('span').textContent = callRecLabel(m);
+  col.appendChild(b);
+  chatWrap.scrollTop = chatWrap.scrollHeight;
+}
+function addCallRecord(kind, seconds, cancelled) {
+  const label = cancelled ? '已取消' : '通话时长 ' + fmtCallDur(seconds);
+  const m = { role: 'user', mid: genMsgId(), ts: Date.now(), callrec: { kind, dur: seconds, cancelled: !!cancelled },
+    content: '（' + (kind === 'video' ? '视频通话' : '语音通话') + (cancelled ? '，已取消' : '，' + label) + '）' };
+  messages.push(m);
+  saveChatHistory();
+  appendCallRecRow(m);
+}
+function minimizeCall(kind) {
+  if (kind === 'video') {
+    if (!isVideo) return;
+    document.getElementById('videoModal').classList.remove('show');
+    const v = document.getElementById('localVideo');
+    document.getElementById('videoMiniSlot').appendChild(v);
+    v.classList.add('mini-vid');
+    document.getElementById('videoMini').classList.add('show');
+  } else {
+    if (!isCalling) return;
+    document.getElementById('callModal').classList.remove('show');
+    document.getElementById('callMini').classList.add('show');
+  }
+}
+function restoreCall(kind) {
+  if (kind === 'video') {
+    document.getElementById('videoMini').classList.remove('show');
+    const v = document.getElementById('localVideo');
+    v.classList.remove('mini-vid');
+    document.getElementById('videoModal').insertBefore(v, document.querySelector('.video-controls'));
+    if (isVideo) document.getElementById('videoModal').classList.add('show');
+  } else {
+    document.getElementById('callMini').classList.remove('show');
+    if (isCalling) document.getElementById('callModal').classList.add('show');
+  }
+}
+function hideCallMini(kind) {
+  if (kind === 'video') {
+    document.getElementById('videoMini').classList.remove('show');
+    const v = document.getElementById('localVideo');
+    if (v.classList.contains('mini-vid')) {
+      v.classList.remove('mini-vid');
+      document.getElementById('videoModal').insertBefore(v, document.querySelector('.video-controls'));
+    }
+  } else {
+    document.getElementById('callMini').classList.remove('show');
+  }
+}
+function makeMiniInteractive(el, restoreFn) {
+  let sx = 0, sy = 0, ox = 0, oy = 0, moved = false, dragging = false;
+  el.addEventListener('pointerdown', (e) => {
+    dragging = true; moved = false;
+    const r = el.getBoundingClientRect();
+    sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+    el.style.right = 'auto'; el.style.left = ox + 'px'; el.style.top = oy + 'px';
+    try { el.setPointerCapture(e.pointerId); } catch(err) {}
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (Math.abs(dx) + Math.abs(dy) > 8) moved = true;
+    if (moved) {
+      el.style.left = Math.min(Math.max(4, ox + dx), innerWidth - el.offsetWidth - 4) + 'px';
+      el.style.top = Math.min(Math.max(4, oy + dy), innerHeight - el.offsetHeight - 4) + 'px';
+    }
+  });
+  el.addEventListener('pointerup', () => { dragging = false; if (!moved) restoreFn(); });
+}
+document.getElementById('callMinBtn').addEventListener('click', () => minimizeCall('voice'));
+document.getElementById('videoMinBtn').addEventListener('click', () => minimizeCall('video'));
+makeMiniInteractive(document.getElementById('callMini'), () => restoreCall('voice'));
+makeMiniInteractive(document.getElementById('videoMini'), () => restoreCall('video'));
+
 // 通话中麦克风按钮 - 切换静音
 document.getElementById('callMicBtn').addEventListener('click',()=>{
   callMicActive = !callMicActive;
@@ -8390,15 +8507,18 @@ document.getElementById('callMicBtn').addEventListener('click',()=>{
 document.getElementById('videoBtn').addEventListener('click',async()=>{
   unlockTtsAudio();
   try { localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); document.getElementById('localVideo').srcObject=localStream; } catch(e){ showToast('无法访问摄像头'); }
-  isVideo=true; document.getElementById('videoModal').classList.add('show');
-  videoSeconds=0; videoInterval=setInterval(()=>{videoSeconds++;const m=String(Math.floor(videoSeconds/60)).padStart(2,'0'),s=String(videoSeconds%60).padStart(2,'0');document.getElementById('videoTimer').textContent=`${m}:${s}`;},1000);
+  isVideo=true; videoConnected=false; document.getElementById('videoModal').classList.add('show');
+  videoSeconds=0; videoInterval=setInterval(()=>{videoSeconds++;const m=String(Math.floor(videoSeconds/60)).padStart(2,'0'),s=String(videoSeconds%60).padStart(2,'0');document.getElementById('videoTimer').textContent=`${m}:${s}`;document.getElementById('videoMiniTimer').textContent=`${m}:${s}`;},1000);
   callBusy = true;
   showTyping(); const reply=await callAPI('（糯糯拨打了视频通话，温柔打个招呼，简短）'); hideTyping();
   callBusy = false; callLastActivity = Date.now(); armCallHeartbeat();
+  videoConnected = true;
   if(reply){speakText(reply);}
 });
 document.getElementById('vHangBtn').addEventListener('click',()=>{
   isVideo=false; stopCallHeartbeat(); clearInterval(videoInterval); speechSynthesis?.cancel(); try{ getTtsAudio().pause(); }catch(e){}
+  addCallRecord('video', videoSeconds, !videoConnected);
+  hideCallMini('video'); videoConnected = false;
   localStream?.getTracks().forEach(t=>t.stop()); document.getElementById('localVideo').srcObject=null;
   document.getElementById('videoModal').classList.remove('show');
   showToast(`视频通话结束 ${document.getElementById('videoTimer').textContent}`);
