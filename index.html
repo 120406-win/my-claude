@@ -1214,6 +1214,21 @@
       </div>
     </div>
     <div class="s-section">
+      <div class="s-section-title">对话摘要</div>
+      <div class="s-card">
+        <div class="s-row">
+          <div class="s-row-label">把聊过的旧消息压成摘要
+            <div class="s-row-sub">对话很长时，较早的消息会自动总结成一段笔记放在上下文最前面，他不会断片，也省额度（会多用一点点 API 额度）</div>
+          </div>
+          <input type="checkbox" id="summaryToggle" onchange="toggleSummary(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
+        </div>
+        <div style="padding:4px 16px 14px;">
+          <div id="summaryPreview" style="font-size:12.5px;color:var(--text-dim);line-height:1.7;white-space:pre-wrap;"></div>
+          <button onclick="clearConvSummary()" style="margin-top:10px;width:100%;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">清除当前对话的摘要</button>
+        </div>
+      </div>
+    </div>
+    <div class="s-section">
       <div class="s-section-title">添加记忆</div>
       <div class="s-card" style="padding:14px 16px;">
         <textarea id="memInput" rows="3" placeholder="写下一件希望 Zephyr 永远记得的事…" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;line-height:1.6;resize:vertical;"></textarea>
@@ -2613,6 +2628,13 @@ function memEmoLabel(m){
 function renderMemories(){
   const tg = document.getElementById('autoMemToggle');
   if(tg) tg.checked = autoMemEnabled();
+  const stg = document.getElementById('summaryToggle');
+  if(stg) stg.checked = summaryEnabled();
+  const spv = document.getElementById('summaryPreview');
+  if(spv){
+    const s = activeConvId ? getConvSummary(activeConvId) : null;
+    spv.textContent = s ? ('当前对话的摘要：\n' + s.text) : '当前对话还没有摘要，聊得足够长之后会自动生成。';
+  }
   const list = loadMemories();
   const countEl = document.getElementById('memCount');
   if(countEl) countEl.textContent = list.length;
@@ -2718,6 +2740,69 @@ function deleteMemory(id){
   storeMemories(list);
   renderMemories();
   showToast('已删除这条记忆');
+}
+
+// ══ 对话摘要压缩：聊得太长时，把旧消息压成一段笔记放在上下文最前面，他不断片、也省额度 ══
+const SUMMARY_KEEP_RECENT = 24;
+const SUMMARY_TRIGGER = 48;
+const SUMMARY_PROMPT = '你是一个对话摘要助手。请把「已有摘要」和「新的对话片段」合并成一段更新后的摘要，不超过 700 字。用第三人称简洁陈述，保留：重要事实与决定、两人的情绪与关系动态、正在做的事、还没聊完的话题与约定。不要寒暄，不要列表，就写成一段连贯的话。只输出摘要正文，不要输出任何其他文字。';
+let summaryRunning = false;
+function summaryEnabled(){ return localStorage.getItem('z_summaryOn') !== '0'; }
+function toggleSummary(on){ localStorage.setItem('z_summaryOn', on ? '1' : '0'); showToast(on ? '对话摘要已开启' : '对话摘要已关闭'); }
+function loadSummaries(){ try{ const o = JSON.parse(localStorage.getItem('z_convSummaries') || '{}'); return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; }catch(e){ return {}; } }
+function storeSummaries(o){ try{ localStorage.setItem('z_convSummaries', JSON.stringify(o)); return true; }catch(e){ return false; } }
+function getConvSummary(convId){ const s = loadSummaries()[convId]; return (s && s.text) ? s : null; }
+function summaryAnchorIndex(list, sum){
+  if(!sum || !sum.uptoMid) return -1;
+  return list.findIndex(m=>m.mid === sum.uptoMid);
+}
+function maybeUpdateSummary(){
+  if(!summaryEnabled() || summaryRunning || !activeConvId) return;
+  const sum = getConvSummary(activeConvId);
+  const hist = messages.filter(m=>!m.recalled);
+  const ai = summaryAnchorIndex(hist, sum);
+  if(sum && ai < 0){
+    // 摘要锚定的那段对话已经被删掉了，摘要作废，下次从头来
+    const all = loadSummaries(); delete all[activeConvId]; storeSummaries(all);
+    return;
+  }
+  if(hist.length - (ai + 1) > SUMMARY_TRIGGER) runSummaryUpdate();
+}
+async function runSummaryUpdate(){
+  if(summaryRunning) return;
+  summaryRunning = true;
+  const convId = activeConvId;
+  try{
+    const sum = getConvSummary(convId);
+    const hist = messages.filter(m=>!m.recalled);
+    const ai = summaryAnchorIndex(hist, sum);
+    const uncovered = hist.slice(ai + 1);
+    if(uncovered.length <= SUMMARY_KEEP_RECENT) return;
+    const chunk = uncovered.slice(0, uncovered.length - SUMMARY_KEEP_RECENT);
+    if(chunk.length < 6) return;
+    const transcript = chunk.map(m=>(m.role === 'user' ? 'Lumi：' : 'Zephyr：') + msgToText(m)).filter(t=>t.length > 7).join('\n').slice(0, 12000);
+    if(!transcript) return;
+    const base = (cfg.apiUrl || 'https://api.anthropic.com/v1').replace(/\/$/, '');
+    const res = await fetch(base + '/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+      body: JSON.stringify({ model: cfg.model, max_tokens: 900, system: SUMMARY_PROMPT, messages: [{ role: 'user', content: '已有摘要：\n' + (sum ? sum.text : '（暂无）') + '\n\n新的对话片段：\n' + transcript }] })
+    });
+    if(!res.ok) return;
+    const data = await res.json();
+    const out = (data.content || []).filter(b=>b.type === 'text').map(b=>b.text).join('').trim();
+    if(!out) return;
+    const all = loadSummaries();
+    all[convId] = { text: out.slice(0, 900), uptoMid: chunk[chunk.length - 1].mid, ts: Date.now() };
+    storeSummaries(all);
+  }catch(e){ /* 摘要失败就安静等下一次 */ }
+  summaryRunning = false;
+}
+function clearConvSummary(){
+  if(!activeConvId){ showToast('先打开一个对话'); return; }
+  const all = loadSummaries(); delete all[activeConvId]; storeSummaries(all);
+  renderMemories();
+  showToast('当前对话的摘要已清除');
 }
 
 // ══ 自动记忆：每聊满 10 条，自动把这段对话总结成长期记忆 ══
@@ -6869,7 +6954,22 @@ async function callAPI(userText, extraBlocks=null, opts=null){
   try {
     const base=(cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/,'');
     // 发给 API 的历史要清洗：去掉本地用的 mid，并跳过已撤回的消息（撤回 = Zephyr 真的看不到）
-    const apiMessages = messages.filter(m=>!m.recalled).map(m=>{
+    const histAll = messages.filter(m=>!m.recalled);
+    let histForApi = histAll;
+    let summaryPair = null;
+    const convSum = activeConvId ? getConvSummary(activeConvId) : null;
+    if(convSum){
+      const ai = summaryAnchorIndex(histAll, convSum);
+      if(ai >= 0){
+        // 已被摘要覆盖的旧消息不再逐条发，只把摘要放在最前面
+        histForApi = histAll.slice(ai + 1);
+        summaryPair = [
+          { role: 'user', content: '【我们之前聊天的摘要】\n' + convSum.text + '\n（以上是之前对话的摘要，请自然地接着聊，不要复述它。）' },
+          { role: 'assistant', content: '嗯，我都记得，我们接着聊。' }
+        ];
+      }
+    }
+    const mappedHist = histForApi.map(m=>{
       let c = m.content;
       // 历史里若混着「思考混在正文里」的旧回复，只把正文发给他，免得他学着那个格式说话
       if(m.role === 'assistant' && typeof c === 'string'){
@@ -6878,6 +6978,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       }
       return { role:m.role, content:c };
     });
+    const apiMessages = summaryPair ? summaryPair.concat(mappedHist) : mappedHist;
     const reqBody = { model:cfg.model, max_tokens:cfg.maxTokens, temperature:cfg.temperature, top_p:cfg.topP, system:buildSystemPrompt(typeof userText === 'string' ? userText : ''), messages:apiMessages, stream:true };
     const thinkOn = thinkingEnabled();
     if(thinkOn){
@@ -7040,6 +7141,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(songShare ? {song: songShare} : {})});
     saveChatHistory();
     maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
+    maybeUpdateSummary(); // 聊得太长时把旧消息压成摘要，后台进行，不打断聊天
     updateRegenButton();
     return reply;
   } catch(e){ if(!regen) messages.pop(); showToast('发送失败：'+e.message + (thinkingEnabled() ? '（开着思考模式时若反复失败，可能是模型或接口不支持，去设置里关掉它）' : '')); return null; }
