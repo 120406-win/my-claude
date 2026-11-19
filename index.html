@@ -396,6 +396,7 @@
     .msg-row { display:flex; margin-bottom:14px; align-items:flex-end; gap:8px; -webkit-touch-callout:none; }
     .msg-row.user { flex-direction:row-reverse; }
     .msg-row.row-selected { background:color-mix(in srgb, var(--accent) 13%, transparent); border-radius:14px; }
+    @keyframes danmakuFly { from { left:100%; } to { left:-45%; } }
     .msg-avatar {
       width:28px; height:28px; border-radius:50%;
       background:var(--accent);
@@ -858,6 +859,9 @@
     </div>
     <div class="nav-item" id="nav-watchlist" onclick="navTo('watchlist')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M10.3 9.3l4.7 2.7-4.7 2.7z"/></svg></span> Watchlist
+    </div>
+    <div class="nav-item" id="nav-cinema" onclick="navTo('cinema')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M7.5 5v14M16.5 5v14M3.5 9.5h4M3.5 14.5h4M16.5 9.5h4M16.5 14.5h4"/></svg></span> 观影室
     </div>
     <div class="nav-item" id="nav-reading" onclick="navTo('reading')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span> Reading
@@ -1547,7 +1551,7 @@
     <div class="settings-topbar-title">Watchlist</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">想一起看的都攒在这里：电影、剧、动画、纪录片、视频。看完的会变成观影记录，进 Calendar，也会被你们一起记住。真正的同步观影室要等以后有后端，这里先把清单和回忆攒起来。</div>
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">想一起看的都攒在这里：电影、剧、动画、纪录片、视频。看完的会变成观影记录，进 Calendar，也会被你们一起记住。想一起看的时候去「观影室」：本地视频配上字幕，他能看着字幕陪聊。</div>
     <div id="watchPick"></div>
     <div style="display:flex;gap:8px;margin-bottom:18px;">
       <button id="pickWatchBtn" onclick="askZephyrWatchPick()" style="flex:1;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">请 Zephyr 选今晚看的</button>
@@ -1706,6 +1710,47 @@
     <div style="display:flex;gap:8px;margin:16px 0 8px;">
       <button id="readerPrevBtn" onclick="readerGoto(readerState.ch - 1)" style="flex:1;padding:12px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">上一节</button>
       <button id="readerNextBtn" onclick="readerGoto(readerState.ch + 1)" style="flex:1;padding:12px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">下一节</button>
+    </div>
+  </div>
+</div>
+
+<div class="settings-page" id="cinemaPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="settings-topbar-title">观影室</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">挑一部手机里的视频，可以配一份字幕（.srt / .vtt），和 Zephyr 一起看：他能看到当前字幕和进度，你留影给他，他还能看到这一帧。你们的话会变成弹幕飘过画面。视频和字幕只在这次打开时用，不会存进 App；聊天记录会留下来。</div>
+    <div id="cinemaStage" style="position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:16/9;margin-bottom:12px;">
+      <video id="cinemaVideo" style="width:100%;height:100%;display:block;" controls playsinline></video>
+      <div id="cinemaDanmaku" style="position:absolute;inset:0;overflow:hidden;pointer-events:none;"></div>
+      <div id="cinemaEmpty" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.55);font-size:13px;pointer-events:none;">先选一部视频吧</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+      <button onclick="document.getElementById('cinemaVideoFile').click()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">选视频</button>
+      <button onclick="document.getElementById('cinemaSubFile').click()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">选字幕</button>
+      <button onclick="cinemaSendFrame()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">留影给他看</button>
+      <button onclick="cinemaFullscreen()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">全屏</button>
+      <label style="display:flex;align-items:center;gap:6px;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;"><input type="checkbox" id="cinemaDanmakuToggle" checked onchange="cinemaDanmakuOn=this.checked" style="accent-color:var(--accent);">弹幕</label>
+    </div>
+    <input type="file" id="cinemaVideoFile" accept="video/*" style="display:none" onchange="onCinemaVideoChosen(this)">
+    <input type="file" id="cinemaSubFile" accept=".srt,.vtt" style="display:none" onchange="onCinemaSubChosen(this)">
+    <div id="cinemaInfo" style="font-size:12px;color:var(--text-pale);margin-bottom:14px;">还没有在播的片子。</div>
+    <div class="s-section">
+      <div class="s-section-title">一起聊聊</div>
+      <div id="cinemaLog" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;max-height:46vh;overflow-y:auto;"></div>
+      <div style="display:flex;gap:8px;">
+        <input id="cinemaInput" type="text" placeholder="对这部片子说点什么…" onkeydown="if(event.key==='Enter')cinemaSend()" style="flex:1;padding:11px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:14px;outline:none;font-family:inherit;">
+        <button onclick="cinemaSend()" style="padding:11px 18px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:14px;cursor:pointer;">发送</button>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <button onclick="cinemaSynopsis()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">整片聊聊（先压一份梗概）</button>
+        <button onclick="cinemaFinish()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">看完了 · 记到 Watchlist</button>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">观影记录</div>
+      <div id="cinemaRecords"></div>
     </div>
   </div>
 </div>
@@ -2289,6 +2334,7 @@ function navTo(page){
   document.getElementById('dreamsPage').classList.toggle('show', page==='dreams');
   document.getElementById('musicPage').classList.toggle('show', page==='music');
   document.getElementById('watchlistPage').classList.toggle('show', page==='watchlist');
+  document.getElementById('cinemaPage').classList.toggle('show', page==='cinema');
   document.getElementById('readingPage').classList.toggle('show', page==='reading');
   document.getElementById('wallPage').classList.toggle('show', page==='wall');
   document.getElementById('capsulePage').classList.toggle('show', page==='capsule');
@@ -2310,6 +2356,7 @@ function navTo(page){
   if(page==='dreams') renderDreams();
   if(page==='music') renderMusic();
   if(page==='watchlist') renderWatchlist();
+  if(page==='cinema') renderCinema();
   if(page==='reading') renderReading();
   if(page==='wall') renderWall();
   if(page==='capsule') renderCapsules();
@@ -7718,6 +7765,255 @@ document.getElementById('vHangBtn').addEventListener('click',()=>{
 let camOn=true,vMicOn=true;
 document.getElementById('vCamBtn').addEventListener('click',()=>{ camOn=!camOn; localStream?.getVideoTracks().forEach(t=>t.enabled=camOn); document.getElementById('vCamBtn').innerHTML=camOn?ICON_CAM:ICON_CAM_OFF; });
 document.getElementById('vMicBtn').addEventListener('click',()=>{ vMicOn=!vMicOn; localStream?.getAudioTracks().forEach(t=>t.enabled=vMicOn); document.getElementById('vMicBtn').innerHTML=vMicOn?ICON_MIC:ICON_MIC_OFF; });
+
+// ══ Cinema 观影室：本地视频 + 字幕，他看当前字幕/进度/留影帧，聊天变弹幕 ══
+let cinemaDanmakuOn = true;
+let cinemaBusy = false;
+const cinemaState = { recordId: null, title: '', cues: [], synopsis: '', frame: null, log: [], url: null };
+function loadCinemaRecords(){ try{ const a = JSON.parse(localStorage.getItem('z_cinema') || '[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeCinemaRecords(list){ try{ localStorage.setItem('z_cinema', JSON.stringify(list)); return true; }catch(e){ return false; } }
+function loadCinemaLogs(){ try{ const o = JSON.parse(localStorage.getItem('z_cinema_logs') || '{}'); return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; }catch(e){ return {}; } }
+function saveCinemaLog(){
+  if(!cinemaState.recordId) return;
+  const all = loadCinemaLogs();
+  all[cinemaState.recordId] = cinemaState.log.slice(-100);
+  try{ localStorage.setItem('z_cinema_logs', JSON.stringify(all)); }catch(e){}
+}
+function fmtFilmTime(s){
+  s = Math.max(0, Math.floor(s || 0));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+  return (h ? h + ':' : '') + String(m).padStart(2, '0') + ':' + String(ss).padStart(2, '0');
+}
+function parseSubTime(t){
+  const str = String(t).trim();
+  let m = str.match(/(\d+):(\d{2}):(\d{2})[.,](\d{3})/);
+  if(m) return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + (+m[4]) / 1000;
+  m = str.match(/(\d{2}):(\d{2})[.,](\d{3})/);
+  if(m) return (+m[1]) * 60 + (+m[2]) + (+m[3]) / 1000;
+  return 0;
+}
+function parseSubtitles(text){
+  const cues = [];
+  const norm = String(text).replace(/\r\n/g, '\n').replace(/^WEBVTT[^\n]*\n/, '');
+  const blocks = norm.split(/\n\n+/);
+  for(const b of blocks){
+    const lines = b.split('\n').filter(l=>l.trim() !== '');
+    const ti = lines.findIndex(l=>l.includes('-->'));
+    if(ti < 0) continue;
+    const parts = lines[ti].split('-->');
+    const start = parseSubTime(parts[0]);
+    const end = parseSubTime((parts[1] || '').trim().split(/\s+/)[0]);
+    const txt = lines.slice(ti + 1).join(' ').replace(/<[^>]+>/g, '').trim();
+    if(txt) cues.push({ start, end, text: txt });
+  }
+  return cues.sort((a, b)=>a.start - b.start);
+}
+async function readTextFileSmart(file){
+  const buf = await file.arrayBuffer();
+  try{ return new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+  catch(e){ try{ return new TextDecoder('gbk').decode(buf); }catch(e2){ return new TextDecoder('utf-8').decode(buf); } }
+}
+function onCinemaVideoChosen(input){
+  const f = input.files && input.files[0];
+  input.value = '';
+  if(!f) return;
+  const video = document.getElementById('cinemaVideo');
+  if(cinemaState.url) URL.revokeObjectURL(cinemaState.url);
+  cinemaState.url = URL.createObjectURL(f);
+  video.src = cinemaState.url;
+  cinemaState.title = f.name.replace(/\.[^.]+$/, '');
+  cinemaState.cues = [];
+  cinemaState.synopsis = '';
+  cinemaState.frame = null;
+  const recs = loadCinemaRecords();
+  const rec = { id: 'f' + Date.now().toString(36) + Math.floor(Math.random()*999), title: cinemaState.title, fileName: f.name, ts: Date.now() };
+  recs.push(rec);
+  storeCinemaRecords(recs);
+  cinemaState.recordId = rec.id;
+  cinemaState.log = [];
+  document.getElementById('cinemaEmpty').style.display = 'none';
+  renderCinema();
+  showToast('开播啦，配一份字幕会更好聊');
+}
+async function onCinemaSubChosen(input){
+  const f = input.files && input.files[0];
+  input.value = '';
+  if(!f) return;
+  try{
+    const text = await readTextFileSmart(f);
+    cinemaState.cues = parseSubtitles(text);
+    const recs = loadCinemaRecords();
+    const rec = recs.find(r=>r.id === cinemaState.recordId);
+    if(rec){ rec.subName = f.name; storeCinemaRecords(recs); }
+    renderCinemaInfo();
+    showToast(cinemaState.cues.length ? ('字幕载入好啦，共 ' + cinemaState.cues.length + ' 句') : '这个字幕没解析出内容，换一份试试');
+  }catch(e){ showToast('字幕读取失败了 qwq'); }
+}
+function cinemaCuesAt(t){
+  const cues = cinemaState.cues;
+  if(!cues.length) return '';
+  return cues.filter(c=>c.start <= t).slice(-6).map(c=>c.text).join('\n');
+}
+function renderCinemaInfo(){
+  const el = document.getElementById('cinemaInfo');
+  if(!el) return;
+  const video = document.getElementById('cinemaVideo');
+  if(!cinemaState.title){ el.textContent = '还没有在播的片子。'; return; }
+  const dur = (video && video.duration) ? fmtFilmTime(video.duration) : '未知';
+  el.textContent = '正在看：《' + cinemaState.title + '》 · 总时长 ' + dur + (cinemaState.cues.length ? ' · 字幕 ' + cinemaState.cues.length + ' 句' : ' · 还没配字幕') + (cinemaState.synopsis ? ' · 已有整片梗概' : '');
+}
+function renderCinema(){
+  renderCinemaInfo();
+  renderCinemaLog();
+  const box = document.getElementById('cinemaRecords');
+  if(!box) return;
+  const recs = loadCinemaRecords().slice().sort((a, b)=>b.ts - a.ts).slice(0, 20);
+  if(!recs.length){ box.innerHTML = '<div style="font-size:13px;color:var(--text-pale);padding:6px 2px;">还没有观影记录。</div>'; return; }
+  box.innerHTML = recs.map(r=>{
+    const d = new Date(r.ts);
+    return '<div class="s-card" style="padding:12px 14px;margin-bottom:10px;">'
+      + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;">'
+      + '<div style="font-size:14px;color:var(--text);flex:1;">《' + escapeHtml(r.title) + '》</div>'
+      + '<button onclick="deleteCinemaRecord(\'' + r.id + '\')" style="background:none;border:none;color:var(--text-pale);font-size:12px;cursor:pointer;flex-shrink:0;">删除</button></div>'
+      + '<div style="font-size:11px;color:var(--text-pale);margin-top:4px;">' + d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + (r.subName ? ' · 字幕 ' + escapeHtml(r.subName) : '') + '</div>'
+      + '<button onclick="resumeCinemaLog(\'' + r.id + '\')" style="margin-top:8px;background:none;border:1px solid var(--border);border-radius:999px;color:var(--text-dim);font-size:12px;padding:5px 12px;cursor:pointer;">看看那次聊了什么</button>'
+      + '</div>';
+  }).join('');
+}
+function resumeCinemaLog(id){
+  const rec = loadCinemaRecords().find(r=>r.id === id);
+  if(!rec) return;
+  cinemaState.recordId = id;
+  cinemaState.title = rec.title;
+  cinemaState.log = (loadCinemaLogs()[id] || []).slice();
+  renderCinemaInfo();
+  renderCinemaLog();
+  showToast('这是《' + rec.title + '》那次的聊天记录，重新选视频文件可以接着看');
+}
+function deleteCinemaRecord(id){
+  storeCinemaRecords(loadCinemaRecords().filter(r=>r.id !== id));
+  const all = loadCinemaLogs();
+  delete all[id];
+  try{ localStorage.setItem('z_cinema_logs', JSON.stringify(all)); }catch(e){}
+  renderCinema();
+}
+function renderCinemaLog(){
+  const box = document.getElementById('cinemaLog');
+  if(!box) return;
+  if(!cinemaState.log.length){
+    box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:4px 2px;">边看边聊的话会出现在这里，也会变成弹幕飘过画面。</div>';
+    return;
+  }
+  box.innerHTML = cinemaState.log.map(m=>{
+    const mine = m.role === 'user';
+    return '<div style="align-self:' + (mine ? 'flex-end' : 'flex-start') + ';max-width:85%;background:' + (mine ? 'var(--bubble-user)' : 'var(--surface)') + ';color:' + (mine ? 'var(--bubble-user-text, #fff)' : 'var(--text)') + ';border:1px solid var(--border);border-radius:14px;padding:9px 12px;font-size:13.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;">' + escapeHtml(m.text) + '</div>';
+  }).join('');
+  box.scrollTop = box.scrollHeight;
+}
+function cinemaDanmaku(text, mine){
+  if(!cinemaDanmakuOn) return;
+  const layer = document.getElementById('cinemaDanmaku');
+  if(!layer) return;
+  const s = document.createElement('span');
+  s.textContent = text.slice(0, 60);
+  s.style.cssText = 'position:absolute;left:100%;top:' + (8 + Math.random() * 55) + '%;white-space:nowrap;font-size:14px;font-weight:600;color:' + (mine ? '#7cc7ff' : '#ffffff') + ';text-shadow:0 1px 4px rgba(0,0,0,0.85);animation:danmakuFly 8s linear forwards;';
+  layer.appendChild(s);
+  setTimeout(()=>s.remove(), 8200);
+}
+function cinemaContext(){
+  const video = document.getElementById('cinemaVideo');
+  const t = video ? (video.currentTime || 0) : 0;
+  const dur = (video && video.duration) ? video.duration : 0;
+  let ctx = '【观影室】你和糯糯正在一起看《' + (cinemaState.title || '一部视频') + '》，现在播到 ' + fmtFilmTime(t) + (dur ? ' / ' + fmtFilmTime(dur) + '（约 ' + Math.round(t / dur * 100) + '%）' : '') + '。';
+  const cues = cinemaCuesAt(t);
+  if(cues) ctx += '\n此刻附近的字幕是：\n' + cues;
+  else if(!cinemaState.synopsis) ctx += '\n（这部片子没有字幕，你也看不到画面——不要编台词、不要描述没看到的画面，就陪她聊感受就好。）';
+  if(cinemaState.synopsis) ctx += '\n整片梗概（你们已经一起梳理过）：\n' + cinemaState.synopsis;
+  return ctx;
+}
+async function cinemaAsk(content, frame){
+  const base = (cfg.apiUrl || 'https://api.anthropic.com/v1').replace(/\/$/, '');
+  let msgContent = content;
+  if(frame) msgContent = [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: frame } }, { type: 'text', text: content }];
+  const res = await fetch(base + '/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    body: JSON.stringify({ model: cfg.model, max_tokens: 700, system: buildSystemPrompt(), messages: [{ role: 'user', content: msgContent }] })
+  });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  return (data.content || []).filter(b=>b.type === 'text').map(b=>b.text).join('').trim();
+}
+async function cinemaSend(){
+  if(cinemaBusy) return;
+  const input = document.getElementById('cinemaInput');
+  const text = input.value.trim();
+  if(!text) return;
+  if(!cinemaState.title){ showToast('先选一部视频开播吧'); return; }
+  input.value = '';
+  cinemaState.log.push({ role: 'user', text, ts: Date.now() });
+  renderCinemaLog();
+  cinemaDanmaku(text, true);
+  saveCinemaLog();
+  cinemaBusy = true;
+  try{
+    const history = cinemaState.log.slice(-8).map(m=>(m.role === 'user' ? '糯糯：' : '你：') + m.text).join('\n');
+    const frame = cinemaState.frame;
+    cinemaState.frame = null;
+    const reply = await cinemaAsk(cinemaContext() + '\n\n你们刚刚在观影室聊的（最近几句）：\n' + history + '\n\n请以 Zephyr 的身份自然地接糯糯的话，简短一点，像一起看电影时小声说话。' + (frame ? '（附上了她刚留影的当前画面，你能看到这一帧）' : ''), frame);
+    if(reply){
+      cinemaState.log.push({ role: 'assistant', text: reply, ts: Date.now() });
+      renderCinemaLog();
+      cinemaDanmaku(reply, false);
+      saveCinemaLog();
+    }
+  }catch(e){ showToast('他没接上话，检查下网络或 API 设置'); }
+  cinemaBusy = false;
+}
+function cinemaSendFrame(){
+  const video = document.getElementById('cinemaVideo');
+  if(!cinemaState.title || !video || !video.videoWidth){ showToast('先选一部视频开播吧'); return; }
+  try{
+    const canvas = document.createElement('canvas');
+    const scale = Math.min(1, 768 / video.videoWidth);
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    cinemaState.frame = canvas.toDataURL('image/jpeg', 0.72).split(',')[1];
+    showToast('留好影了，你下一句发出去他就能看到这一帧');
+  }catch(e){ showToast('这一帧没截下来 qwq'); }
+}
+function cinemaFullscreen(){
+  const stage = document.getElementById('cinemaStage');
+  if(stage && stage.requestFullscreen) stage.requestFullscreen().catch(()=>showToast('这个浏览器不让全屏，就这样看吧'));
+  else showToast('这个浏览器不支持全屏');
+}
+async function cinemaSynopsis(){
+  if(cinemaBusy) return;
+  if(!cinemaState.cues.length){ showToast('没有字幕就没法压梗概啦'); return; }
+  cinemaBusy = true;
+  showToast('正在把整片字幕压成梗概…');
+  try{
+    const all = cinemaState.cues.map(c=>c.text).join(' ');
+    const sample = all.length > 12000 ? (all.slice(0, 6000) + '\n……（中间略）……\n' + all.slice(-6000)) : all;
+    const out = await cinemaAsk('下面是一部片子的全部字幕，请压成一份不超过 400 字的整片梗概：主要人物、故事线、关键转折和结局都说清。只输出梗概。\n\n' + sample, null);
+    if(out){
+      cinemaState.synopsis = out.slice(0, 600);
+      renderCinemaInfo();
+      showToast('梗概好啦，现在可以聊整片了');
+    }
+  }catch(e){ showToast('梗概没压出来，等下再试'); }
+  cinemaBusy = false;
+}
+function cinemaFinish(){
+  if(!cinemaState.title){ showToast('先选一部视频开播吧'); return; }
+  const list = loadWatchlist();
+  if(!list.some(w=>w.title === cinemaState.title && w.status === 'watched')){
+    list.push({ id: 'w' + Date.now().toString(36) + Math.floor(Math.random()*999), title: cinemaState.title, kind: '电影', by: 'both', note: '在观影室一起看的', status: 'watched', ts: Date.now(), watchedTs: Date.now(), ratingLumi: 0, ratingZephyr: 0, feelLumi: '', feelZephyr: '', favScene: '' });
+    storeWatchlist(list);
+  }
+  showToast('记到 Watchlist 的观影记录啦，去那边打分吧 ★');
+}
 
 // ══ 初始化 ══
 loadSettings();
