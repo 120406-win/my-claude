@@ -8337,10 +8337,15 @@ async function callRecSend(R, chunks, rate) {
     if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
     const text = data && data.text ? String(data.text).trim() : '';
     if (text && isCalling) {
-      addTextMsg('user', text);
-      messages.push({ role: 'user', content: text, mid: genMid(), ts: Date.now() });
-      saveChatHistory();
-      const reply = await callAPI(text);
+      // 与浏览器识别版 onresult 完全同款：callAPI 自己负责把这句存进对话，
+      // 这里只管显示气泡（pendingUserMid 让 callAPI 用同一个 mid 存档）
+      const sttMid = genMsgId(); pendingUserMid = sttMid;
+      addTextMsg(text, true, false, sttMid);
+      headerSub.textContent = '正在回复…';
+      showTyping();
+      let reply = null;
+      try { reply = await callAPI(text); } catch(e2) {}
+      hideTyping(); headerSub.textContent = '通话中';
       if (reply && isCalling) await speakText(reply);
     }
   } catch(e) {
