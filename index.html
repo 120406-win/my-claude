@@ -4650,15 +4650,32 @@ function splitLeakedThinking(text){
   const m = text.match(/^thinking[\s:：]+/);
   if(!m) return null;
   const body = text.slice(m[0].length);
+  // 规则一：以最后一个「句首的糯糯」为界——前面是思考（在说她），从这里开始是正文（对她说话）
   let idx = -1;
   const re = /[。！？\n] *糯糯|\^\^ *糯糯|~ *糯糯/g;
   let mm;
   while((mm = re.exec(body)) !== null){ idx = mm.index + mm[0].length - 2; }
-  if(idx < 10 || body.length - idx < 4) return null;
-  const thinking = body.slice(0, idx).trim();
-  const reply = body.slice(idx).trim();
-  if(!thinking || !reply) return null;
-  return { thinking, reply };
+  if(idx >= 10 && body.length - idx >= 4){
+    const thinking = body.slice(0, idx).trim();
+    const reply = body.slice(idx).trim();
+    if(thinking && reply) return { thinking, reply };
+  }
+  // 规则二：整段都是思考语气、只有最后一句像回复时，以最后一个句号为界切开
+  let cut = -1;
+  for(let i = 0; i < body.length; i++){
+    if('。！？'.includes(body[i])){
+      const head = body.slice(0, i + 1).trim();
+      const tail = body.slice(i + 1).trim();
+      if(head.length >= 10 && tail.length >= 6) cut = i;
+    }
+  }
+  if(cut >= 0){
+    const thinking = body.slice(0, cut + 1).trim();
+    const reply = body.slice(cut + 1).trim();
+    if(thinking && reply) return { thinking, reply };
+  }
+  // 实在切不开：至少把开头的 thinking 字样摘掉，正文原样留下
+  return { thinking:'', reply: body.trim() };
 }
 
 function makeThinkingBlock(col, beforeEl, startCollapsed){
@@ -4774,11 +4791,13 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     if(thinkOn && !thinking){
       const split = splitLeakedThinking(reply);
       if(split){
-        thinking = split.thinking;
         reply = split.reply;
-        thinkBox = makeThinkingBlock(col, bubble, true);
-        thinkBox.body.textContent = thinking;
         bubble.textContent = reply;
+        if(split.thinking){
+          thinking = split.thinking;
+          thinkBox = makeThinkingBlock(col, bubble, true);
+          thinkBox.body.textContent = thinking;
+        }
       }
     }
 
