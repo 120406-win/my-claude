@@ -1734,6 +1734,7 @@ function navTo(page){
   document.getElementById('musicPage').classList.toggle('show', page==='music');
   document.getElementById('watchlistPage').classList.toggle('show', page==='watchlist');
   document.getElementById('wallPage').classList.toggle('show', page==='wall');
+  document.getElementById('capsulePage').classList.toggle('show', page==='capsule');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   if(page==='settings') loadSettings();
@@ -1749,6 +1750,7 @@ function navTo(page){
   if(page==='music') renderMusic();
   if(page==='watchlist') renderWatchlist();
   if(page==='wall') renderWall();
+  if(page==='capsule') renderCapsules();
 }
 
 // ══ Memory 系统（本地版）：长期记忆存 localStorage，每次请求自动带进系统提示词，新窗口也不失忆 ══
@@ -1782,6 +1784,17 @@ function buildSystemPrompt(){
     const lines = sorted.map(m=>'・['+(m.cat||'其他')+'] '+(m.pinned?'★很重要：':'')+m.text).join('\n');
     out += '\n\n【长期记忆】\n以下是 Lumi 亲手写下的长期记忆，是属于你和 Lumi 共同的记忆。请自然地记住，并在合适的时候运用，不要生硬地复述清单：\n' + lines;
   }
+  // 时间胶囊：封存中的只报标题与开启日期（内容保密）；打开过的把内容一起带上
+  try{
+    const caps = loadCapsules();
+    const sealedC = caps.filter(c=>!c.opened);
+    const openedC = caps.filter(c=>c.opened).slice(-3);
+    if(sealedC.length || openedC.length){
+      out += '\n\n【时间胶囊】\n侧边栏「时间胶囊」里封存着你们写给未来的东西：';
+      sealedC.forEach(c=>{ const d = new Date(c.openTs); out += '\n・封存中：' + (c.by === 'zephyr' ? '你' : '糯糯') + '封的「' + (c.title || '无题') + '」，约定 ' + d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate() + ' 打开。内容是保密的，到日子之前谁都看不到；就算是你写的，也先假装忘了吧。'; });
+      openedC.forEach(c=>{ out += '\n・已打开的胶囊「' + (c.title || '无题') + '」（' + (c.by === 'zephyr' ? '你写的' : '糯糯写的') + '）：' + (c.content || '').slice(0, 200); });
+    }
+  }catch(e){}
   // Lumi 寄出的信会随每次请求一起给 Zephyr，确保他真的读得到她的信
   const letters = loadLetters().filter(l=>l.from==='lumi' && !l.draft).slice(-10);
   if(letters.length){
@@ -2476,6 +2489,7 @@ function collectMilestones(){
   loadJournal().forEach(j=>out.push({ ts:j.ts, title:'Zephyr 写了一篇日记', tag:'日记' }));
   loadMemories().filter(m=>m.cat==='重要事件' && m.ts).forEach(m=>out.push({ ts:m.ts, title:m.text, tag:'重要事件' }));
   loadWatchlist().filter(w=>w.status==='watched' && w.watchedTs).forEach(w=>out.push({ ts:w.watchedTs, title:'一起看了《' + w.title + '》（' + w.kind + '）', tag:'观影' }));
+  loadCapsules().filter(c=>c.opened && c.openedTs).forEach(c=>out.push({ ts:c.openedTs, title:'打开了时间胶囊「' + (c.title || '无题') + '」', tag:'时间胶囊' }));
   loadEvents().forEach(e=>out.push({ ts:e.ts, title:e.title, tag:'手动记录', manualId:e.id }));
   return out.sort((a,b)=>b.ts-a.ts);
 }
@@ -4344,6 +4358,168 @@ function processZephyrActions(reply, bubble){
   if(saved) setTimeout(()=>showToast('Zephyr 悄悄许了一个愿望，去 Wishes 看看 ★'), 350);
   return cleaned;
 }
+// ══ 时间胶囊 Time Capsule：封存给未来的信/话/愿望/回忆/照片，到日子一起打开 ══
+let pendingCapsuleImg = null;
+function loadCapsules(){ try{ const a = JSON.parse(localStorage.getItem('z_capsules')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeCapsules(list){ try{ localStorage.setItem('z_capsules', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间满了，这颗胶囊存不下 qwq'); return false; } }
+function capsuleOpenTs(months){ const d = new Date(); d.setMonth(d.getMonth() + months); return d.getTime(); }
+function pickCapsulePhoto(input){
+  const file = input.files && input.files[0];
+  input.value = '';
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const max = 1080;
+      let w = img.width, h = img.height;
+      if(w > max || h > max){ const r = max / Math.max(w, h); w = Math.round(w * r); h = Math.round(h * r); }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      pendingCapsuleImg = canvas.toDataURL('image/jpeg', 0.82);
+      const prev = document.getElementById('capsulePendingImg');
+      prev.src = pendingCapsuleImg;
+      prev.style.display = '';
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+function sealCapsule(){
+  const title = document.getElementById('capsuleTitle').value.trim();
+  const content = document.getElementById('capsuleContent').value.trim();
+  if(!content && !pendingCapsuleImg){ showToast('胶囊里总得放点什么呀 ~'); return; }
+  const when = document.getElementById('capsuleWhen').value;
+  let openTs;
+  if(when === 'custom'){
+    const dv = document.getElementById('capsuleDate').value;
+    if(!dv){ showToast('选一个打开的日期呀'); return; }
+    openTs = new Date(dv + 'T09:00:00').getTime();
+    if(!(openTs > Date.now())){ showToast('打开的日子要选在未来呀'); return; }
+  } else openTs = capsuleOpenTs(parseInt(when, 10) || 6);
+  const list = loadCapsules();
+  list.push({ id:'c'+Date.now().toString(36)+Math.floor(Math.random()*999), title, content, img:pendingCapsuleImg || null, by:'lumi', createdTs:Date.now(), openTs, opened:false, openedTs:0 });
+  if(storeCapsules(list)){
+    document.getElementById('capsuleTitle').value = '';
+    document.getElementById('capsuleContent').value = '';
+    pendingCapsuleImg = null;
+    document.getElementById('capsulePendingImg').style.display = 'none';
+    renderCapsules();
+    showToast('胶囊封好啦，到日子一起打开');
+  }
+}
+async function askZephyrCapsule(btn){
+  if(btn.disabled) return;
+  btn.disabled = true;
+  const old = btn.textContent;
+  btn.textContent = 'Zephyr 正在写……';
+  try{
+    const recent = messages.slice(-8).map(m=>msgToText(m)).filter(Boolean).join('\n').slice(0, 1200);
+    const out = await musicAskZephyr('你和糯糯有一个时间胶囊功能：可以把一封信封存起来，约定几个月后一起打开。\n请你写一封给「未来的糯糯和未来的你」的短信，温柔真诚，写你们现在的状态、想记住的事、和对未来的小期待。\n\n最近的对话（供你参考近况）：\n' + recent + '\n\n只输出一个 JSON 对象，不要任何其他文字：{"title":"信的标题","content":"信的正文（150-300字）","months":6}。months 是你希望几个月后打开（1-24 的整数）。如果你现在实在不想写，输出 {"refuse":true}。', 700);
+    const obj = parseZephyrJson(out);
+    if(!obj || obj.refuse || !obj.content){ showToast('他想了想，这次先不写'); return; }
+    const months = Math.min(24, Math.max(1, parseInt(obj.months, 10) || 6));
+    const list = loadCapsules();
+    list.push({ id:'c'+Date.now().toString(36)+Math.floor(Math.random()*999), title:String(obj.title || 'Zephyr 写给未来的信'), content:String(obj.content), img:null, by:'zephyr', createdTs:Date.now(), openTs:capsuleOpenTs(months), opened:false, openedTs:0 });
+    if(storeCapsules(list)){ renderCapsules(); showToast('Zephyr 的信封进胶囊啦，' + months + ' 个月后一起打开'); }
+  }catch(e){ showToast('没写成：' + e.message); }
+  finally{ btn.disabled = false; btn.textContent = old; }
+}
+function openCapsule(id){
+  const list = loadCapsules();
+  const c = list.find(x=>x.id===id);
+  if(!c || c.opened) return;
+  c.opened = true;
+  c.openedTs = Date.now();
+  storeCapsules(list);
+  renderCapsules();
+  showToast('胶囊打开啦，看看过去写了什么');
+}
+function deleteCapsule(id){
+  storeCapsules(loadCapsules().filter(c=>c.id!==id));
+  renderCapsules();
+}
+function renderCapsules(){
+  const sealedBox = document.getElementById('capsuleSealed');
+  const openedBox = document.getElementById('capsuleOpened');
+  if(!sealedBox || !openedBox) return;
+  const BY = { lumi:'糯糯封的', zephyr:'Zephyr 封的' };
+  const list = loadCapsules();
+  const sealed = list.filter(c=>!c.opened).sort((a,b)=>a.openTs-b.openTs);
+  const opened = list.filter(c=>c.opened).sort((a,b)=>b.openedTs-a.openedTs);
+  sealedBox.innerHTML = '';
+  openedBox.innerHTML = '';
+  if(!sealed.length) sealedBox.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:14px 0;">没有封存中的胶囊</div>';
+  sealed.forEach(c=>{
+    const due = Date.now() >= c.openTs;
+    const days = Math.max(0, Math.ceil((c.openTs - Date.now()) / 86400000));
+    const card = document.createElement('div');
+    card.className = 's-card';
+    card.style.cssText = 'padding:12px;margin-bottom:10px;' + (due ? 'border:1px solid var(--accent);' : '');
+    const t = document.createElement('div');
+    t.style.cssText = 'font-size:14px;color:var(--text);';
+    t.textContent = c.title || '（无题胶囊）';
+    const meta = document.createElement('div');
+    meta.style.cssText = 'font-size:11.5px;color:var(--text-pale);margin-top:4px;line-height:1.6;';
+    meta.textContent = (BY[c.by] || '') + ' · ' + fmtWallDate(c.createdTs) + ' 封存 · 约定 ' + fmtWallDate(c.openTs) + ' 打开' + (c.img ? ' · 里面有一张照片' : '');
+    const st = document.createElement('div');
+    st.style.cssText = 'font-size:12.5px;margin-top:6px;color:' + (due ? 'var(--accent-s)' : 'var(--text-dim)') + ';';
+    st.textContent = due ? '到时间啦，可以打开了' : '封存中，内容保密 · 还有 ' + days + ' 天';
+    card.appendChild(t);
+    card.appendChild(meta);
+    card.appendChild(st);
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:8px;margin-top:9px;';
+    if(due){
+      const ob = document.createElement('button');
+      ob.textContent = '打开胶囊';
+      ob.style.cssText = 'flex:1;padding:9px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:13px;cursor:pointer;';
+      ob.onclick = ()=>openCapsule(c.id);
+      row.appendChild(ob);
+    }
+    const del = document.createElement('button');
+    del.textContent = '删除';
+    del.style.cssText = 'padding:9px 14px;border:1px solid var(--border);border-radius:10px;background:transparent;color:#e0657a;font-size:13px;cursor:pointer;';
+    del.onclick = ()=>deleteCapsule(c.id);
+    row.appendChild(del);
+    card.appendChild(row);
+    sealedBox.appendChild(card);
+  });
+  if(!opened.length) openedBox.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:14px 0;">还没有打开过的胶囊</div>';
+  opened.forEach(c=>{
+    const card = document.createElement('div');
+    card.className = 's-card';
+    card.style.cssText = 'padding:12px;margin-bottom:10px;';
+    const t = document.createElement('div');
+    t.style.cssText = 'font-size:14px;color:var(--text);';
+    t.textContent = c.title || '（无题胶囊）';
+    const meta = document.createElement('div');
+    meta.style.cssText = 'font-size:11.5px;color:var(--text-pale);margin-top:4px;';
+    meta.textContent = (BY[c.by] || '') + ' · ' + fmtWallDate(c.createdTs) + ' 写下 · ' + fmtWallDate(c.openedTs) + ' 打开';
+    card.appendChild(t);
+    card.appendChild(meta);
+    if(c.content){
+      const body = document.createElement('div');
+      body.style.cssText = 'font-size:13.5px;line-height:1.75;color:var(--text);margin-top:8px;white-space:pre-wrap;word-break:break-word;';
+      body.textContent = c.content;
+      card.appendChild(body);
+    }
+    if(c.img){
+      const img = document.createElement('img');
+      img.src = c.img;
+      img.style.cssText = 'width:100%;max-height:220px;object-fit:cover;border-radius:10px;margin-top:8px;display:block;';
+      card.appendChild(img);
+    }
+    const del = document.createElement('button');
+    del.textContent = '删除';
+    del.style.cssText = 'background:none;border:none;color:#e0657a;font-size:11.5px;cursor:pointer;padding:2px;margin-top:8px;';
+    del.onclick = ()=>deleteCapsule(c.id);
+    card.appendChild(del);
+    openedBox.appendChild(card);
+  });
+}
+document.getElementById('capsuleWhen')?.addEventListener('change', e=>{ document.getElementById('capsuleDate').style.display = e.target.value === 'custom' ? '' : 'none'; });
 // ══ 回忆墙 Memory Wall：各模块的共同经历自动汇成时间线；可钉住、可自己加 ══
 function loadWallCustom(){ try{ const a = JSON.parse(localStorage.getItem('z_wall_custom')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
 function storeWallCustom(list){ localStorage.setItem('z_wall_custom', JSON.stringify(list)); }
