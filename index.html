@@ -7765,6 +7765,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       if (bubble) bubble.textContent = reply;
       makeTranslationNote(col, translation);
     }
+    if (!translation && enZhEnabled() && looksEnglishReply(reply)) attachTranslationLater(asstMid, col, reply);
     const songShare = pendingSongShare; pendingSongShare = null;
     if(songShare && bubble && bubble.parentElement) makeSongCard(bubble.parentElement, songShare);
     const stickerShare = pendingSticker; pendingSticker = null;
@@ -8167,6 +8168,23 @@ function parseBilingualReply(text) {
   }
   if (!en.length || !zh.length || other > 0) return null;
   return { en: en.join('\n'), zh: zh.join('\n') };
+}
+function looksEnglishReply(text) {
+  if (!text) return false;
+  const s = String(text);
+  const latin = (s.match(/[A-Za-z]/g) || []).length;
+  const cjk = (s.match(/[一-鿿]/g) || []).length;
+  return latin >= 15 && cjk <= 2 && latin > cjk * 5;
+}
+async function attachTranslationLater(mid, col, enText) {
+  try {
+    const out = await musicAskZephyr('把下面这段英文翻译成自然的中文，只输出译文本身，不要解释、不要引号、不要任何前缀：\n' + enText, 500);
+    let t = (out || '').trim().replace(/^ZH\s*[:：]\s*/i, '');
+    if (!t) return;
+    const m = messages.find(x => x.mid === mid);
+    if (m && !m.translation) { m.translation = t; saveChatHistory(); }
+    if (col && document.body && document.body.contains(col)) makeTranslationNote(col, t);
+  } catch (e) {}
 }
 function makeTranslationNote(col, text) {
   const note = document.createElement('div');
