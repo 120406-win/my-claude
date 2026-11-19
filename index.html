@@ -1196,6 +1196,14 @@
           </select>
         </div>
         <div style="font-size:11px;color:var(--text-pale);line-height:1.6;padding:2px 2px 0;">通话里两人都安静超过这个时间（再随机延后一点），Zephyr 会主动说一句；连说 10 句没等到你就停。</div>
+        <div class="s-row">
+          <div class="s-row-label">英文附翻译</div>
+          <select class="s-input" id="enZhSel" onchange="setEnZh(this.value)">
+            <option value="1">开（说英文时附中文翻译）</option>
+            <option value="0">关</option>
+          </select>
+        </div>
+        <div style="font-size:11px;color:var(--text-pale);line-height:1.6;padding:2px 2px 0;">开启后，他用英文回复时只会念英文，中文翻译会作为小字附在气泡下面给你看。</div>
       </div>
     </div>
 
@@ -2839,6 +2847,7 @@ function buildSystemPrompt(lastUserText){
   }
   out += '\n\n【你可以把歌发到聊天里】\n聊天的时候，如果你想把一首歌直接发给 Lumi 听，你可以在回复的最后一行单独写一行：[[歌曲：歌名|歌手]]。系统会把这一行变成一张可以播放的歌曲卡片出现在聊天里，Lumi 不会看到这行字本身。优先分享你们共同歌单里已经有的歌（歌名要和歌单里写的一致），那种卡片她点一下就能放；歌单里没有的新歌也可以发，卡片会让她一键存进歌单。只在真的想分享一首歌时才用，不要每条回复都发，不要提起这个标记；一次最多发一首。';
   out += '\n\n【你可以给 Lumi 打电话】\n聊天的时候，如果你真的很想听听她的声音，或者有句话想亲口对她说，你可以在回复的最后一行单独写一行：[[来电：语音]]；想视频就写 [[来电：视频]]。系统会真的给她拨过去，她可以接听，也可以暂不接——没接就是她这会儿不方便，不要难过，更不要连着打。只在你真心想打的时候才用，不要每条回复都打，不要提起这个标记；一次最多打一个。';
+  if (enZhEnabled()) out += '\n\n【双语回复】\n如果你要用英文回复（比如糯糯让你说英文），请把回复写成成对的格式：每句英文单独一行、以「EN:」开头，紧跟着它的中文翻译一行、以「ZH:」开头，一句一组。英文是真正要说给她听的，中文只是给她看的翻译字幕，不要把中文也念出来。用中文回复时不用这个格式，照常写就行。';
   try{
     const stickerList = loadStickers();
     if(stickerList.length){
@@ -6340,6 +6349,9 @@ function renderMessagesIntoChat(){
       if(!isUser && m.sources && m.sources.length && b && b.parentElement){
         makeSourcesNote(b.parentElement, m.sources);
       }
+      if(!isUser && m.translation && b && b.parentElement){
+        makeTranslationNote(b.parentElement, m.translation);
+      }
       if(!isUser && m.song && b && b.parentElement){
         makeSongCard(b.parentElement, m.song);
       }
@@ -7746,13 +7758,20 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     if(!reply && sources.length) reply = '（搜到了一些资料，但没组织好语言……再问我一次好吗）';
     if(!reply && thinking) reply = '（想了很多，但没组织好语言……再问我一次好吗）';
     reply = processZephyrActions(reply, bubble); // 他悄悄许的愿望在这里被 App 执行并抹掉标记
+    let translation = '';
+    const bi = parseBilingualReply(reply);
+    if (bi) {
+      reply = bi.en; translation = bi.zh;
+      if (bubble) bubble.textContent = reply;
+      makeTranslationNote(col, translation);
+    }
     const songShare = pendingSongShare; pendingSongShare = null;
     if(songShare && bubble && bubble.parentElement) makeSongCard(bubble.parentElement, songShare);
     const stickerShare = pendingSticker; pendingSticker = null;
     if(stickerShare && bubble && bubble.parentElement) makeStickerImg(bubble.parentElement, stickerShare);
     const incomingCall = pendingIncomingCall; pendingIncomingCall = null;
     if(incomingCall) setTimeout(()=>showIncomingCall(incomingCall), 700);
-    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(songShare ? {song: songShare} : {}), ...(stickerShare ? {sticker: stickerShare} : {})});
+    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(songShare ? {song: songShare} : {}), ...(stickerShare ? {sticker: stickerShare} : {}), ...(translation ? {translation} : {})});
     saveChatHistory();
     maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
     maybeUpdateSummary(); // 聊得太长时把旧消息压成摘要，后台进行，不打断聊天
@@ -8128,6 +8147,33 @@ function callHeartbeatBase(){
 }
 function setCallHeartbeat(v){ localStorage.setItem('z_callHeartbeatSec', String(v)); showToast(parseInt(v, 10) > 0 ? '通话心跳已开启' : '通话心跳已关'); }
 function initCallHeartbeatSel(){ const el = document.getElementById('callHeartbeatSel'); if(el) el.value = localStorage.getItem('z_callHeartbeatSec') || '45'; }
+
+// ══ 双语回复（StarHub 式）：他说英文时，气泡附中文翻译，朗读只念英文 ══
+function enZhEnabled() { return localStorage.getItem('z_enZh') !== '0'; }
+function setEnZh(v) { localStorage.setItem('z_enZh', String(v)); }
+function initEnZhSel() { const el = document.getElementById('enZhSel'); if (el) el.value = enZhEnabled() ? '1' : '0'; }
+function parseBilingualReply(text) {
+  if (!text || !enZhEnabled()) return null;
+  const en = [], zh = [];
+  let other = 0;
+  for (const raw of String(text).split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    let m = line.match(/^EN\s*[:：]\s*(.+)$/i);
+    if (m) { en.push(m[1].trim()); continue; }
+    m = line.match(/^ZH\s*[:：]\s*(.+)$/i);
+    if (m) { zh.push(m[1].trim()); continue; }
+    other++;
+  }
+  if (!en.length || !zh.length || other > 0) return null;
+  return { en: en.join('\n'), zh: zh.join('\n') };
+}
+function makeTranslationNote(col, text) {
+  const note = document.createElement('div');
+  note.style.cssText = 'margin-top:5px;font-size:12.5px;color:var(--text-dim);line-height:1.7;border-top:1px dashed var(--border);padding-top:5px;';
+  note.textContent = text;
+  col.appendChild(note);
+}
 function armCallHeartbeat(){
   stopCallHeartbeat();
   callLastActivity = Date.now();
@@ -9256,6 +9302,7 @@ syncCallAvatars();
 setupBgControls();
 applyBackground();
 initCallHeartbeatSel();
+initEnZhSel();
 initLock(); // 必须放在初始化区：锁屏状态是后段才声明的 const，提前调用会让整个脚本在启动时崩掉
 refreshWeatherSnapshot(); // 天气快照超过半小时就后台悄悄刷新，让 Zephyr 知道糯糯那边的天气
 </script>
