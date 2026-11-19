@@ -923,6 +923,10 @@
           <div class="s-row-label">思考过程（Thinking）<div class="s-row-sub">让 Zephyr 回复前先深度思考，并把思考过程显示在回复上方（可折叠）。会更慢、更费 token；开启时 Temperature / Top P 不生效。需要模型和接口支持，不支持时会发送失败，关掉即可。</div></div>
           <input type="checkbox" id="thinkingToggle" onchange="toggleThinking(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
         </div>
+        <div class="s-row">
+          <div class="s-row-label">联网搜索（Web Search）<div class="s-row-sub">让 Zephyr 在聊天时像官网那样上网搜索：遇到时事、实时信息或他不确定的事，他会自己搜一下再回答，回复下方会附上来源。需要接口支持官方的 web_search 工具；中转接口不支持时会自动退回普通聊天并提醒你。</div></div>
+          <input type="checkbox" id="webSearchToggle" onchange="toggleWebSearch(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
+        </div>
       </div>
     </div>
 
@@ -1955,6 +1959,8 @@ function loadSettings(){
   fs.value=cfg.fontSize; document.getElementById('fontVal').textContent=cfg.fontSize+'px';
   const tt=document.getElementById('thinkingToggle');
   if(tt) tt.checked = thinkingEnabled();
+  const wt=document.getElementById('webSearchToggle');
+  if(wt) wt.checked = webSearchEnabled();
 
   applyTheme(cfg.theme);
 }
@@ -2212,6 +2218,9 @@ function buildSystemPrompt(){
     if(rdIng.length) rt += (rt ? '\n' : '') + '正在一起读的：\n' + rdIng.slice(0, 5).map(r=>'・《' + r.title + '》' + (r.progress ? '，读到：' + r.progress : '')).join('\n');
     if(rdDone.length) rt += (rt ? '\n' : '') + '最近一起读完的：\n' + rdDone.slice(0, 5).map(r=>'・《' + r.title + '》' + (r.ratingLumi ? '，糯糯打了 ' + r.ratingLumi + ' 星' : '') + (r.feelLumi ? '，她说：' + r.feelLumi : '')).join('\n');
     out += '\n\n【Reading 一起阅读】\n以下是你们的一起读书单。聊天时可以自然地问问她读到哪了、聊聊你们读完的书，但不要逐条念清单：\n' + rt.slice(0, 2500);
+  }
+  if(webSearchEnabled()){
+    out += '\n\n【联网搜索】\n你有联网搜索能力（web_search 工具）。遇到最新消息、实时信息（天气、价格、赛程、新闻等）、或者你不确定、可能已经变化的事实时，先搜一下再回答，并自然地提到信息来自哪里；日常闲聊、情感话题和你有把握的常识不用搜。';
   }
   return out;
 }
@@ -4776,6 +4785,9 @@ function renderMessagesIntoChat(){
         const tb = makeThinkingBlock(b.parentElement, b, true);
         tb.body.textContent = dispThinking;
       }
+      if(!isUser && m.sources && m.sources.length && b && b.parentElement){
+        makeSourcesNote(b.parentElement, m.sources);
+      }
     } else if(Array.isArray(m.content)){
       const hasMedia = m.content.some(b=>b.type==='image'||b.type==='document');
       m.content.forEach(block=>{
@@ -5304,6 +5316,33 @@ function addWallCustom(){
 // ══ 思考过程（Extended Thinking）：开关在设置页；思考内容显示在回复上方的小块里，可折叠 ══
 function thinkingEnabled(){ return localStorage.getItem('z_thinking') === 'true'; }
 function toggleThinking(on){ localStorage.setItem('z_thinking', on ? 'true' : 'false'); showToast(on ? '思考过程已开启，Zephyr 回复会变慢一点' : '思考过程已关闭'); }
+// ══ 联网搜索（官方 web_search 工具）：开关在设置页；搜索在接口服务端执行，回复下方附来源 ══
+function webSearchEnabled(){ return localStorage.getItem('z_webSearch') === 'true'; }
+function toggleWebSearch(on){ localStorage.setItem('z_webSearch', on ? 'true' : 'false'); showToast(on ? '联网搜索已开启，Zephyr 可以上网查东西啦' : '联网搜索已关闭'); }
+function makeSearchStatus(col, beforeEl){
+  const el = document.createElement('div');
+  el.style.cssText = 'margin:2px 0 6px;font-size:12px;color:var(--text-pale);';
+  el.textContent = '正在联网搜索…';
+  col.insertBefore(el, beforeEl);
+  return el;
+}
+function makeSourcesNote(col, sources){
+  const note = document.createElement('div');
+  note.style.cssText = 'margin-top:5px;font-size:11.5px;color:var(--text-pale);line-height:1.7;';
+  note.appendChild(document.createTextNode('来源：'));
+  sources.forEach((s,i)=>{
+    const a = document.createElement('a');
+    a.href = s.url;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.style.cssText = 'color:var(--accent-s);text-decoration:none;';
+    a.textContent = s.title || s.url;
+    note.appendChild(a);
+    if(i < sources.length - 1) note.appendChild(document.createTextNode(' · '));
+  });
+  col.appendChild(note);
+  return note;
+}
 // 有些中转接口会把思考和正文混成一股文本返回，开头带个 thinking 字样、中间没有分隔。
 // 这种混流文本可以启发式切开：思考部分是在「说她」（第三人称地想），正文是开始「对她说话」——
 // 以最后一个「句首的糯糯」为界切开，切不开就原样返回 null。切错也不要紧，思考块点开就能看全。
@@ -5394,11 +5433,23 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       delete reqBody.temperature;
       delete reqBody.top_p;
     }
-    const res=await fetch(base+'/messages',{
+    const searchOn = webSearchEnabled();
+    if(searchOn){
+      // 官方联网搜索工具：搜索在接口服务端执行，结果和来源会随流式响应一起回来（和官网同款机制）
+      reqBody.tools = [{ type:'web_search_20250305', name:'web_search', max_uses:3 }];
+    }
+    const sendReq = () => fetch(base+'/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify(reqBody)
     });
+    let res = await sendReq();
+    if(!res.ok && reqBody.tools){
+      // 中转接口若不支持 web_search 工具，去掉工具重试一次，别让整段聊天直接失败
+      delete reqBody.tools;
+      res = await sendReq();
+      if(res.ok) showToast('这个接口暂时用不了联网搜索，先陪你把话聊完 qwq');
+    }
     if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`HTTP ${res.status}`);}
 
     let reply = '';
@@ -5406,6 +5457,8 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     let thinking = '';
     let thinkBox = null;
     let thinkDone = false;
+    let sources = [];
+    let searchStatus = null;
 
     hideTyping();
     const asstMid = genMsgId();
@@ -5432,7 +5485,13 @@ async function callAPI(userText, extraBlocks=null, opts=null){
         if(data === '[DONE]') break;
         try {
           const parsed = JSON.parse(data);
-          if(parsed.type === 'content_block_delta' && parsed.delta?.type === 'thinking_delta'){
+          if(parsed.type === 'content_block_start' && parsed.content_block?.type === 'server_tool_use'){
+            if(!searchStatus) searchStatus = makeSearchStatus(col, bubble);
+          } else if(parsed.type === 'content_block_start' && parsed.content_block?.type === 'web_search_tool_result'){
+            const arr = Array.isArray(parsed.content_block.content) ? parsed.content_block.content : [];
+            arr.forEach(r=>{ if(r && r.type === 'web_search_result' && r.url && !sources.some(s=>s.url === r.url)) sources.push({ title:String(r.title || '').slice(0, 80), url:r.url }); });
+            if(searchStatus) searchStatus.textContent = '联网搜到了 ' + sources.length + ' 条结果，正在整理…';
+          } else if(parsed.type === 'content_block_delta' && parsed.delta?.type === 'thinking_delta'){
             thinking += parsed.delta.thinking || '';
             if(!thinkBox) thinkBox = makeThinkingBlock(col, bubble, false);
             thinkBox.label.textContent = '思考中…';
@@ -5463,9 +5522,12 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       }
     }
 
+    if(searchStatus){ searchStatus.remove(); searchStatus = null; }
+    if(sources.length) makeSourcesNote(col, sources.slice(0, 5));
+    if(!reply && sources.length) reply = '（搜到了一些资料，但没组织好语言……再问我一次好吗）';
     if(!reply && thinking) reply = '（想了很多，但没组织好语言……再问我一次好吗）';
     reply = processZephyrActions(reply, bubble); // 他悄悄许的愿望在这里被 App 执行并抹掉标记
-    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {})});
+    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {})});
     saveChatHistory();
     maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
     updateRegenButton();
