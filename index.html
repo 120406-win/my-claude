@@ -462,6 +462,8 @@
     }
     @keyframes recpulse{0%,100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--accent) 45%, transparent);}50%{box-shadow:0 0 0 20px rgba(0,0,0,0);}}
     .rec-tip { color:white; font-size:16px; }
+    @keyframes discSpin { to { transform:rotate(360deg); } }
+    #musicDisc.playing { animation:discSpin 14s linear infinite; }
 
     /* ══════════════════════════
        SETTINGS 页面
@@ -1577,6 +1579,14 @@
         <div style="font-size:12px;color:var(--text-pale);letter-spacing:.08em;">正在一起听</div>
         <div id="npTitle" style="font-size:17px;margin-top:6px;">还没开始放歌</div>
         <div id="npMeta" style="font-size:12px;color:var(--text-dim);margin-top:3px;">从下面的歌单里挑一首吧</div>
+        <div style="display:flex;justify-content:center;margin:12px 0 4px;">
+          <div style="position:relative;width:190px;height:190px;flex-shrink:0;">
+            <canvas id="musicHalo" width="220" height="220" style="position:absolute;left:0;top:0;width:190px;height:190px;"></canvas>
+            <div id="musicDisc" style="position:absolute;left:50%;top:50%;width:92px;height:92px;margin:-46px 0 0 -46px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-s));display:flex;align-items:center;justify-content:center;color:#fff;box-shadow:0 10px 30px color-mix(in srgb, var(--accent) 35%, transparent);">
+              <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18.5V6l10-2v11.5"/><circle cx="6.8" cy="18.5" r="2.4"/><circle cx="16.8" cy="15.5" r="2.4"/></svg>
+            </div>
+          </div>
+        </div>
         <div id="npNote" style="display:none;font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:10px;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 12px;white-space:pre-wrap;"></div>
         <div style="display:flex;align-items:center;justify-content:center;gap:18px;margin-top:14px;">
           <button onclick="playStep(-1)" style="width:40px;height:40px;border-radius:50%;background:var(--bg);border:1px solid var(--border);color:var(--text);cursor:pointer;display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M7 6h2.2v12H7zM19.5 6l-9.8 6 9.8 6z"/></svg></button>
@@ -5445,8 +5455,10 @@ function bindMusicAudio(){
     if(du) du.textContent = fmtTime(a.duration);
   });
   a.addEventListener('ended', ()=>playStep(1));
-  a.addEventListener('play', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PAUSE_ICON; updateSongCards(); });
-  a.addEventListener('pause', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PLAY_ICON; updateSongCards(); });
+  a.addEventListener('play', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PAUSE_ICON; updateSongCards(); haloSync(); });
+  a.addEventListener('pause', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PLAY_ICON; updateSongCards(); haloSync(); });
+  a.addEventListener('ended', ()=>haloSync());
+  a.addEventListener('seeked', ()=>{ if(haloShadow && !haloShadow.paused && isFinite(a.currentTime) && isFinite(a.duration)){ try{ haloShadow.currentTime = a.currentTime; }catch(e){} } });
   a.addEventListener('error', ()=>{
     if(!a.src) return;
     const cur = currentTrack();
@@ -5454,8 +5466,111 @@ function bindMusicAudio(){
     else showToast('这首歌的链接打不开 qwq 换个链接试试');
   });
 }
+// ══ 音乐光晕：跟着声音律动的圆环（借鉴「天体宙音」的想法，代码自己写）══
+// 主播放器一行不改：另用一个静音的影子音频喂频谱分析器，只有跨域友好的来源才启用；
+// 分析不到时光晕退回轻轻呼吸的样子，主播放永远不受影响、不会被弄没声。
+let haloCtx = null, haloAnalyser = null, haloShadow = null, haloRAF = 0, haloLevel = 0, haloAngle = 0, haloIdleFrames = 0;
+function haloSafeSrc(u){
+  if(!u) return false;
+  if(u.indexOf('blob:') === 0) return true;
+  try{ const h = new URL(u).hostname; return /(^|\.)github\.io$/.test(h) || /(^|\.)archive\.org$/.test(h) || /(^|\.)somafm\.com$/.test(h); }catch(e){ return false; }
+}
+function haloRgba(hex, a){
+  const m = /^#?([0-9a-fA-F]{6})$/.exec((hex || '').trim());
+  if(!m) return 'rgba(138,124,255,' + a + ')';
+  const n = parseInt(m[1], 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+function ensureHalo(){
+  if(haloCtx) return true;
+  try{
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return false;
+    haloCtx = new AC();
+    haloShadow = new Audio();
+    haloShadow.crossOrigin = 'anonymous';
+    haloShadow.preload = 'auto';
+    const srcNode = haloCtx.createMediaElementSource(haloShadow);
+    haloAnalyser = haloCtx.createAnalyser();
+    haloAnalyser.fftSize = 256;
+    const g = haloCtx.createGain(); g.gain.value = 0;
+    srcNode.connect(haloAnalyser); haloAnalyser.connect(g); g.connect(haloCtx.destination);
+    return true;
+  }catch(e){ haloCtx = null; haloAnalyser = null; haloShadow = null; return false; }
+}
+function haloSync(){
+  const a = musicAudioEl(); if(!a) return;
+  const disc = document.getElementById('musicDisc');
+  const playing = !a.paused && !a.ended;
+  if(disc) disc.classList.toggle('playing', playing);
+  if(!playing){ if(haloShadow) haloShadow.pause(); haloDrawStart(); return; }
+  const target = a.currentSrc || a.src;
+  if(haloSafeSrc(target) && ensureHalo()){
+    if(haloCtx.state === 'suspended') haloCtx.resume();
+    if(haloShadow.getAttribute('data-hsrc') !== target){
+      haloShadow.setAttribute('data-hsrc', target);
+      haloShadow.src = target;
+    }
+    if(isFinite(a.duration) && Math.abs((haloShadow.currentTime || 0) - a.currentTime) > 0.6){ try{ haloShadow.currentTime = a.currentTime; }catch(e){} }
+    if(haloShadow.paused) haloShadow.play().catch(()=>{});
+  } else if(haloShadow) haloShadow.pause();
+  haloDrawStart();
+}
+function haloDrawStart(){
+  if(haloRAF) return;
+  haloIdleFrames = 0;
+  haloRAF = requestAnimationFrame(haloFrame);
+}
+function haloFrame(){
+  haloRAF = 0;
+  const cv = document.getElementById('musicHalo');
+  if(!cv) return;
+  const ctx = cv.getContext('2d');
+  if(!ctx) return;
+  const a = musicAudioEl();
+  const playing = !!(a && !a.paused && !a.ended);
+  let target = 0, measured = false;
+  if(haloAnalyser && haloShadow && !haloShadow.paused){
+    const data = new Uint8Array(haloAnalyser.frequencyBinCount);
+    haloAnalyser.getByteFrequencyData(data);
+    let s = 0; const n = Math.min(20, data.length);
+    for(let i = 0; i < n; i++) s += data[i];
+    if(s > 0){ target = s / n / 255; measured = true; }
+  }
+  if(playing && !measured) target = 0.16 + 0.06 * Math.sin(Date.now() / 300) + 0.04 * Math.sin(Date.now() / 113);
+  if(!playing) target = 0.05 + 0.025 * Math.sin(Date.now() / 1700);
+  haloLevel += (target - haloLevel) * 0.18;
+  haloAngle += playing ? 0.004 : 0.0012;
+  const W = cv.width, C = W / 2;
+  ctx.clearRect(0, 0, W, W);
+  const accent = (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '').trim() || '#8a7cff';
+  const lv = Math.max(0, Math.min(1, haloLevel));
+  const grd = ctx.createRadialGradient(C, C, 26, C, C, C);
+  grd.addColorStop(0, haloRgba(accent, 0.16 + lv * 0.30));
+  grd.addColorStop(1, haloRgba(accent, 0));
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, W);
+  for(let r = 0; r < 3; r++){
+    const base = 54 + r * 13;
+    ctx.beginPath();
+    for(let i = 0; i <= 72; i++){
+      const ang = (i / 72) * Math.PI * 2;
+      const wob = Math.sin(ang * 3 + haloAngle * (r + 2)) * (1.5 + lv * 5) + Math.sin(ang * 5 - haloAngle * 3) * lv * 3;
+      const rad = base + wob + lv * 9;
+      const x = C + Math.cos(ang) * rad, y = C + Math.sin(ang) * rad;
+      if(i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = haloRgba(accent, Math.max(0.06, 0.5 - r * 0.13 + lv * 0.18));
+    ctx.lineWidth = 2 - r * 0.4;
+    ctx.stroke();
+  }
+  if(playing){ haloIdleFrames = 0; haloRAF = requestAnimationFrame(haloFrame); }
+  else { haloIdleFrames++; if(haloIdleFrames < 100) haloRAF = requestAnimationFrame(haloFrame); }
+}
 function renderMusic(){
   bindMusicAudio();
+  haloDrawStart();
   const d = loadMusic();
   const cur = currentTrack();
   const a = musicAudioEl();
