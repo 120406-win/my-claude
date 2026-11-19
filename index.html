@@ -1880,9 +1880,13 @@ function renderMemories(){
   const q = memSearchText.trim();
   const match = m => !q || m.text.includes(q) || (m.cat||'').includes(q);
   let shown = 0;
-  MEM_CATS.concat(['其他']).forEach(cat=>{
+  // 分组顺序：先按标准分类，再把数据里出现的任何其他分类也逐组列出来——保证计数和能看到的条数永远一致，不会有记忆被藏起来
+  const catsInData = [];
+  list.forEach(m=>{ const c = m.cat || '其他'; if(!catsInData.includes(c)) catsInData.push(c); });
+  const orderedCats = MEM_CATS.concat(catsInData.filter(c=>!MEM_CATS.includes(c)));
+  orderedCats.forEach(cat=>{
     const items = list.filter(m=>(m.cat||'其他')===cat && match(m))
-      .slice().sort((a,b)=>((b.pinned?1:0)-(a.pinned?1:0)) || (a.ts||0)-(b.ts||0));
+      .slice().sort((a,b)=>((b.pinned?1:0)-(a.pinned?1:0)) || (b.ts||0)-(a.ts||0));
     if(!items.length) return;
     shown += items.length;
     const card = document.createElement('div'); card.className='s-card'; card.style.marginBottom='12px';
