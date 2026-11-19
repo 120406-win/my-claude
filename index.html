@@ -2414,6 +2414,7 @@ function buildSystemPrompt(){
     const curT = musicData.tracks.find(t=>t.id === musicData.lastId);
     out += '\n\n【Music 一起听歌】\n以下是你们在 Music 里共同的歌单。聊天时可以自然地聊起你们一起听的歌、推荐新歌，但不要逐条念歌单：\n' + ml.slice(0, 2000) + (curT ? '\n你们最近在听：《' + curT.title + '》' : '');
   }
+  out += '\n\n【你可以把歌发到聊天里】\n聊天的时候，如果你想把一首歌直接发给 Lumi 听，你可以在回复的最后一行单独写一行：[[歌曲：歌名|歌手]]。系统会把这一行变成一张可以播放的歌曲卡片出现在聊天里，Lumi 不会看到这行字本身。优先分享你们共同歌单里已经有的歌（歌名要和歌单里写的一致），那种卡片她点一下就能放；歌单里没有的新歌也可以发，卡片会让她一键存进歌单。只在真的想分享一首歌时才用，不要每条回复都发，不要提起这个标记；一次最多发一首。';
   // Watchlist 也给 Zephyr：想看清单和观影记录，聊天时能提议一起看、聊看过的
   const watchData = loadWatchlist();
   const wlWant = watchData.filter(w=>w.status === 'want');
@@ -4331,8 +4332,8 @@ function bindMusicAudio(){
     if(du) du.textContent = fmtTime(a.duration);
   });
   a.addEventListener('ended', ()=>playStep(1));
-  a.addEventListener('play', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PAUSE_ICON; });
-  a.addEventListener('pause', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PLAY_ICON; });
+  a.addEventListener('play', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PAUSE_ICON; updateSongCards(); });
+  a.addEventListener('pause', ()=>{ const ic = document.getElementById('playBtnIcon'); if(ic) ic.innerHTML = MUS_PLAY_ICON; updateSongCards(); });
   a.addEventListener('error', ()=>{
     if(!a.src) return;
     const cur = currentTrack();
@@ -5083,6 +5084,9 @@ function renderMessagesIntoChat(){
       if(!isUser && m.sources && m.sources.length && b && b.parentElement){
         makeSourcesNote(b.parentElement, m.sources);
       }
+      if(!isUser && m.song && b && b.parentElement){
+        makeSongCard(b.parentElement, m.song);
+      }
     } else if(Array.isArray(m.content)){
       const hasMedia = m.content.some(b=>b.type==='image'||b.type==='document');
       m.content.forEach(block=>{
@@ -5314,8 +5318,9 @@ function hideTyping(){ document.getElementById('typing-row')?.remove(); }
 
 const headerSub=document.getElementById('headerSub');
 // ══ Zephyr 的愿望 skill：回复末尾的 [[愿望：…]] 标记会被 App 执行——存进愿望清单，并从聊天里抹掉 ══
+let pendingSongShare = null; // 他这次回复里分享的歌，callAPI 收尾时挂到消息上渲染成卡片
 function processZephyrActions(reply, bubble){
-  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0)) return reply;
+  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0)) return reply;
   const found = [];
   let cleaned = reply.replace(/\[\[愿望[:：]([^\]]{1,120})\]\]/g, (m, text)=>{
     const t = text.trim();
@@ -5333,9 +5338,15 @@ function processZephyrActions(reply, bubble){
     const t = text.trim();
     if(t) foundD.push(t);
     return '';
+  });
+  const foundS = [];
+  cleaned = cleaned.replace(/\[\[歌曲[:：]([^\]]{1,120})\]\]/g, (m, text)=>{
+    const t = text.trim();
+    if(t) foundS.push(t);
+    return '';
   }).replace(/\n{3,}/g, '\n\n').trim();
-  if(!found.length && !foundC.length && !foundD.length) return reply;
-  if(!cleaned) cleaned = found.length ? '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。' : (foundC.length ? '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。' : '（小声）我把刚刚发现的新鲜事，悄悄记到 Discoveries 里了。');
+  if(!found.length && !foundC.length && !foundD.length && !foundS.length) return reply;
+  if(!cleaned) cleaned = found.length ? '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。' : (foundC.length ? '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。' : (foundD.length ? '（小声）我把刚刚发现的新鲜事，悄悄记到 Discoveries 里了。' : '给你分享一首歌，点卡片就能听。'));
   if(found.length){
     const list = loadWishes();
     list.push({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), text:found[0].slice(0, 120), status:'wish', by:'zephyr', ts:Date.now(), auto:true });
@@ -5361,6 +5372,16 @@ function processZephyrActions(reply, bubble){
       const list = loadDiscoveries();
       list.push({ id:'d' + Date.now().toString(36) + Math.floor(Math.random()*999), title, text, url:'', ts:Date.now(), auto:true });
       if(storeDiscoveries(list)) setTimeout(()=>showToast('Zephyr 有了个新发现，去 Discoveries 看看 ★'), 350);
+    }
+  }
+  if(foundS.length){
+    const parts = foundS[0].split(/[|｜]/);
+    const title = (parts[0] || '').trim().slice(0, 80);
+    const artist = (parts[1] || '').trim().slice(0, 60);
+    if(title){
+      const tracks = loadMusic().tracks;
+      const hit = tracks.find(t=>t.title === title) || tracks.find(t=>t.title && (t.title.includes(title) || title.includes(t.title)));
+      pendingSongShare = { title: hit ? hit.title : title, artist: hit ? (hit.artist || artist) : artist, trackId: hit ? hit.id : null };
     }
   }
   if(bubble) bubble.textContent = cleaned;
@@ -6013,6 +6034,58 @@ function makeSourcesNote(col, sources){
   col.appendChild(note);
   return note;
 }
+// ══ 聊天里的歌曲卡片：Zephyr 用 [[歌曲：歌名|歌手]] 分享，歌单里有就能直接放 ══
+function makeSongCard(col, song){
+  if(!col || !song || !song.title) return;
+  const d = loadMusic();
+  const track = song.trackId ? d.tracks.find(t=>t.id===song.trackId) : d.tracks.find(t=>t.title===song.title);
+  const card = document.createElement('div');
+  card.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px 12px;max-width:290px;';
+  const tile = '<div style="width:40px;height:40px;flex:none;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-s));display:flex;align-items:center;justify-content:center;color:#fff;"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5.5L21 3v13.5"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="18.5" cy="16.5" r="2.5"/></svg></div>';
+  const meta = '<div style="flex:1;min-width:0;"><div style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(song.title) + '</div><div style="font-size:11.5px;color:var(--text-dim);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(song.artist || '佚名') + ' · Zephyr 分享的</div></div>';
+  let btn = '';
+  if(track && hasPlayable(track)){
+    btn = '<button data-song-btn="' + track.id + '" onclick="toggleSongCard(\'' + track.id + '\')" style="width:38px;height:38px;flex:none;border-radius:50%;background:var(--accent);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;">' + MUS_PLAY_ICON + '</button>';
+  } else if(track){
+    btn = '<button onclick="fillTrackUrl(\'' + track.id + '\')" style="flex:none;padding:8px 11px;border-radius:999px;background:var(--bg);border:1px dashed var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">补链接</button>';
+  } else {
+    btn = '<button onclick="saveSharedSong(this)" style="flex:none;padding:8px 11px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">存进歌单</button>';
+  }
+  card.innerHTML = tile + meta + btn;
+  col.appendChild(card);
+  updateSongCards();
+}
+function toggleSongCard(trackId){
+  const d = loadMusic();
+  const a = musicAudioEl();
+  bindMusicAudio();
+  if(d.lastId === trackId && a && a.src){ if(a.paused) a.play().catch(()=>showToast('这首歌放不出来 qwq')); else a.pause(); }
+  else playTrack(trackId);
+  setTimeout(updateSongCards, 250);
+}
+function updateSongCards(){
+  const d = loadMusic();
+  const a = musicAudioEl();
+  document.querySelectorAll('[data-song-btn]').forEach(btn=>{
+    const isCur = btn.getAttribute('data-song-btn') === d.lastId;
+    btn.innerHTML = (isCur && a && !a.paused) ? MUS_PAUSE_ICON : MUS_PLAY_ICON;
+  });
+}
+function saveSharedSong(btn){
+  const row = btn.closest('.msg-row');
+  const mid = row && row.dataset.mid;
+  const m = messages.find(x=>x.mid===mid);
+  if(!m || !m.song) return;
+  const d = loadMusic();
+  const id = 't' + Date.now().toString(36) + Math.floor(Math.random()*999);
+  d.tracks.unshift({ id, title:m.song.title, artist:m.song.artist || '', url:'', by:'zephyr', ts:Date.now(), notes:[] });
+  if(storeMusic(d)){
+    m.song.trackId = id;
+    saveChatHistory();
+    renderMessagesIntoChat();
+    showToast('存进歌单啦，给它补个链接就能放');
+  }
+}
 // 有些中转接口会把思考和正文混成一股文本返回，开头带个 thinking 字样、中间没有分隔。
 // 这种混流文本可以启发式切开：思考部分是在「说她」（第三人称地想），正文是开始「对她说话」——
 // 以最后一个「句首的糯糯」为界切开，切不开就原样返回 null。切错也不要紧，思考块点开就能看全。
@@ -6249,7 +6322,9 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     if(!reply && sources.length) reply = '（搜到了一些资料，但没组织好语言……再问我一次好吗）';
     if(!reply && thinking) reply = '（想了很多，但没组织好语言……再问我一次好吗）';
     reply = processZephyrActions(reply, bubble); // 他悄悄许的愿望在这里被 App 执行并抹掉标记
-    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {})});
+    const songShare = pendingSongShare; pendingSongShare = null;
+    if(songShare && bubble && bubble.parentElement) makeSongCard(bubble.parentElement, songShare);
+    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(songShare ? {song: songShare} : {})});
     saveChatHistory();
     maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
     updateRegenButton();
