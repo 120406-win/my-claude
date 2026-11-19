@@ -7680,7 +7680,9 @@ function renderMessagesIntoChat(){
         const sp = splitLeakedThinking(dispText);
         if(sp){ dispThinking = sp.thinking; dispText = sp.reply; }
       }
-      const b = addTextMsg(dispText, isUser, false, m.mid);
+      let b = null;
+      if(isUser && m.voice && m.voice.data) addVoiceBubble('data:' + (m.voice.type || 'audio/mp4') + ';base64,' + m.voice.data, m.voice.dur || 0, true, m.mid);
+      else b = addTextMsg(dispText, isUser, false, m.mid);
       if(!isUser && dispThinking && b && b.parentElement){
         const tb = makeThinkingBlock(b.parentElement, b, true);
         tb.body.textContent = dispThinking;
@@ -8038,9 +8040,11 @@ function addRow(isUser, mid){
 }
 function addTextMsg(text,isUser,skipSave,mid){ const col=addRow(isUser,mid); const b=document.createElement('div'); b.className='msg'; b.textContent=text; col.appendChild(b); chatWrap.scrollTop=chatWrap.scrollHeight; return b; }
 function addImgMsg(src,isUser,skipSave,mid){ const col=addRow(isUser,mid); const wrap=document.createElement('div'); wrap.className='msg-img-wrap'; const img=document.createElement('img'); img.className='msg-img'; img.src=src; img.onclick=()=>{ if(window.__suppressImgClick && Date.now()-window.__suppressImgClick<900) return; document.getElementById('imgPreviewEl').src=src; document.getElementById('imgPreview').classList.add('show'); }; wrap.appendChild(img); col.appendChild(wrap); chatWrap.scrollTop=chatWrap.scrollHeight; }
-function addVoiceMsg(blob,dur,isUser,mid){
+async function voiceBlobToB64(blob){ const buf = new Uint8Array(await blob.arrayBuffer()); return bytesToB64(buf); }
+function addVoiceMsg(blob,dur,isUser,mid){ addVoiceBubble(URL.createObjectURL(blob), dur, isUser, mid); }
+function addVoiceBubble(src,dur,isUser,mid){
   const col=addRow(isUser,mid);
-  const url=URL.createObjectURL(blob);
+  const url=src;
   const wrap=document.createElement('div'); wrap.className='voice-bubble';
   const icon=document.createElement('span'); icon.className='voice-icon'; icon.innerHTML='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path fill="currentColor" stroke="none" d="M5 9.8v4.4h3.2L14 18.6V5.4L8.2 9.8H5z"/><path d="M16.8 9.2a4.2 4.2 0 0 1 0 5.6"/></svg>';
   const waves=document.createElement('div'); waves.className='voice-waves';
@@ -8048,7 +8052,7 @@ function addVoiceMsg(blob,dur,isUser,mid){
   const durEl=document.createElement('span'); durEl.className='voice-dur'; durEl.textContent=`${Math.round(dur)}"`;
   wrap.appendChild(icon); wrap.appendChild(waves); wrap.appendChild(durEl);
   const audio=new Audio(url); audio.onended=()=>wrap.classList.remove('playing');
-  wrap.addEventListener('click',()=>{ if(wrap.classList.contains('playing')){audio.pause();audio.currentTime=0;wrap.classList.remove('playing');}else{audio.play();wrap.classList.add('playing');} });
+  wrap.addEventListener('click',()=>{ if(wrap.classList.contains('playing')){audio.pause();audio.currentTime=0;wrap.classList.remove('playing');}else{ const p=audio.play(); if(p && p.catch) p.catch(()=>{ wrap.classList.remove('playing'); showToast('这条语音放不出来 qwq'); }); wrap.classList.add('playing');} });
   col.appendChild(wrap); chatWrap.scrollTop=chatWrap.scrollHeight;
 }
 function showTyping(){ chatWrap.querySelector('.empty-tip')?.remove(); const row=document.createElement('div'); row.className='msg-row ai'; row.id='typing-row'; const av=getAvatarEl(false); const col=document.createElement('div'); col.className='msg-col'; const b=document.createElement('div'); b.className='msg'; b.innerHTML='<div class="typing-dots"><span></span><span></span><span></span></div>'; col.appendChild(b); row.appendChild(av); row.appendChild(col); chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; }
@@ -9570,7 +9574,7 @@ async function startRecording(){
       recordChunks=[];
       mediaRecorder=new MediaRecorder(stream);
       mediaRecorder.ondataavailable=e=>{if(e.data.size>0)recordChunks.push(e.data);};
-      mediaRecorder.onstop=()=>{ stream.getTracks().forEach(t=>t.stop()); onRecordStopped(new Blob(recordChunks,{type:'audio/webm'})); };
+      mediaRecorder.onstop=()=>{ stream.getTracks().forEach(t=>t.stop()); onRecordStopped(new Blob(recordChunks,{type:(mediaRecorder && mediaRecorder.mimeType) || 'audio/mp4'})); };
       mediaRecorder.start();
     }catch(e){
       recHasAudio=false;
@@ -9606,13 +9610,15 @@ async function onRecordStopped(blob){
   const dur=(Date.now()-recordStart)/1000;
   if(dur<0.5){ dropVoiceRec(); showToast('录音太短了'); return; }
   const voiceMid = genMsgId(); pendingUserMid = voiceMid;
-  if(blob) addVoiceMsg(blob,dur,true,voiceMid);
+  let voiceSaveP = null;
+  if(blob){ addVoiceMsg(blob,dur,true,voiceMid); if(blob.size <= 2621440) voiceSaveP = voiceBlobToB64(blob).catch(()=>null); }
   const text=await finishVoiceRec();
   if(text){
     if(!blob) addTextMsg(text,true,false,voiceMid); // 纯识别模式就用文字气泡展示她说的话
     headerSub.textContent='正在输入…'; showTyping();
     const reply=await callAPI(text);
     hideTyping(); headerSub.textContent='在线';
+    if(voiceSaveP){ const b64 = await voiceSaveP; if(b64){ const vm = messages.find(x=>x.mid === voiceMid); if(vm){ vm.voice = { data:b64, type:(blob && blob.type) || 'audio/mp4', dur:Math.round(dur) }; saveChatHistory(); } } }
     if(reply && voiceEnabled) speakText(reply);
   } else if(!voiceRecSupported){
     showToast('这个浏览器不支持语音识别，语音条暂时传不到 AI 那里 qwq');
