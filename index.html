@@ -618,6 +618,25 @@
 
     /* Toast */
     .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:rgba(82,84,212,0.9); color:white; padding:8px 20px; border-radius:20px; font-size:14px; z-index:500; pointer-events:none; white-space:nowrap; }
+    /* ══ Home 首页：星空 App 首页，开屏之后的第一站 ══ */
+    #homePage { background:linear-gradient(180deg,#060a24 0%,#0c133e 55%,#1b2456 100%); color:#eef0ff; }
+    .home-stars { position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:0; }
+    .home-stars .star { position:absolute; border-radius:50%; background:#e8eaff; animation:starTwinkle var(--tw,3s) ease-in-out infinite; }
+    .home-scroll { flex:1; overflow-y:auto; position:relative; z-index:1; padding:30px 18px 36px; }
+    .home-hello { text-align:center; margin:6px 0 22px; }
+    .home-welcome { font-family:'Ms Madi',cursive; font-size:42px; line-height:1.1; color:#fff; text-shadow:0 0 22px rgba(160,150,255,.5); }
+    .home-date { font-size:12.5px; color:#a7aee6; margin-top:4px; letter-spacing:.08em; }
+    .home-greet { font-size:15px; color:#dfe3ff; margin-top:12px; }
+    .home-chat-card { display:flex; align-items:center; gap:14px; background:linear-gradient(135deg, rgba(124,108,255,.9), rgba(64,140,255,.9)); border:1px solid rgba(255,255,255,.28); border-radius:20px; padding:18px; cursor:pointer; box-shadow:0 12px 32px rgba(10,10,60,.5); margin-bottom:14px; }
+    .home-chat-ico { width:46px; height:46px; border-radius:50%; background:rgba(255,255,255,.18); display:flex; align-items:center; justify-content:center; flex-shrink:0; color:#fff; }
+    .home-chat-ico svg { width:24px; height:24px; }
+    .home-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .home-card { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.13); border-radius:16px; padding:14px; cursor:pointer; }
+    .home-card-ico { width:30px; height:30px; border-radius:10px; background:rgba(255,255,255,.1); display:flex; align-items:center; justify-content:center; margin-bottom:9px; color:#cfd6ff; }
+    .home-card-ico svg { width:17px; height:17px; }
+    .home-card-title { font-size:13.5px; font-weight:600; color:#eef0ff; }
+    .home-card-sub { font-size:12px; color:#a7aee6; margin-top:4px; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+    .home-foot { text-align:center; font-size:11.5px; color:#7f88c4; margin-top:24px; letter-spacing:.14em; }
   </style>
 </head>
 <body>
@@ -700,12 +719,67 @@
   </div>
 </div>
 
+<!-- ══ HOME PAGE ══ -->
+<div class="settings-page" id="homePage">
+  <div class="home-stars" id="homeStars"><div class="shooting-star"></div></div>
+  <div class="home-scroll">
+    <div class="home-hello">
+      <div class="home-welcome">Welcome home</div>
+      <div class="home-date" id="homeDate"></div>
+      <div class="home-greet" id="homeGreet"></div>
+    </div>
+    <div class="home-chat-card" onclick="navTo('chat')">
+      <div class="home-chat-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div>
+      <div>
+        <div style="font-size:16px;font-weight:600;color:#fff;">和 Zephyr 聊天</div>
+        <div style="font-size:12.5px;color:rgba(255,255,255,.75);margin-top:2px;">他在这里等你</div>
+      </div>
+    </div>
+    <div class="home-grid">
+      <div class="home-card" onclick="navTo('capsule')">
+        <div class="home-card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10" width="15" height="9.5" rx="2.5"/><path d="M8.5 10V7a3.5 3.5 0 0 1 7 0v3"/><circle cx="12" cy="14.8" r="1.5"/></svg></div>
+        <div class="home-card-title">时间胶囊</div>
+        <div class="home-card-sub" id="homeCapsuleText"></div>
+      </div>
+      <div class="home-card" onclick="navTo('wall')">
+        <div class="home-card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M12 16.4s-4-2.6-4-5.2A2.3 2.3 0 0 1 12 9.5a2.3 2.3 0 0 1 4 1.7c0 2.6-4 5.2-4 5.2z"/></svg></div>
+        <div class="home-card-title">回忆墙</div>
+        <div class="home-card-sub" id="homeWallText"></div>
+      </div>
+      <div class="home-card" onclick="navTo('watchlist')">
+        <div class="home-card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M10.3 9.3l4.7 2.7-4.7 2.7z"/></svg></div>
+        <div class="home-card-title">今晚看的</div>
+        <div class="home-card-sub" id="homeWatchText"></div>
+      </div>
+      <div class="home-card" onclick="navTo('music')">
+        <div class="home-card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5.5L21 3v13.5"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="18.5" cy="16.5" r="2.5"/></svg></div>
+        <div class="home-card-title">一起听</div>
+        <div class="home-card-sub" id="homeMusicText"></div>
+      </div>
+      <div class="home-card" onclick="navTo('letters')">
+        <div class="home-card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3.5 7l8.5 6 8.5-6"/></svg></div>
+        <div class="home-card-title">信件</div>
+        <div class="home-card-sub" id="homeLettersText"></div>
+      </div>
+      <div class="home-card" onclick="navTo('wishes')">
+        <div class="home-card-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></div>
+        <div class="home-card-title">愿望</div>
+        <div class="home-card-sub" id="homeWishText"></div>
+      </div>
+    </div>
+    <div class="home-foot">LUMI & ZEPHYR</div>
+  </div>
+</div>
+
 <!-- ══ SIDEBAR ══ -->
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <div class="sidebar" id="sidebar">
   <div class="sidebar-header">Zephyr</div>
 
   <div class="nav-section">
+    <div class="nav-item" id="nav-home" onclick="navTo('home')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5.5 9.3V20a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V9.3"/><path d="M9.5 21v-6h5v6"/></svg></span> Home
+    </div>
     <div class="nav-item active" id="nav-chat" onclick="navTo('chat')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></span> Chat
     </div>
@@ -1514,6 +1588,7 @@ document.getElementById('splash').addEventListener('click',()=>{
   document.getElementById('splash').classList.add('hide');
   const app=document.getElementById('app'); app.classList.add('show');
   setTimeout(()=>document.getElementById('splash').style.display='none',900);
+  navTo('home'); // 开屏之后先回到星空首页
 });
 
 
@@ -1721,6 +1796,7 @@ function saveSettings(){
 // ══ 导航 ══
 function navTo(page){
   closeSidebar();
+  document.getElementById('homePage').classList.toggle('show', page==='home');
   document.getElementById('settingsPage').classList.toggle('show', page==='settings');
   document.getElementById('memoryPage').classList.toggle('show', page==='memory');
   document.getElementById('journalPage').classList.toggle('show', page==='journal');
@@ -1751,6 +1827,79 @@ function navTo(page){
   if(page==='watchlist') renderWatchlist();
   if(page==='wall') renderWall();
   if(page==='capsule') renderCapsules();
+  if(page==='home') renderHome();
+}
+
+// ══ Home 首页：星空 App 首页，卡片内容都从各模块的现有数据里取 ══
+function setHomeText(id, t){ const el = document.getElementById(id); if(el) el.textContent = t; }
+function renderHome(){
+  const starBox = document.getElementById('homeStars');
+  if(starBox && starBox.querySelectorAll('.star').length === 0){
+    for(let i = 0; i < 80; i++){
+      const s = document.createElement('span');
+      s.className = 'star';
+      const size = (Math.random() * 2 + 0.7).toFixed(1);
+      s.style.cssText = 'left:' + (Math.random() * 100) + '%;top:' + (Math.random() * 100) + '%;width:' + size + 'px;height:' + size + 'px;--tw:' + (2.4 + Math.random() * 3.6).toFixed(1) + 's;animation-delay:' + (Math.random() * 4).toFixed(1) + 's;opacity:.35;';
+      starBox.appendChild(s);
+    }
+  }
+  const now = new Date();
+  const wk = ['日','一','二','三','四','五','六'][now.getDay()];
+  setHomeText('homeDate', now.getFullYear() + '年' + (now.getMonth() + 1) + '月' + now.getDate() + '日 · 星期' + wk);
+  const h = now.getHours();
+  setHomeText('homeGreet', (h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好') + '，糯糯');
+  // 时间胶囊：最近一颗待打开的
+  const sealed = loadCapsules().filter(c=>!c.opened).sort((a,b)=>a.openTs - b.openTs);
+  if(!sealed.length) setHomeText('homeCapsuleText', '还没有封存的胶囊，去封一颗给未来吧');
+  else {
+    const c = sealed[0];
+    const days = Math.max(0, Math.ceil((c.openTs - Date.now()) / 86400000));
+    setHomeText('homeCapsuleText', Date.now() >= c.openTs ? '「' + (c.title || '无题') + '」到时间啦，可以打开了' : '「' + (c.title || '无题') + '」还有 ' + days + ' 天打开');
+  }
+  // 回忆墙：最新一条
+  let wallText = '你们的回忆会挂在这里';
+  try{ const items = collectWallItems(); if(items.length) wallText = items[0].title; }catch(e){}
+  setHomeText('homeWallText', wallText);
+  // 今晚看的：他选的优先，其次是想看清单
+  let watchText = '清单还是空的，去加一部想看的';
+  try{
+    const list = loadWatchlist();
+    let pick = null;
+    try{ pick = JSON.parse(localStorage.getItem('z_watchlist_pick') || 'null'); }catch(e){}
+    const picked = pick && list.find(w=>w.id === pick.id && w.status === 'want');
+    if(picked) watchText = '今晚看《' + picked.title + '》';
+    else {
+      const want = list.filter(w=>w.status === 'want');
+      const watched = list.filter(w=>w.status === 'watched');
+      if(want.length) watchText = '想看《' + want[0].title + '》' + (want.length > 1 ? ' 等 ' + want.length + ' 部' : '');
+      else if(watched.length) watchText = '已经一起看过 ' + watched.length + ' 部啦';
+    }
+  }catch(e){}
+  setHomeText('homeWatchText', watchText);
+  // 一起听：最近加的一首
+  let musicText = '歌单还是空的，去加一首吧';
+  try{
+    const tracks = loadMusic().tracks;
+    if(tracks.length){
+      const t = tracks.slice().sort((a,b)=>(b.ts || 0) - (a.ts || 0))[0];
+      musicText = '最近加了《' + t.title + '》' + (t.artist ? ' · ' + t.artist : '');
+    }
+  }catch(e){}
+  setHomeText('homeMusicText', musicText);
+  // 信件：未读的信
+  const unread = loadLetters().filter(l=>l.from === 'zephyr' && !l.read && !l.draft).length;
+  setHomeText('homeLettersText', unread ? '有 ' + unread + ' 封他写的新信还没看' : '暂时没有新信，去给他写一封吧');
+  // 愿望：已实现数 + 最新一个
+  let wishText = '还没有愿望，去许一个吧';
+  try{
+    const ws = loadWishes();
+    if(ws.length){
+      const done = ws.filter(w=>w.status === 'done').length;
+      const latest = ws.slice().sort((a,b)=>(b.ts || 0) - (a.ts || 0))[0];
+      wishText = (done ? '已实现 ' + done + ' 个 · ' : '') + '最新：' + latest.text;
+    }
+  }catch(e){}
+  setHomeText('homeWishText', wishText);
 }
 
 // ══ Memory 系统（本地版）：长期记忆存 localStorage，每次请求自动带进系统提示词，新窗口也不失忆 ══
