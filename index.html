@@ -7741,6 +7741,21 @@ async function callAPI(userText, extraBlocks=null, opts=null){
   } catch(e){ if(!regen) messages.pop(); showToast('发送失败：'+e.message + (thinkingEnabled() ? '（开着思考模式时若反复失败，可能是模型或接口不支持，去设置里关掉它）' : '')); return null; }
 }
 
+// ══ TTS 播放器：全局共用一个 Audio 元素。iOS 只放行被用户手势「解锁」过的
+// 元素出声，每次新建 Audio 又在异步回调里 play() 会被系统直接掐掉还没声音，
+// 所以要在点通话/发送/开朗读的那一下先用静音片段把这个元素喂活。══
+let ttsAudioEl = null;
+function getTtsAudio(){ if(!ttsAudioEl) ttsAudioEl = new Audio(); return ttsAudioEl; }
+const TTS_SILENT_WAV = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+function unlockTtsAudio(){
+  try {
+    const a = getTtsAudio();
+    if(!a.paused) return;
+    a.src = TTS_SILENT_WAV;
+    const p = a.play(); if(p && p.catch) p.catch(()=>{});
+  } catch(e) {}
+}
+
 async function speakText(text){
   callLastActivity = Date.now(); // 他开口说话也算通话里的动静，心跳从他说完重新计时（近似）
   const ttsUrl = cfg.ttsUrl || '';
@@ -7756,9 +7771,10 @@ async function speakText(text){
         const audioBytes = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
         const blob = new Blob([audioBytes], {type: 'audio/wav'});
         const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.play();
-        return;
+        const a = getTtsAudio();
+        a.src = url;
+        try { await a.play(); return; }
+        catch(e) { console.log('TTS play blocked, fallback to system voice', e); }
       }
     } catch(e) { console.log('MiMo TTS failed, fallback to system voice', e); }
   }
@@ -7796,6 +7812,7 @@ function renderVoiceToggle(){
 }
 renderVoiceToggle();
 voiceToggleBtn.addEventListener('click', () => {
+  unlockTtsAudio();
   voiceEnabled = !voiceEnabled;
   localStorage.setItem('z_voiceEnabled', voiceEnabled);
   renderVoiceToggle();
@@ -7812,6 +7829,7 @@ async function sendMessage(){
   if(reply && (voiceEnabled||isCalling||isVideo)) speakText(reply);
 }
 document.getElementById('sendBtn').addEventListener('click',sendMessage);
+document.getElementById('sendBtn').addEventListener('click',unlockTtsAudio);
 document.getElementById('msgInput').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} });
 
 // ══ 发图片 ══
@@ -8118,6 +8136,7 @@ function startCallSTT() {
 }
 
 document.getElementById('callBtn').addEventListener('click',async()=>{
+  unlockTtsAudio();
   isCalling=true; document.getElementById('callModal').classList.add('show');
   callSeconds=0; callInterval=setInterval(()=>{callSeconds++;const m=String(Math.floor(callSeconds/60)).padStart(2,'0'),s=String(callSeconds%60).padStart(2,'0');document.getElementById('callTimer').textContent=`${m}:${s}`;},1000);
   callBusy = true;
@@ -8131,7 +8150,7 @@ document.getElementById('callBtn').addEventListener('click',async()=>{
 document.getElementById('callHangBtn').addEventListener('click',()=>{
   isCalling=false; callMicActive=false; stopCallHeartbeat();
   callRecognition?.stop();
-  clearInterval(callInterval); speechSynthesis?.cancel();
+  clearInterval(callInterval); speechSynthesis?.cancel(); try{ getTtsAudio().pause(); }catch(e){}
   document.getElementById('callModal').classList.remove('show');
   showToast(`通话结束 ${document.getElementById('callTimer').textContent}`);
 });
@@ -8144,6 +8163,7 @@ document.getElementById('callMicBtn').addEventListener('click',()=>{
 
 // ══ 视频通话 ══
 document.getElementById('videoBtn').addEventListener('click',async()=>{
+  unlockTtsAudio();
   try { localStream=await navigator.mediaDevices.getUserMedia({video:true,audio:true}); document.getElementById('localVideo').srcObject=localStream; } catch(e){ showToast('无法访问摄像头'); }
   isVideo=true; document.getElementById('videoModal').classList.add('show');
   videoSeconds=0; videoInterval=setInterval(()=>{videoSeconds++;const m=String(Math.floor(videoSeconds/60)).padStart(2,'0'),s=String(videoSeconds%60).padStart(2,'0');document.getElementById('videoTimer').textContent=`${m}:${s}`;},1000);
@@ -8153,7 +8173,7 @@ document.getElementById('videoBtn').addEventListener('click',async()=>{
   if(reply){speakText(reply);}
 });
 document.getElementById('vHangBtn').addEventListener('click',()=>{
-  isVideo=false; stopCallHeartbeat(); clearInterval(videoInterval); speechSynthesis?.cancel();
+  isVideo=false; stopCallHeartbeat(); clearInterval(videoInterval); speechSynthesis?.cancel(); try{ getTtsAudio().pause(); }catch(e){}
   localStream?.getTracks().forEach(t=>t.stop()); document.getElementById('localVideo').srcObject=null;
   document.getElementById('videoModal').classList.remove('show');
   showToast(`视频通话结束 ${document.getElementById('videoTimer').textContent}`);
