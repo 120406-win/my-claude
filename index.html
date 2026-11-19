@@ -818,7 +818,7 @@
 
   <div class="nav-section">
     <div class="nav-label" onclick="toggleMemoryNav()" style="display:flex;align-items:center;justify-content:space-between;padding-right:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;">
-      <span>Memory</span>
+      <span>小日子</span>
       <span style="display:flex;align-items:center;gap:6px;">
         <span id="memoryNavDot" style="display:none;width:7px;height:7px;border-radius:50%;background:var(--accent);"></span>
         <svg id="memoryNavChevron" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s;"><path d="M6 9l6 6 6-6"/></svg>
@@ -1775,7 +1775,7 @@
   </div>
 </div>
 
-<!-- ══ 消息操作菜单（长按气泡弹出） ══ -->
+<!-- ══ 消息操作菜单（双击气泡弹出） ══ -->
 <div id="msgSheet" onclick="if(event.target===this)closeMsgMenu()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:220;align-items:flex-end;justify-content:center;">
   <div style="width:100%;max-width:480px;padding:0 14px calc(14px + env(safe-area-inset-bottom));">
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:10px;">
@@ -5165,7 +5165,7 @@ function loadAvatarPreviews(){
 
 // ══ 消息渲染 ══
 const chatWrap=document.getElementById('chatWrap');
-// ══ 消息撤回/删除：长按（或右键）气泡弹出菜单。撤回会清掉内容并从发给 API 的历史里剔除，Zephyr 真的看不到 ══
+// ══ 消息撤回/删除：双击/连点两下气泡（或右键）弹出菜单。撤回会清掉内容并从发给 API 的历史里剔除，Zephyr 真的看不到 ══
 let msgMenuMid = null;
 function openMsgMenu(mid){
   const m = messages.find(x=>x.mid===mid);
@@ -5263,19 +5263,19 @@ async function regenerateLastReply(){
   if(!reply) showToast('重新生成失败了，再试一次 qwq');
 }
 function regenFromMenu(){ closeMsgMenu(); regenerateLastReply(); }
-let lpTimer = null, lpX = 0, lpY = 0;
-chatWrap.addEventListener('pointerdown', e=>{
+// 双击（手机上连点两下）气泡打开菜单，不用再长按等了
+let lastTapMid = null, lastTapTs = 0;
+chatWrap.addEventListener('pointerup', e=>{
   const row = e.target.closest('.msg-row');
   if(!row || !row.dataset.mid) return;
-  lpX = e.clientX; lpY = e.clientY;
-  const mid = row.dataset.mid;
-  clearTimeout(lpTimer);
-  lpTimer = setTimeout(()=>openMsgMenu(mid), 550);
+  const now = Date.now();
+  if(lastTapMid === row.dataset.mid && now - lastTapTs < 330){ lastTapMid = null; openMsgMenu(row.dataset.mid); }
+  else { lastTapMid = row.dataset.mid; lastTapTs = now; }
 });
-chatWrap.addEventListener('pointermove', e=>{
-  if(lpTimer && (Math.abs(e.clientX-lpX) > 12 || Math.abs(e.clientY-lpY) > 12)){ clearTimeout(lpTimer); lpTimer = null; }
+chatWrap.addEventListener('dblclick', e=>{
+  const row = e.target.closest('.msg-row');
+  if(row && row.dataset.mid) openMsgMenu(row.dataset.mid);
 });
-['pointerup','pointercancel'].forEach(ev=>chatWrap.addEventListener(ev, ()=>{ clearTimeout(lpTimer); lpTimer = null; }));
 chatWrap.addEventListener('contextmenu', e=>{
   const row = e.target.closest('.msg-row');
   if(row && row.dataset.mid){ e.preventDefault(); openMsgMenu(row.dataset.mid); }
