@@ -758,6 +758,12 @@
     <div class="nav-item" id="nav-watchlist" onclick="navTo('watchlist')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M10.3 9.3l4.7 2.7-4.7 2.7z"/></svg></span> Watchlist
     </div>
+    <div class="nav-item" id="nav-wall" onclick="navTo('wall')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M12 16.4s-4-2.6-4-5.2A2.3 2.3 0 0 1 12 9.5a2.3 2.3 0 0 1 4 1.7c0 2.6-4 5.2-4 5.2z"/></svg></span> 回忆墙
+    </div>
+    <div class="nav-item" id="nav-capsule" onclick="navTo('capsule')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="10" width="15" height="9.5" rx="2.5"/><path d="M8.5 10V7a3.5 3.5 0 0 1 7 0v3"/><circle cx="12" cy="14.8" r="1.5"/></svg></span> 时间胶囊
+    </div>
     <div class="nav-item" onclick="showToast('即将上线 ^ ^')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4.5 17.5l4.8-4.8 3 3 3.2-3.2 4 4"/></svg></span> Darkroom
     </div>
@@ -1334,6 +1340,82 @@
   </div>
 </div>
 
+<!-- ══ 回忆墙 Memory Wall ══ -->
+<div class="settings-page" id="wallPage">
+  <div class="s-topbar">
+    <button class="back-btn" onclick="closePage('wallPage')">‹</button>
+    <div class="s-title">回忆墙</div>
+  </div>
+  <div class="s-body">
+    <div class="s-section">
+      <div class="s-section-title">Memory Wall</div>
+      <div style="font-size:12.5px;color:var(--text-pale);line-height:1.7;">你们一起经历的事会自动挂上这面墙：看过的电影、实现的愿望、存下的照片、他写的信、加进歌单的歌、共同的回忆……点「钉住」可以把最珍贵的留在最上面。</div>
+    </div>
+    <div class="s-section" id="wallPinnedSection" style="display:none;">
+      <div class="s-section-title">钉在墙上</div>
+      <div id="wallPinned"></div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">自己加一条回忆</div>
+      <div class="s-card" style="padding:12px;">
+        <textarea id="wallCustomText" rows="2" placeholder="比如：今天和小猫玩了一下午，它睡在我键盘上……" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 11px;color:var(--text);font-size:13.5px;font-family:inherit;resize:vertical;"></textarea>
+        <button onclick="addWallCustom()" style="width:100%;margin-top:9px;padding:10px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:13.5px;cursor:pointer;">挂上墙</button>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">时间线</div>
+      <div id="wallList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 时间胶囊 Time Capsule ══ -->
+<div class="settings-page" id="capsulePage">
+  <div class="s-topbar">
+    <button class="back-btn" onclick="closePage('capsulePage')">‹</button>
+    <div class="s-title">时间胶囊</div>
+  </div>
+  <div class="s-body">
+    <div class="s-section">
+      <div class="s-section-title">Time Capsule</div>
+      <div style="font-size:12.5px;color:var(--text-pale);line-height:1.7;">把一封信、一句话、一个愿望或一段回忆封进胶囊，选一个未来的日子，到时间再一起打开。封存期间谁都看不到内容——Zephyr 也不行。</div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">封一颗新胶囊</div>
+      <div class="s-card" style="padding:12px;">
+        <input id="capsuleTitle" type="text" placeholder="给这颗胶囊起个名字" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 11px;color:var(--text);font-size:13.5px;font-family:inherit;">
+        <textarea id="capsuleContent" rows="4" placeholder="想对未来的你们说的话……" style="width:100%;box-sizing:border-box;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 11px;color:var(--text);font-size:13.5px;font-family:inherit;resize:vertical;margin-top:8px;"></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+          <span style="font-size:12px;color:var(--text-pale);flex-shrink:0;">什么时候打开</span>
+          <select id="capsuleWhen" style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px;color:var(--text);font-size:13px;">
+            <option value="1">一个月后</option>
+            <option value="3">三个月后</option>
+            <option value="6" selected>半年后</option>
+            <option value="12">一年后</option>
+            <option value="custom">自定义日期</option>
+          </select>
+          <input id="capsuleDate" type="date" style="display:none;flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px;color:var(--text);font-size:13px;">
+        </div>
+        <img id="capsulePendingImg" style="display:none;width:100%;max-height:180px;object-fit:cover;border-radius:10px;margin-top:8px;">
+        <div style="display:flex;gap:8px;margin-top:9px;">
+          <button onclick="document.getElementById('capsuleFile').click()" style="flex:1;padding:9px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text-dim);font-size:13px;cursor:pointer;">放一张照片进去</button>
+          <input type="file" id="capsuleFile" accept="image/*" style="display:none;" onchange="pickCapsulePhoto(this)">
+          <button onclick="sealCapsule()" style="flex:1;padding:9px;border:none;border-radius:10px;background:var(--accent);color:#fff;font-size:13px;cursor:pointer;">封存胶囊</button>
+        </div>
+        <button onclick="askZephyrCapsule(this)" style="width:100%;margin-top:8px;padding:9px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--accent-s);font-size:13px;cursor:pointer;">请 Zephyr 写一封给未来的信</button>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">封存中</div>
+      <div id="capsuleSealed"></div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">已经打开的</div>
+      <div id="capsuleOpened"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ 消息操作菜单（长按气泡弹出） ══ -->
 <div id="msgSheet" onclick="if(event.target===this)closeMsgMenu()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:220;align-items:flex-end;justify-content:center;">
   <div style="width:100%;max-width:480px;padding:0 14px calc(14px + env(safe-area-inset-bottom));">
@@ -1651,6 +1733,7 @@ function navTo(page){
   document.getElementById('dreamsPage').classList.toggle('show', page==='dreams');
   document.getElementById('musicPage').classList.toggle('show', page==='music');
   document.getElementById('watchlistPage').classList.toggle('show', page==='watchlist');
+  document.getElementById('wallPage').classList.toggle('show', page==='wall');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('nav-'+page)?.classList.add('active');
   if(page==='settings') loadSettings();
@@ -1665,6 +1748,7 @@ function navTo(page){
   if(page==='dreams') renderDreams();
   if(page==='music') renderMusic();
   if(page==='watchlist') renderWatchlist();
+  if(page==='wall') renderWall();
 }
 
 // ══ Memory 系统（本地版）：长期记忆存 localStorage，每次请求自动带进系统提示词，新窗口也不失忆 ══
@@ -4259,6 +4343,114 @@ function processZephyrActions(reply, bubble){
   if(bubble) bubble.textContent = cleaned;
   if(saved) setTimeout(()=>showToast('Zephyr 悄悄许了一个愿望，去 Wishes 看看 ★'), 350);
   return cleaned;
+}
+// ══ 回忆墙 Memory Wall：各模块的共同经历自动汇成时间线；可钉住、可自己加 ══
+function loadWallCustom(){ try{ const a = JSON.parse(localStorage.getItem('z_wall_custom')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function storeWallCustom(list){ localStorage.setItem('z_wall_custom', JSON.stringify(list)); }
+function loadWallPins(){ try{ const a = JSON.parse(localStorage.getItem('z_wall_pins')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
+function toggleWallPin(key){
+  let pins = loadWallPins();
+  pins = pins.includes(key) ? pins.filter(k=>k!==key) : pins.concat(key);
+  localStorage.setItem('z_wall_pins', JSON.stringify(pins));
+  renderWall();
+}
+function fmtWallDate(ts){ const d = new Date(ts); return d.getFullYear() + '/' + (d.getMonth()+1) + '/' + d.getDate(); }
+function collectWallItems(){
+  const items = [];
+  const BY = { lumi:'糯糯', zephyr:'Zephyr', both:'我们一起' };
+  loadWatchlist().filter(w=>w.status==='watched').forEach(w=>{
+    const rs = [];
+    if(w.ratingLumi) rs.push('糯糯 ★' + w.ratingLumi);
+    if(w.ratingZephyr) rs.push('Zephyr ★' + w.ratingZephyr);
+    const sub = (rs.join(' · ') + (w.favScene ? ' · 最喜欢的一幕：' + w.favScene : '')).trim();
+    items.push({ key:'movie:'+w.id, kind:'电影', ts:w.watchedTs || w.ts, title:'一起看了《' + w.title + '》', sub });
+  });
+  loadWishes().filter(w=>w.status==='done').forEach(w=> items.push({ key:'wish:'+w.id, kind:'愿望', ts:w.doneTs || w.ts, title:'实现的愿望：' + w.text, sub:(BY[w.by] || '') + '许下的' }));
+  loadGallery().forEach(p=> items.push({ key:'photo:'+p.id, kind:'照片', ts:p.ts, title:p.caption || '一张照片', sub:(BY[p.by] || '我们一起') + '存的', img:p.img }));
+  loadLetters().filter(l=>l.from==='zephyr' && !l.draft).forEach(l=> items.push({ key:'letter:'+l.id, kind:'信件', ts:l.ts, title:'Zephyr 的信' + (l.title ? '：' + l.title : ''), sub:(l.content || '').slice(0, 60) }));
+  loadMusic().tracks.forEach(t=> items.push({ key:'music:'+t.id, kind:'音乐', ts:t.ts || Date.now(), title:'歌单里加了《' + t.title + '》', sub:((t.artist || '') + (t.by ? ' · ' + (BY[t.by] || '') + '加的' : '')).trim() }));
+  loadMemories().filter(m=>m.cat==='共同经历' || m.cat==='重要事件').forEach(m=> items.push({ key:'mem:'+m.id, kind:'回忆', ts:m.ts || Date.now(), title:m.text, sub:m.cat }));
+  if(typeof loadCapsules === 'function') loadCapsules().filter(c=>c.opened).forEach(c=> items.push({ key:'capsule:'+c.id, kind:'时间胶囊', ts:c.openedTs || c.openTs, title:'打开了时间胶囊「' + (c.title || '无题') + '」', sub:(c.content || '').slice(0, 60) }));
+  loadWallCustom().forEach(c=> items.push({ key:'custom:'+c.id, kind:'回忆', ts:c.ts, title:c.text, sub:'', customId:c.id }));
+  return items.sort((a,b)=>b.ts-a.ts).slice(0, 80);
+}
+function wallCardEl(item, pinned){
+  const card = document.createElement('div');
+  card.className = 's-card';
+  card.style.cssText = 'padding:12px;margin-bottom:10px;' + (pinned ? 'border:1px solid var(--accent);' : '');
+  const top = document.createElement('div');
+  top.style.cssText = 'display:flex;align-items:center;gap:8px;';
+  const chip = document.createElement('span');
+  chip.style.cssText = 'font-size:11px;padding:2px 9px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--accent-s);flex-shrink:0;';
+  chip.textContent = item.kind;
+  const date = document.createElement('span');
+  date.style.cssText = 'font-size:11px;color:var(--text-pale);';
+  date.textContent = fmtWallDate(item.ts);
+  const spacer = document.createElement('span');
+  spacer.style.flex = '1';
+  const pin = document.createElement('button');
+  pin.textContent = pinned ? '取消钉住' : '钉住';
+  pin.style.cssText = 'background:none;border:none;color:var(--accent-s);font-size:11.5px;cursor:pointer;padding:2px;';
+  pin.onclick = ()=>toggleWallPin(item.key);
+  top.appendChild(chip);
+  top.appendChild(date);
+  top.appendChild(spacer);
+  top.appendChild(pin);
+  if(item.customId){
+    const del = document.createElement('button');
+    del.textContent = '删除';
+    del.style.cssText = 'background:none;border:none;color:#e0657a;font-size:11.5px;cursor:pointer;padding:2px;';
+    del.onclick = ()=>{ storeWallCustom(loadWallCustom().filter(c=>c.id!==item.customId)); renderWall(); };
+    top.appendChild(del);
+  }
+  card.appendChild(top);
+  const title = document.createElement('div');
+  title.style.cssText = 'font-size:13.5px;line-height:1.6;color:var(--text);margin-top:7px;word-break:break-word;';
+  title.textContent = item.title;
+  card.appendChild(title);
+  if(item.sub){
+    const sub = document.createElement('div');
+    sub.style.cssText = 'font-size:12px;line-height:1.6;color:var(--text-pale);margin-top:3px;word-break:break-word;';
+    sub.textContent = item.sub;
+    card.appendChild(sub);
+  }
+  if(item.img){
+    const img = document.createElement('img');
+    img.src = item.img;
+    img.style.cssText = 'width:100%;max-height:190px;object-fit:cover;border-radius:10px;margin-top:8px;display:block;';
+    card.appendChild(img);
+  }
+  return card;
+}
+function renderWall(){
+  const listEl = document.getElementById('wallList');
+  if(!listEl) return;
+  const items = collectWallItems();
+  const pins = loadWallPins();
+  const pinnedItems = items.filter(i=>pins.includes(i.key));
+  const rest = items.filter(i=>!pins.includes(i.key));
+  const pSec = document.getElementById('wallPinnedSection');
+  const pBox = document.getElementById('wallPinned');
+  pBox.innerHTML = '';
+  pinnedItems.forEach(i=>pBox.appendChild(wallCardEl(i, true)));
+  pSec.style.display = pinnedItems.length ? '' : 'none';
+  listEl.innerHTML = '';
+  if(!rest.length && !pinnedItems.length){
+    listEl.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:18px 0;">墙上还空空的——一起看部电影、实现一个愿望，或者在上面自己加一条吧 ~</div>';
+    return;
+  }
+  rest.forEach(i=>listEl.appendChild(wallCardEl(i, false)));
+}
+function addWallCustom(){
+  const ta = document.getElementById('wallCustomText');
+  const text = ta.value.trim();
+  if(!text){ showToast('先写点什么呀 ~'); return; }
+  const list = loadWallCustom();
+  list.push({ id:'w'+Date.now().toString(36), text, ts:Date.now() });
+  storeWallCustom(list);
+  ta.value = '';
+  renderWall();
+  showToast('挂上墙啦');
 }
 // ══ 思考过程（Extended Thinking）：开关在设置页；思考内容显示在回复上方的小块里，可折叠 ══
 function thinkingEnabled(){ return localStorage.getItem('z_thinking') === 'true'; }
