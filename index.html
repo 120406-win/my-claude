@@ -410,8 +410,8 @@
       line-height:1.5; font-size:var(--font-size); word-break:break-word;
       transition: font-size 0.2s;
     }
-    .msg-row.user .msg { background:var(--bubble-user); color:#fff; border-bottom-right-radius:4px; }
-    .msg-row.ai  .msg { background:var(--bubble-ai); border-bottom-left-radius:4px; border:1px solid var(--border); color:var(--text); }
+    .msg-row.user .msg { background:var(--bubble-user); color:var(--bubble-user-text, #fff); border-bottom-right-radius:4px; }
+    .msg-row.ai  .msg { background:var(--bubble-ai); border-bottom-left-radius:4px; border:1px solid var(--border); color:var(--bubble-ai-text, var(--text)); }
     .msg-time { font-size:10px; color:var(--text-pale); padding:0 4px; }
 
     /* 图片 */
@@ -637,6 +637,14 @@
     .home-card-title { font-size:13.5px; font-weight:600; color:var(--text); }
     .home-card-sub { font-size:12px; color:var(--text-pale); margin-top:4px; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
     .home-foot { text-align:center; font-size:11.5px; color:var(--text-pale); margin-top:24px; letter-spacing:.14em; }
+    /* ══ 毛玻璃模式：气泡、顶栏、输入栏、侧边栏和卡片变半透明磨砂 ══ */
+    html.glass .msg-row.ai .msg { background:color-mix(in srgb, var(--bubble-ai) 50%, transparent); backdrop-filter:blur(14px) saturate(1.5); -webkit-backdrop-filter:blur(14px) saturate(1.5); border:1px solid color-mix(in srgb, var(--text) 13%, transparent); }
+    html.glass .msg-row.user .msg { background:color-mix(in srgb, var(--bubble-user) 55%, transparent); backdrop-filter:blur(14px) saturate(1.5); -webkit-backdrop-filter:blur(14px) saturate(1.5); }
+    html.glass .header { background:color-mix(in srgb, var(--bg) 42%, transparent); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); }
+    html.glass .input-bar { background:color-mix(in srgb, var(--bg) 42%, transparent); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); }
+    html.glass .sidebar { background:color-mix(in srgb, var(--bg) 66%, transparent); backdrop-filter:blur(20px) saturate(1.3); -webkit-backdrop-filter:blur(20px) saturate(1.3); }
+    html.glass .s-card { background:color-mix(in srgb, var(--surface) 70%, transparent); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+    html.glass .home-card { backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
   </style>
 </head>
 <body>
@@ -946,6 +954,30 @@
           <button id="themeRose"   onclick="setTheme('rose')"   class="theme-btn" style="background:#1e0e14;color:#f0a0b8;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🌹 玫瑰暮光</button>
           <button id="themeBunny"  onclick="setTheme('bunny')"  class="theme-btn" style="background:#fdeef4;color:#e5639c;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🐰 奶糖小兔</button>
           <button id="themeKitty"  onclick="setTheme('kitty')"  class="theme-btn" style="background:#fdf3e0;color:#e07f2e;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🐱 布丁小猫</button>
+        </div>
+        <div class="s-row">
+          <div>
+            <div class="s-row-label">自定义颜色</div>
+            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;">选了之后会盖过主题的颜色，气泡上的文字会自动配成看得清的</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;padding:0 16px 14px;flex-wrap:wrap;">
+          <label style="display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11.5px;color:var(--text-pale);cursor:pointer;">
+            <input type="color" id="accentPicker" value="#e5639c" oninput="setCustomColor('accent', this.value)" style="width:38px;height:38px;border:none;background:none;cursor:pointer;padding:0;">主题色
+          </label>
+          <label style="display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11.5px;color:var(--text-pale);cursor:pointer;">
+            <input type="color" id="bubbleUserPicker" value="#e5639c" oninput="setCustomColor('user', this.value)" style="width:38px;height:38px;border:none;background:none;cursor:pointer;padding:0;">我的气泡
+          </label>
+          <label style="display:flex;flex-direction:column;align-items:center;gap:5px;font-size:11.5px;color:var(--text-pale);cursor:pointer;">
+            <input type="color" id="bubbleAiPicker" value="#ffffff" oninput="setCustomColor('ai', this.value)" style="width:38px;height:38px;border:none;background:none;cursor:pointer;padding:0;">Zephyr 气泡
+          </label>
+        </div>
+        <div class="s-row">
+          <div class="s-row-label">毛玻璃效果<div class="s-row-sub">气泡、顶栏、输入栏和卡片变成半透明的磨砂玻璃，透出后面的背景</div></div>
+          <input type="checkbox" id="glassToggle" onchange="toggleGlass(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
+        </div>
+        <div style="padding:0 16px 14px;">
+          <button onclick="resetAppearance()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">恢复默认外观</button>
         </div>
         <div class="s-row">
           <div>
@@ -1631,9 +1663,58 @@ function applyTheme(t){
   buildParticles(t);
 }
 applyTheme(cfg.theme);
+applyAppearance();
 
 function setTheme(t){
   cfg.theme=t; localStorage.setItem('z_theme',t); applyTheme(t);
+}
+
+// ══ 外观定制：主题色/气泡色自选（盖过主题）+ 毛玻璃开关 ══
+function readableTextOn(hex){
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  if(!m) return '#ffffff';
+  const n = parseInt(m[1], 16);
+  const lum = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+  return lum > 0.62 ? '#3a2e35' : '#ffffff';
+}
+function applyAppearance(){
+  const root = document.documentElement;
+  const accent = localStorage.getItem('z_accentCustom');
+  if(accent){
+    root.style.setProperty('--accent', accent);
+    root.style.setProperty('--accent-s', 'color-mix(in srgb, ' + accent + ' 55%, #ffffff)');
+  }
+  const bu = localStorage.getItem('z_bubbleUser');
+  if(bu){
+    root.style.setProperty('--bubble-user', bu);
+    root.style.setProperty('--bubble-user-text', readableTextOn(bu));
+  }
+  const ba = localStorage.getItem('z_bubbleAi');
+  if(ba){
+    root.style.setProperty('--bubble-ai', ba);
+    root.style.setProperty('--bubble-ai-text', readableTextOn(ba));
+  }
+  root.classList.toggle('glass', localStorage.getItem('z_glass') === 'true');
+  const ap = document.getElementById('accentPicker'); if(ap && accent) ap.value = accent;
+  const up = document.getElementById('bubbleUserPicker'); if(up && bu) up.value = bu;
+  const ip = document.getElementById('bubbleAiPicker'); if(ip && ba) ip.value = ba;
+  const gt = document.getElementById('glassToggle'); if(gt) gt.checked = localStorage.getItem('z_glass') === 'true';
+}
+function setCustomColor(kind, val){
+  const key = kind === 'accent' ? 'z_accentCustom' : kind === 'user' ? 'z_bubbleUser' : 'z_bubbleAi';
+  localStorage.setItem(key, val);
+  applyAppearance();
+}
+function toggleGlass(on){
+  localStorage.setItem('z_glass', on ? 'true' : 'false');
+  applyAppearance();
+}
+function resetAppearance(){
+  ['z_accentCustom','z_bubbleUser','z_bubbleAi','z_glass'].forEach(k=>localStorage.removeItem(k));
+  const root = document.documentElement;
+  ['--accent','--accent-s','--bubble-user','--bubble-user-text','--bubble-ai','--bubble-ai-text'].forEach(v=>root.style.removeProperty(v));
+  applyAppearance();
+  showToast('外观恢复默认啦');
 }
 
 // ══ 聊天背景（和主题解耦，独立保存）══
