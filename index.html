@@ -406,7 +406,7 @@
     .msg-row.user .msg-col { align-items:flex-end; }
     .msg-row.ai  .msg-col { align-items:flex-start; }
     .msg {
-      padding:10px 14px; border-radius:18px;
+      padding:10px 14px; border-radius:var(--bubble-radius, 18px);
       line-height:1.5; font-size:var(--font-size); word-break:break-word;
       transition: font-size 0.2s;
     }
@@ -421,7 +421,7 @@
     /* 语音气泡 */
     .voice-bubble {
       display:flex; align-items:center; gap:8px;
-      padding:10px 14px; border-radius:18px;
+      padding:10px 14px; border-radius:var(--bubble-radius, 18px);
       cursor:pointer; min-width:100px;
     }
     .msg-row.user .voice-bubble { background:var(--bubble-user); border-bottom-right-radius:4px; }
@@ -637,14 +637,17 @@
     .home-card-title { font-size:13.5px; font-weight:600; color:var(--text); }
     .home-card-sub { font-size:12px; color:var(--text-pale); margin-top:4px; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
     .home-foot { text-align:center; font-size:11.5px; color:var(--text-pale); margin-top:24px; letter-spacing:.14em; }
-    /* ══ 毛玻璃模式：气泡、顶栏、输入栏、侧边栏和卡片变半透明磨砂 ══ */
-    html.glass .msg-row.ai .msg { background:linear-gradient(135deg, color-mix(in srgb, var(--bubble-ai) 58%, transparent), color-mix(in srgb, var(--bubble-ai) 32%, transparent)); backdrop-filter:blur(16px) saturate(1.6); -webkit-backdrop-filter:blur(16px) saturate(1.6); border:1px solid color-mix(in srgb, #ffffff 32%, transparent); box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 38%, transparent), 0 8px 22px rgba(30,20,60,.10); }
-    html.glass .msg-row.user .msg { background:linear-gradient(135deg, color-mix(in srgb, var(--bubble-user) 62%, transparent), color-mix(in srgb, var(--bubble-user) 38%, transparent)); backdrop-filter:blur(16px) saturate(1.6); -webkit-backdrop-filter:blur(16px) saturate(1.6); border:1px solid color-mix(in srgb, #ffffff 30%, transparent); box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 35%, transparent), 0 8px 22px rgba(30,20,60,.10); }
-    html.glass .header { background:color-mix(in srgb, var(--bg) 42%, transparent); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); }
-    html.glass .input-bar { background:color-mix(in srgb, var(--bg) 42%, transparent); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); }
-    html.glass .sidebar { background:color-mix(in srgb, var(--bg) 66%, transparent); backdrop-filter:blur(20px) saturate(1.3); -webkit-backdrop-filter:blur(20px) saturate(1.3); }
-    html.glass .s-card { background:color-mix(in srgb, var(--surface) 70%, transparent); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
-    html.glass .home-card { backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+    /* ══ 气泡材质：半磨砂 / 液态玻璃（透明度由 --bubble-alpha 控制，可滑杆调） ══ */
+    html.mat-frost .msg-row.ai .msg, html.mat-frost .msg-row.ai .voice-bubble { background:color-mix(in srgb, var(--bubble-ai) calc(var(--bubble-alpha, .7) * 100%), transparent); backdrop-filter:blur(9px) saturate(1.3); -webkit-backdrop-filter:blur(9px) saturate(1.3); }
+    html.mat-frost .msg-row.user .msg, html.mat-frost .msg-row.user .voice-bubble { background:color-mix(in srgb, var(--bubble-user) calc(var(--bubble-alpha, .7) * 100%), transparent); backdrop-filter:blur(9px) saturate(1.3); -webkit-backdrop-filter:blur(9px) saturate(1.3); }
+    html.mat-glass .msg-row.ai .msg, html.mat-glass .msg-row.ai .voice-bubble { background:linear-gradient(135deg, color-mix(in srgb, var(--bubble-ai) calc(var(--bubble-alpha, .55) * 100%), transparent), color-mix(in srgb, var(--bubble-ai) calc(var(--bubble-alpha, .55) * 55%), transparent)); backdrop-filter:blur(18px) saturate(1.6); -webkit-backdrop-filter:blur(18px) saturate(1.6); border:1px solid color-mix(in srgb, #ffffff 32%, transparent); box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 38%, transparent), 0 8px 22px rgba(30,20,60,.10); }
+    html.mat-glass .msg-row.user .msg, html.mat-glass .msg-row.user .voice-bubble { background:linear-gradient(135deg, color-mix(in srgb, var(--bubble-user) calc(var(--bubble-alpha, .55) * 100%), transparent), color-mix(in srgb, var(--bubble-user) calc(var(--bubble-alpha, .55) * 55%), transparent)); backdrop-filter:blur(18px) saturate(1.6); -webkit-backdrop-filter:blur(18px) saturate(1.6); border:1px solid color-mix(in srgb, #ffffff 30%, transparent); box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 35%, transparent), 0 8px 22px rgba(30,20,60,.10); }
+    html.mat-frost .header, html.mat-frost .input-bar { background:color-mix(in srgb, var(--bg) 62%, transparent); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+    html.mat-glass .header { background:color-mix(in srgb, var(--bg) 42%, transparent); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); }
+    html.mat-glass .input-bar { background:color-mix(in srgb, var(--bg) 42%, transparent); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); }
+    html.mat-frost .sidebar, html.mat-glass .sidebar { background:color-mix(in srgb, var(--bg) 66%, transparent); backdrop-filter:blur(20px) saturate(1.3); -webkit-backdrop-filter:blur(20px) saturate(1.3); }
+    html.mat-frost .s-card, html.mat-glass .s-card { background:color-mix(in srgb, var(--surface) 70%, transparent); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+    html.mat-frost .home-card, html.mat-glass .home-card { backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
   </style>
 </head>
 <body>
@@ -973,8 +976,34 @@
           </label>
         </div>
         <div class="s-row">
-          <div class="s-row-label">毛玻璃效果<div class="s-row-sub">气泡、顶栏、输入栏和卡片变成半透明的磨砂玻璃，透出后面的背景</div></div>
-          <input type="checkbox" id="glassToggle" onchange="toggleGlass(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
+          <div>
+            <div class="s-row-label">气泡材质</div>
+            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;">磨砂和玻璃会让气泡透出后面的背景，顶栏和卡片也会跟着变</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;padding:0 16px 14px;">
+          <button id="matSolid" class="bg-mode-btn" onclick="setBubbleMaterial('solid')">柔和填充</button>
+          <button id="matFrost" class="bg-mode-btn" onclick="setBubbleMaterial('frost')">半磨砂</button>
+          <button id="matGlass" class="bg-mode-btn" onclick="setBubbleMaterial('glass')">液态玻璃</button>
+        </div>
+        <div class="s-row slider-row">
+          <div class="slider-header">
+            <div>
+              <div class="s-row-label">气泡透明度</div>
+              <div class="s-row-sub">越低越透，选了半磨砂或液态玻璃时生效</div>
+            </div>
+            <div class="slider-val" id="opacityVal">55%</div>
+          </div>
+          <input type="range" id="opacitySlider" min="10" max="100" step="1" value="55" oninput="setBubbleOpacity(this.value)">
+        </div>
+        <div class="s-row slider-row">
+          <div class="slider-header">
+            <div>
+              <div class="s-row-label">气泡圆润度</div>
+            </div>
+            <div class="slider-val" id="radiusVal">18</div>
+          </div>
+          <input type="range" id="radiusSlider" min="4" max="28" step="1" value="18" oninput="setBubbleRadius(this.value)">
         </div>
         <div style="padding:0 16px 14px;">
           <button onclick="resetAppearance()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">恢复默认外观</button>
@@ -1694,25 +1723,53 @@ function applyAppearance(){
     root.style.setProperty('--bubble-ai', ba);
     root.style.setProperty('--bubble-ai-text', readableTextOn(ba));
   }
-  root.classList.toggle('glass', localStorage.getItem('z_glass') === 'true');
+  const mat = bubbleMaterial();
+  root.classList.remove('glass');
+  root.classList.toggle('mat-frost', mat === 'frost');
+  root.classList.toggle('mat-glass', mat === 'glass');
+  const opStored = parseFloat(localStorage.getItem('z_bubbleOpacity') || '');
+  const op = isNaN(opStored) ? (mat === 'glass' ? 0.55 : 0.7) : opStored;
+  root.style.setProperty('--bubble-alpha', String(op));
+  const radStored = parseInt(localStorage.getItem('z_bubbleRadius') || '', 10);
+  if(!isNaN(radStored)) root.style.setProperty('--bubble-radius', radStored + 'px');
   const ap = document.getElementById('accentPicker'); if(ap && accent) ap.value = accent;
   const up = document.getElementById('bubbleUserPicker'); if(up && bu) up.value = bu;
   const ip = document.getElementById('bubbleAiPicker'); if(ip && ba) ip.value = ba;
-  const gt = document.getElementById('glassToggle'); if(gt) gt.checked = localStorage.getItem('z_glass') === 'true';
+  ['matSolid','matFrost','matGlass'].forEach((id, i)=>{
+    const btn = document.getElementById(id);
+    if(btn) btn.style.borderColor = ['solid','frost','glass'][i] === mat ? 'var(--accent)' : 'transparent';
+  });
+  const os = document.getElementById('opacitySlider'); if(os) os.value = Math.round(op * 100);
+  const ov = document.getElementById('opacityVal'); if(ov) ov.textContent = Math.round(op * 100) + '%';
+  const rs = document.getElementById('radiusSlider'); if(rs) rs.value = isNaN(radStored) ? 18 : radStored;
+  const rv = document.getElementById('radiusVal'); if(rv) rv.textContent = isNaN(radStored) ? 18 : radStored;
 }
 function setCustomColor(kind, val){
   const key = kind === 'accent' ? 'z_accentCustom' : kind === 'user' ? 'z_bubbleUser' : 'z_bubbleAi';
   localStorage.setItem(key, val);
   applyAppearance();
 }
-function toggleGlass(on){
-  localStorage.setItem('z_glass', on ? 'true' : 'false');
+function bubbleMaterial(){
+  const m = localStorage.getItem('z_bubbleMaterial');
+  if(m === 'solid' || m === 'frost' || m === 'glass') return m;
+  return localStorage.getItem('z_glass') === 'true' ? 'glass' : 'solid'; // 旧版毛玻璃开关自动迁移成液态玻璃
+}
+function setBubbleMaterial(m){
+  localStorage.setItem('z_bubbleMaterial', m);
+  applyAppearance();
+}
+function setBubbleOpacity(v){
+  localStorage.setItem('z_bubbleOpacity', String(parseInt(v, 10) / 100));
+  applyAppearance();
+}
+function setBubbleRadius(v){
+  localStorage.setItem('z_bubbleRadius', String(parseInt(v, 10)));
   applyAppearance();
 }
 function resetAppearance(){
-  ['z_accentCustom','z_bubbleUser','z_bubbleAi','z_glass'].forEach(k=>localStorage.removeItem(k));
+  ['z_accentCustom','z_bubbleUser','z_bubbleAi','z_glass','z_bubbleMaterial','z_bubbleOpacity','z_bubbleRadius'].forEach(k=>localStorage.removeItem(k));
   const root = document.documentElement;
-  ['--accent','--accent-s','--bubble-user','--bubble-user-text','--bubble-ai','--bubble-ai-text'].forEach(v=>root.style.removeProperty(v));
+  ['--accent','--accent-s','--bubble-user','--bubble-user-text','--bubble-ai','--bubble-ai-text','--bubble-alpha','--bubble-radius'].forEach(v=>root.style.removeProperty(v));
   applyAppearance();
   showToast('外观恢复默认啦');
 }
