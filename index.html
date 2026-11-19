@@ -924,8 +924,17 @@
           <input type="checkbox" id="thinkingToggle" onchange="toggleThinking(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
         </div>
         <div class="s-row">
-          <div class="s-row-label">联网搜索（Web Search）<div class="s-row-sub">让 Zephyr 在聊天时像官网那样上网搜索：遇到时事、实时信息或他不确定的事，他会自己搜一下再回答，回复下方会附上来源。需要接口支持官方的 web_search 工具；中转接口不支持时会自动退回普通聊天并提醒你。</div></div>
+          <div class="s-row-label">联网搜索（Web Search）<div class="s-row-sub">让 Zephyr 在聊天时像官网那样上网搜索：遇到时事、实时信息或他不确定的事，他会开口要搜，App 帮他搜完把结果喂给他再回答，回复下方会附上来源。和 Kelivo 同款机制，中转接口也能用；需要下面这个搜索 Key。</div></div>
           <input type="checkbox" id="webSearchToggle" onchange="toggleWebSearch(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
+        </div>
+        <div class="s-row">
+          <div>
+            <div class="s-row-label">搜索 API Key（Tavily）</div>
+            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;line-height:1.6;">去 tavily.com 免费注册就有一个（每月 1000 次，不用绑卡），或者把你在 Kelivo 里配过的 Tavily Key 填进来也行。只存在这台设备上，不进备份导出。</div>
+          </div>
+        </div>
+        <div style="padding:0 16px 14px;">
+          <input class="s-input" type="password" id="searchKey" placeholder="tvly-..." onchange="saveSearchKey(this.value)" style="width:100%;box-sizing:border-box;">
         </div>
       </div>
     </div>
@@ -1961,6 +1970,8 @@ function loadSettings(){
   if(tt) tt.checked = thinkingEnabled();
   const wt=document.getElementById('webSearchToggle');
   if(wt) wt.checked = webSearchEnabled();
+  const sk=document.getElementById('searchKey');
+  if(sk) sk.value = localStorage.getItem('z_searchKey') || '';
 
   applyTheme(cfg.theme);
 }
@@ -2220,7 +2231,7 @@ function buildSystemPrompt(){
     out += '\n\n【Reading 一起阅读】\n以下是你们的一起读书单。聊天时可以自然地问问她读到哪了、聊聊你们读完的书，但不要逐条念清单：\n' + rt.slice(0, 2500);
   }
   if(webSearchEnabled()){
-    out += '\n\n【联网搜索】\n你有联网搜索能力（web_search 工具）。遇到最新消息、实时信息（天气、价格、赛程、新闻等）、或者你不确定、可能已经变化的事实时，先搜一下再回答，并自然地提到信息来自哪里；日常闲聊、情感话题和你有把握的常识不用搜。';
+    out += '\n\n【联网搜索】\n你有一个 search_web 工具可以联网搜索。遇到最新消息、实时信息（天气、价格、赛程、新闻等）、或者你不确定、可能已经变化的事实时，先用它搜一下再回答，回答里自然地带上你参考了什么；日常闲聊、情感话题和你有把握的常识不用搜。如果搜索没成功，就用你知道的回答，并坦白这次没搜到。';
   }
   return out;
 }
@@ -2819,7 +2830,7 @@ function exportData(){
   const data = {};
   for(let i = 0; i < localStorage.length; i++){
     const k = localStorage.key(i);
-    if(k && k.startsWith('z_') && k !== 'z_apiKey') data[k] = localStorage.getItem(k);
+    if(k && k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey') data[k] = localStorage.getItem(k);
   }
   const payload = JSON.stringify({ app:'zephyr', version:1, exportedAt:new Date().toISOString(), data }, null, 2);
   const blob = new Blob([payload], { type:'application/json' });
@@ -2843,7 +2854,7 @@ function importDataFile(input){
       const obj = JSON.parse(reader.result);
       if(!obj || obj.app !== 'zephyr' || !obj.data || typeof obj.data !== 'object') throw new Error('bad file');
       if(!confirm('导入会用备份覆盖当前全部数据（对话、记忆、日记、愿望、信件、设置），确定继续吗？')) return;
-      Object.keys(obj.data).forEach(k=>{ if(k.startsWith('z_') && k !== 'z_apiKey') localStorage.setItem(k, obj.data[k]); });
+      Object.keys(obj.data).forEach(k=>{ if(k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey') localStorage.setItem(k, obj.data[k]); });
       showToast('恢复完成，正在刷新 ~');
       setTimeout(()=>location.reload(), 600);
     }catch(e){
@@ -5318,7 +5329,41 @@ function thinkingEnabled(){ return localStorage.getItem('z_thinking') === 'true'
 function toggleThinking(on){ localStorage.setItem('z_thinking', on ? 'true' : 'false'); showToast(on ? '思考过程已开启，Zephyr 回复会变慢一点' : '思考过程已关闭'); }
 // ══ 联网搜索（官方 web_search 工具）：开关在设置页；搜索在接口服务端执行，回复下方附来源 ══
 function webSearchEnabled(){ return localStorage.getItem('z_webSearch') === 'true'; }
-function toggleWebSearch(on){ localStorage.setItem('z_webSearch', on ? 'true' : 'false'); showToast(on ? '联网搜索已开启，Zephyr 可以上网查东西啦' : '联网搜索已关闭'); }
+function toggleWebSearch(on){
+  localStorage.setItem('z_webSearch', on ? 'true' : 'false');
+  if(on && !(localStorage.getItem('z_searchKey') || '').trim()) showToast('联网搜索已开启，还差一个 Tavily 的 Key，填在下面就能搜啦');
+  else showToast(on ? '联网搜索已开启，Zephyr 可以上网查东西啦' : '联网搜索已关闭');
+}
+function saveSearchKey(v){
+  localStorage.setItem('z_searchKey', (v || '').trim());
+  showToast('搜索 Key 已保存，只存在这台设备上');
+}
+// 客户端搜索工具：模型开口要搜，App 执行搜索再把结果回喂（和 Kelivo 同款机制，中转接口也能用）
+const SEARCH_WEB_TOOL = {
+  name:'search_web',
+  description:'联网搜索：查最新消息、实时信息和你不确定的事实。需要核实、或想了解近期发生的事时调用它；查询词用简洁的关键词，可以多次调用、换关键词或换一种语言再搜。',
+  input_schema:{ type:'object', properties:{ query:{ type:'string', description:'搜索关键词' } }, required:['query'] }
+};
+async function executeWebSearch(query){
+  const q = String(query || '').trim();
+  if(!q) return { error:'查询词是空的', items:[] };
+  const key = (localStorage.getItem('z_searchKey') || '').trim();
+  if(!key) return { error:'搜索服务还没配置 Key', items:[] };
+  try{
+    const res = await fetch('https://api.tavily.com/search', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + key },
+      body: JSON.stringify({ query:q, max_results:5, search_depth:'basic' })
+    });
+    if(!res.ok) return { error:'搜索服务返回了 ' + res.status, items:[] };
+    const data = await res.json();
+    const items = (data.results || []).slice(0, 5).map((r,i)=>({ index:i + 1, title:String(r.title || '').slice(0, 120), url:r.url || '', text:String(r.content || '').slice(0, 600) }));
+    if(!items.length) return { error:'没有搜到结果', items:[] };
+    return { items };
+  }catch(e){
+    return { error:'网络请求失败', items:[] };
+  }
+}
 function makeSearchStatus(col, beforeEl){
   const el = document.createElement('div');
   el.style.cssText = 'margin:2px 0 6px;font-size:12px;color:var(--text-pale);';
@@ -5435,17 +5480,19 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     }
     const searchOn = webSearchEnabled();
     if(searchOn){
-      // 官方联网搜索工具：搜索在接口服务端执行，结果和来源会随流式响应一起回来（和官网同款机制）
-      reqBody.tools = [{ type:'web_search_20250305', name:'web_search', max_uses:3 }];
+      // 联网搜索走客户端工具：模型开口要搜，App 自己执行搜索再把结果回喂给他（和 Kelivo 同款机制）
+      reqBody.tools = [SEARCH_WEB_TOOL];
     }
     const sendReq = () => fetch(base+'/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
       body:JSON.stringify(reqBody)
     });
+    const workMsgs = apiMessages.slice();
+    reqBody.messages = workMsgs;
     let res = await sendReq();
     if(!res.ok && reqBody.tools){
-      // 中转接口若不支持 web_search 工具，去掉工具重试一次，别让整段聊天直接失败
+      // 接口连普通工具都不收时，去掉工具重试一次，别让整段聊天直接失败
       delete reqBody.tools;
       res = await sendReq();
       if(res.ok) showToast('这个接口暂时用不了联网搜索，先陪你把话聊完 qwq');
@@ -5468,44 +5515,94 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     bubble.textContent = '';
     col.appendChild(bubble);
 
-    // 流式解析 SSE
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    while(true){
-      const {done, value} = await reader.read();
-      if(done) break;
-      // SSE 一行可能被切成多个 chunk，必须缓存未完整的最后一行，下次拼起来再解析，否则会丢字
-      buffer += decoder.decode(value, {stream:true});
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      for(const line of lines){
-        if(!line.startsWith('data:')) continue;
-        const data = line.slice(5).trim();
-        if(data === '[DONE]') break;
-        try {
-          const parsed = JSON.parse(data);
-          if(parsed.type === 'content_block_start' && parsed.content_block?.type === 'server_tool_use'){
-            if(!searchStatus) searchStatus = makeSearchStatus(col, bubble);
-          } else if(parsed.type === 'content_block_start' && parsed.content_block?.type === 'web_search_tool_result'){
-            const arr = Array.isArray(parsed.content_block.content) ? parsed.content_block.content : [];
-            arr.forEach(r=>{ if(r && r.type === 'web_search_result' && r.url && !sources.some(s=>s.url === r.url)) sources.push({ title:String(r.title || '').slice(0, 80), url:r.url }); });
-            if(searchStatus) searchStatus.textContent = '联网搜到了 ' + sources.length + ' 条结果，正在整理…';
-          } else if(parsed.type === 'content_block_delta' && parsed.delta?.type === 'thinking_delta'){
-            thinking += parsed.delta.thinking || '';
-            if(!thinkBox) thinkBox = makeThinkingBlock(col, bubble, false);
-            thinkBox.label.textContent = '思考中…';
-            thinkBox.body.textContent = thinking;
-            thinkBox.body.scrollTop = thinkBox.body.scrollHeight;
-            chatWrap.scrollTop = chatWrap.scrollHeight;
-          } else if(parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta'){
-            if(thinkBox && !thinkDone){ thinkDone = true; thinkBox.label.textContent = '思考过程'; thinkBox.setCollapsed(true); }
-            reply += parsed.delta.text;
-            bubble.textContent = reply;
-            chatWrap.scrollTop = chatWrap.scrollHeight;
-          }
-        } catch(e){}
+    // 多轮循环：普通回复一轮就结束；模型调用 search_web 时，App 执行搜索、把结果回喂，再请他接着答（最多搜 3 轮）
+    for(let round = 0; round < 4; round++){
+      if(round > 0){
+        delete reqBody.thinking; // 续轮不再带思考参数，避开接口对思考块回传的要求
+        reqBody.messages = workMsgs;
+        res = await sendReq();
+        if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`HTTP ${res.status}`);}
       }
+      const blocks = [];
+      let stopReason = '';
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let streamDone = false;
+      while(!streamDone){
+        const {done, value} = await reader.read();
+        if(done) break;
+        // SSE 一行可能被切成多个 chunk，必须缓存未完整的最后一行，下次拼起来再解析，否则会丢字
+        buffer += decoder.decode(value, {stream:true});
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for(const line of lines){
+          if(!line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if(data === '[DONE]'){ streamDone = true; break; }
+          try {
+            const parsed = JSON.parse(data);
+            if(parsed.type === 'content_block_start'){
+              const cb = parsed.content_block || {};
+              if(cb.type === 'text') blocks[parsed.index] = { type:'text', text:'' };
+              else if(cb.type === 'thinking') blocks[parsed.index] = { type:'thinking', thinking:'', signature:'' };
+              else if(cb.type === 'tool_use') blocks[parsed.index] = { type:'tool_use', id:cb.id, name:cb.name, json:'' };
+            } else if(parsed.type === 'content_block_delta'){
+              const d = parsed.delta || {};
+              const blk = blocks[parsed.index];
+              if(d.type === 'thinking_delta'){
+                thinking += d.thinking || '';
+                if(blk) blk.thinking += d.thinking || '';
+                if(!thinkBox) thinkBox = makeThinkingBlock(col, bubble, false);
+                thinkBox.label.textContent = '思考中…';
+                thinkBox.body.textContent = thinking;
+                thinkBox.body.scrollTop = thinkBox.body.scrollHeight;
+                chatWrap.scrollTop = chatWrap.scrollHeight;
+              } else if(d.type === 'signature_delta'){
+                if(blk) blk.signature += d.signature || '';
+              } else if(d.type === 'text_delta'){
+                if(thinkBox && !thinkDone){ thinkDone = true; thinkBox.label.textContent = '思考过程'; thinkBox.setCollapsed(true); }
+                reply += d.text || '';
+                if(blk) blk.text += d.text || '';
+                bubble.textContent = reply;
+                chatWrap.scrollTop = chatWrap.scrollHeight;
+              } else if(d.type === 'input_json_delta'){
+                if(blk) blk.json += d.partial_json || '';
+              }
+            } else if(parsed.type === 'message_delta'){
+              if(parsed.delta?.stop_reason) stopReason = parsed.delta.stop_reason;
+            }
+          } catch(e){}
+        }
+      }
+
+      const toolUses = blocks.filter(b=>b && b.type === 'tool_use' && b.name === 'search_web');
+      if(stopReason !== 'tool_use' || !toolUses.length || round === 3) break;
+
+      // 把他这轮的话和工具调用原样记进工作历史（思考块不回传：中转常把思考压扁、签名对不上，硬回传容易整段失败）
+      const assistantContent = [];
+      blocks.forEach(b=>{
+        if(!b) return;
+        if(b.type === 'text' && b.text) assistantContent.push({ type:'text', text:b.text });
+        else if(b.type === 'tool_use'){
+          let input = {};
+          try{ input = JSON.parse(b.json || '{}'); }catch(e){}
+          assistantContent.push({ type:'tool_use', id:b.id, name:b.name, input });
+        }
+      });
+      workMsgs.push({ role:'assistant', content:assistantContent });
+      if(!searchStatus) searchStatus = makeSearchStatus(col, bubble);
+      const resultBlocks = [];
+      for(const tu of toolUses){
+        let q = '';
+        try{ q = String(JSON.parse(tu.json || '{}').query || ''); }catch(e){}
+        if(searchStatus) searchStatus.textContent = '正在联网搜索：' + (q || '…');
+        const out = await executeWebSearch(q);
+        out.items.forEach(it=>{ if(it.url && !sources.some(s=>s.url === it.url)) sources.push({ title:String(it.title || '').slice(0, 80), url:it.url }); });
+        resultBlocks.push({ type:'tool_result', tool_use_id:tu.id, content: out.error ? ('搜索没成功（' + out.error + '）。请根据你已有的知识回答糯糯，并坦白这次没搜到。') : JSON.stringify({ items: out.items }) });
+      }
+      if(searchStatus) searchStatus.textContent = '联网搜到了 ' + sources.length + ' 条结果，正在整理…';
+      workMsgs.push({ role:'user', content:resultBlocks });
     }
 
     // 接口把思考混进正文返回时（开头带 thinking 字样、没有原生思考块），在这里切开折好
