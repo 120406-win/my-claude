@@ -846,6 +846,9 @@
     <div class="nav-item" id="nav-watchlist" onclick="navTo('watchlist')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M10.3 9.3l4.7 2.7-4.7 2.7z"/></svg></span> Watchlist
     </div>
+    <div class="nav-item" id="nav-reading" onclick="navTo('reading')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span> Reading
+    </div>
     <div class="nav-item" id="nav-wall" onclick="navTo('wall')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M12 16.4s-4-2.6-4-5.2A2.3 2.3 0 0 1 12 9.5a2.3 2.3 0 0 1 4 1.7c0 2.6-4 5.2-4 5.2z"/></svg></span> 回忆墙
     </div>
@@ -1475,6 +1478,57 @@
   </div>
 </div>
 
+<div class="settings-page" id="readingPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="settings-topbar-title">Reading</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">想一起读的都攒在这里：书、漫画、小说、文章。慢慢读，不赶进度，没有打卡；读完的会变成阅读记录，进 Calendar 和回忆墙，他在聊天里也看得见你们的书单。</div>
+    <div id="readPick"></div>
+    <div style="display:flex;gap:8px;margin-bottom:18px;">
+      <button id="pickReadBtn" onclick="askZephyrReadPick()" style="flex:1;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">请 Zephyr 选今晚读的</button>
+      <button id="recReadBtn" onclick="askZephyrReadRecommend()" style="flex:1;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">请 Zephyr 推荐一本</button>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">加一本想读的</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <input id="rdTitle" type="text" placeholder="书名" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;padding:2px 0;">
+        <input id="rdAuthor" type="text" placeholder="作者（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:2px 0;margin-top:8px;">
+        <input id="rdNote" type="text" placeholder="为什么想读（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:2px 0;margin-top:8px;">
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <select id="rdKind" style="padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="小说">小说</option>
+            <option value="非虚构">非虚构</option>
+            <option value="漫画">漫画</option>
+            <option value="诗集">诗集</option>
+            <option value="文章">文章</option>
+            <option value="其他">其他</option>
+          </select>
+          <select id="rdBy" style="padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
+            <option value="lumi">糯糯想读</option>
+            <option value="both">我们一起想读</option>
+            <option value="zephyr">Zephyr 想读</option>
+          </select>
+          <button onclick="addReadItem()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">加进书单</button>
+        </div>
+      </div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">想读清单</div>
+      <div id="readWantList"></div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">正在读</div>
+      <div id="readIngList"></div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">读完记录</div>
+      <div id="readDoneList"></div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ 回忆墙 Memory Wall ══ -->
 <div class="settings-page" id="wallPage">
   <div class="settings-topbar">
@@ -1952,6 +2006,7 @@ function navTo(page){
   document.getElementById('dreamsPage').classList.toggle('show', page==='dreams');
   document.getElementById('musicPage').classList.toggle('show', page==='music');
   document.getElementById('watchlistPage').classList.toggle('show', page==='watchlist');
+  document.getElementById('readingPage').classList.toggle('show', page==='reading');
   document.getElementById('wallPage').classList.toggle('show', page==='wall');
   document.getElementById('capsulePage').classList.toggle('show', page==='capsule');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));
@@ -1968,6 +2023,7 @@ function navTo(page){
   if(page==='dreams') renderDreams();
   if(page==='music') renderMusic();
   if(page==='watchlist') renderWatchlist();
+  if(page==='reading') renderReading();
   if(page==='wall') renderWall();
   if(page==='capsule') renderCapsules();
   if(page==='home') renderHome();
@@ -2143,6 +2199,18 @@ function buildSystemPrompt(){
     if(wlWant.length) wt2 += '想看清单：\n' + wlWant.slice(0, 10).map(w=>'・《' + w.title + '》（' + w.kind + '，' + watchByLabel(w.by) + '）').join('\n');
     if(wlDone.length) wt2 += (wt2 ? '\n' : '') + '最近一起看过的：\n' + wlDone.slice(0, 5).map(w=>'・《' + w.title + '》' + (w.ratingLumi ? '，糯糯打了 ' + w.ratingLumi + ' 星' : '') + (w.feelLumi ? '，她说：' + w.feelLumi : '')).join('\n');
     out += '\n\n【Watchlist 一起看】\n以下是你们的一起看清单和观影记录。聊天时可以自然地提议一起看清单里的某一部，或聊起你们看过的作品，但不要逐条念清单：\n' + wt2.slice(0, 2500);
+  }
+  // Reading 也给 Zephyr：想读、在读和读完的书，聊天时能问问进度、聊聊读后感
+  const readData = loadReading();
+  const rdWant = readData.filter(r=>r.status === 'want');
+  const rdIng = readData.filter(r=>r.status === 'reading');
+  const rdDone = readData.filter(r=>r.status === 'done').sort((a,b)=>(b.doneTs||0) - (a.doneTs||0));
+  if(rdWant.length || rdIng.length || rdDone.length){
+    let rt = '';
+    if(rdWant.length) rt += '想读清单：\n' + rdWant.slice(0, 10).map(r=>'・《' + r.title + '》' + (r.author ? ' - ' + r.author : '') + '（' + r.kind + '，' + readByLabel(r.by) + '）').join('\n');
+    if(rdIng.length) rt += (rt ? '\n' : '') + '正在一起读的：\n' + rdIng.slice(0, 5).map(r=>'・《' + r.title + '》' + (r.progress ? '，读到：' + r.progress : '')).join('\n');
+    if(rdDone.length) rt += (rt ? '\n' : '') + '最近一起读完的：\n' + rdDone.slice(0, 5).map(r=>'・《' + r.title + '》' + (r.ratingLumi ? '，糯糯打了 ' + r.ratingLumi + ' 星' : '') + (r.feelLumi ? '，她说：' + r.feelLumi : '')).join('\n');
+    out += '\n\n【Reading 一起阅读】\n以下是你们的一起读书单。聊天时可以自然地问问她读到哪了、聊聊你们读完的书，但不要逐条念清单：\n' + rt.slice(0, 2500);
   }
   return out;
 }
@@ -2785,6 +2853,7 @@ function collectMilestones(){
   loadJournal().forEach(j=>out.push({ ts:j.ts, title:'Zephyr 写了一篇日记', tag:'日记' }));
   loadMemories().filter(m=>m.cat==='重要事件' && m.ts).forEach(m=>out.push({ ts:m.ts, title:m.text, tag:'重要事件' }));
   loadWatchlist().filter(w=>w.status==='watched' && w.watchedTs).forEach(w=>out.push({ ts:w.watchedTs, title:'一起看了《' + w.title + '》（' + w.kind + '）', tag:'观影' }));
+  loadReading().filter(r=>r.status==='done' && r.doneTs).forEach(r=>out.push({ ts:r.doneTs, title:'一起读完了《' + r.title + '》（' + r.kind + '）', tag:'阅读' }));
   loadCapsules().filter(c=>c.opened && c.openedTs).forEach(c=>out.push({ ts:c.openedTs, title:'打开了时间胶囊「' + (c.title || '无题') + '」', tag:'时间胶囊' }));
   loadEvents().forEach(e=>out.push({ ts:e.ts, title:e.title, tag:'手动记录', manualId:e.id }));
   return out.sort((a,b)=>b.ts-a.ts);
@@ -3599,6 +3668,238 @@ async function askZephyrWatchFeel(id){
     showToast('没说成，待会儿再试 qwq');
   }finally{
     watchBusy = false;
+  }
+}
+
+// ══ Reading：一起阅读。书单存 z_reading；读完自动进 Calendar 和回忆墙，高分同步一条共同经历记忆 ══
+const READ_KINDS = ['小说','非虚构','漫画','诗集','文章','其他'];
+function loadReading(){ try{ const a = JSON.parse(localStorage.getItem('z_reading')||'[]'); if(Array.isArray(a)) return a; }catch(e){} return []; }
+function storeReading(list){ try{ localStorage.setItem('z_reading', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间不够了 qwq'); return false; } }
+function readByLabel(by){ return by === 'zephyr' ? 'Zephyr 想读' : (by === 'both' ? '我们一起想读' : '糯糯想读'); }
+let readBusy = false, readFormFor = null, readFormRating = 0, readFormFeel = '', readFormPart = '';
+function renderReading(){
+  const list = loadReading();
+  const pickWrap = document.getElementById('readPick');
+  let pick = null;
+  try{ pick = JSON.parse(localStorage.getItem('z_reading_pick')||'null'); }catch(e){}
+  const pickItem = pick && list.find(r=>r.id===pick.id && r.status==='want');
+  if(pickItem){
+    pickWrap.innerHTML = '<div class="s-card" style="padding:14px 16px;margin-bottom:14px;border-color:var(--accent);">'
+      + '<div style="font-size:12px;color:var(--text-pale);letter-spacing:.06em;">Zephyr 今晚想读</div>'
+      + '<div style="font-size:16px;margin-top:4px;">《' + escapeHtml(pickItem.title) + '》</div>'
+      + (pick.reason ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:4px;">' + escapeHtml(pick.reason) + '</div>' : '')
+      + '<button onclick="clearReadPick()" style="margin-top:8px;padding:7px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">知道啦</button></div>';
+  } else pickWrap.innerHTML = '';
+  const want = list.filter(r=>r.status==='want');
+  const wantWrap = document.getElementById('readWantList');
+  wantWrap.innerHTML = '';
+  if(!want.length) wantWrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:14px 0;">还没有想读的，加第一本吧 ~</div>';
+  want.forEach(r=>{
+    const card = document.createElement('div');
+    card.className = 's-card';
+    card.style.cssText = 'padding:13px 15px;margin-bottom:10px;';
+    card.innerHTML = '<div style="display:flex;gap:10px;align-items:flex-start;">'
+      + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(r.title) + '》</div>'
+      + '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">' + escapeHtml(r.kind) + (r.author ? ' · ' + escapeHtml(r.author) : '') + ' · ' + readByLabel(r.by) + ' · ' + fmtDay(r.ts) + ' 加的</div>'
+      + (r.note ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:5px;">' + escapeHtml(r.note) + '</div>' : '')
+      + '</div>'
+      + '<button onclick="deleteReadItem(\'' + r.id + '\')" style="flex:none;background:none;border:none;color:var(--text-pale);font-size:18px;cursor:pointer;padding:2px 6px;">×</button></div>'
+      + '<div style="margin-top:9px;"><button onclick="startReading(\'' + r.id + '\')" style="padding:8px 14px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">开始读</button></div>';
+    wantWrap.appendChild(card);
+  });
+  const ing = list.filter(r=>r.status==='reading');
+  const ingWrap = document.getElementById('readIngList');
+  ingWrap.innerHTML = '';
+  if(!ing.length) ingWrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:14px 0;">还没有正在读的，从想读清单里挑一本开始吧。</div>';
+  ing.forEach(r=>{
+    const card = document.createElement('div');
+    card.className = 's-card';
+    card.style.cssText = 'padding:13px 15px;margin-bottom:10px;';
+    let html = '<div style="display:flex;gap:10px;align-items:flex-start;">'
+      + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(r.title) + '》</div>'
+      + '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">' + escapeHtml(r.kind) + (r.author ? ' · ' + escapeHtml(r.author) : '') + ' · ' + fmtDay(r.startedTs || r.ts) + ' 开始读的</div>'
+      + '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:5px;">' + (r.progress ? '读到：' + escapeHtml(r.progress) : '还没记进度，读到哪随手记一笔吧') + '</div>'
+      + '</div>'
+      + '<button onclick="deleteReadItem(\'' + r.id + '\')" style="flex:none;background:none;border:none;color:var(--text-pale);font-size:18px;cursor:pointer;padding:2px 6px;">×</button></div>'
+      + '<div style="display:flex;gap:8px;margin-top:9px;"><input id="readProg-' + r.id + '" type="text" value="' + escapeHtml(r.progress || '') + '" placeholder="读到哪了，如：第三章 / 45%" style="flex:1;background:transparent;border:1px solid var(--border);border-radius:999px;outline:none;color:var(--text);font-size:12px;font-family:inherit;padding:8px 13px;">'
+      + '<button onclick="updateReadProgress(\'' + r.id + '\')" style="padding:8px 14px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">记进度</button>'
+      + '<button onclick="openReadDoneForm(\'' + r.id + '\')" style="padding:8px 14px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">读完了</button></div>';
+    if(readFormFor === r.id){
+      let stars = '';
+      for(let n = 1; n <= 5; n++) stars += '<button onclick="setReadRating(' + n + ')" style="background:none;border:none;font-size:24px;line-height:1;cursor:pointer;padding:2px;color:' + (n <= readFormRating ? 'var(--accent-s)' : 'var(--text-pale)') + ';">★</button>';
+      html += '<div style="margin-top:11px;border-top:1px solid var(--border);padding-top:11px;">'
+        + '<div style="font-size:12px;color:var(--text-dim);">给它打个分</div><div style="margin-top:2px;">' + stars + '</div>'
+        + '<input id="readFeel" type="text" value="' + escapeHtml(readFormFeel) + '" placeholder="读完最想说的一句（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:4px 0;margin-top:6px;">'
+        + '<input id="readPart" type="text" value="' + escapeHtml(readFormPart) + '" placeholder="最喜欢的一段或一句（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:13px;font-family:inherit;padding:4px 0;margin-top:4px;">'
+        + '<div style="display:flex;gap:8px;margin-top:10px;"><button onclick="saveReadDone(\'' + r.id + '\')" style="flex:1;padding:10px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">保存阅读记录</button>'
+        + '<button onclick="cancelReadDoneForm()" style="padding:10px 14px;border-radius:10px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">取消</button></div></div>';
+    }
+    card.innerHTML = html;
+    ingWrap.appendChild(card);
+  });
+  const done = list.filter(r=>r.status==='done').sort((a,b)=>(b.doneTs||0)-(a.doneTs||0));
+  const doneWrap = document.getElementById('readDoneList');
+  doneWrap.innerHTML = '';
+  if(!done.length) doneWrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:14px 0;">还没有一起读完的书，读完第一本就记在这里。</div>';
+  done.forEach(r=>{
+    const card = document.createElement('div');
+    card.className = 's-card';
+    card.style.cssText = 'padding:13px 15px;margin-bottom:10px;';
+    let html = '<div style="display:flex;gap:10px;align-items:flex-start;">'
+      + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(r.title) + '》</div>'
+      + '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">' + escapeHtml(r.kind) + (r.author ? ' · ' + escapeHtml(r.author) : '') + ' · ' + fmtDay(r.doneTs) + ' 一起读完的</div>'
+      + '<div style="font-size:13px;margin-top:6px;line-height:1.8;">糯糯 <span style="color:var(--accent-s);">' + starStr(r.ratingLumi) + '</span> · Zephyr <span style="color:var(--accent-s);">' + starStr(r.ratingZephyr) + '</span></div>'
+      + (r.feelLumi ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:3px;">糯糯说：' + escapeHtml(r.feelLumi) + '</div>' : '')
+      + (r.feelZephyr ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:3px;">Zephyr 说：' + escapeHtml(r.feelZephyr) + '</div>' : '')
+      + (r.favPart ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:3px;">最喜欢的一段：' + escapeHtml(r.favPart) + '</div>' : '')
+      + '</div>'
+      + '<button onclick="deleteReadItem(\'' + r.id + '\')" style="flex:none;background:none;border:none;color:var(--text-pale);font-size:18px;cursor:pointer;padding:2px 6px;">×</button></div>';
+    if(!r.feelZephyr) html += '<div style="margin-top:9px;"><button onclick="askZephyrReadFeel(\'' + r.id + '\')" style="padding:8px 14px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">请 Zephyr 评分和说读后感</button></div>';
+    card.innerHTML = html;
+    doneWrap.appendChild(card);
+  });
+}
+function addReadItem(){
+  const title = document.getElementById('rdTitle').value.trim();
+  if(!title){ showToast('先写书名呀 ~'); return; }
+  const list = loadReading();
+  list.unshift({ id:'r' + Date.now().toString(36) + Math.floor(Math.random()*999), title, author:document.getElementById('rdAuthor').value.trim(), kind:document.getElementById('rdKind').value, by:document.getElementById('rdBy').value, note:document.getElementById('rdNote').value.trim(), status:'want', ts:Date.now() });
+  if(storeReading(list)){
+    document.getElementById('rdTitle').value = '';
+    document.getElementById('rdAuthor').value = '';
+    document.getElementById('rdNote').value = '';
+    renderReading();
+    showToast('加进想读书单啦');
+  }
+}
+function deleteReadItem(id){
+  const list = loadReading().filter(r=>r.id!==id);
+  if(storeReading(list)){ renderReading(); showToast('已删掉'); }
+}
+function startReading(id){
+  const list = loadReading();
+  const it = list.find(r=>r.id===id);
+  if(!it) return;
+  it.status = 'reading';
+  it.startedTs = Date.now();
+  if(storeReading(list)){ renderReading(); showToast('开始读《' + it.title + '》啦，慢慢来'); }
+}
+function updateReadProgress(id){
+  const el = document.getElementById('readProg-' + id);
+  const list = loadReading();
+  const it = list.find(r=>r.id===id);
+  if(!it) return;
+  it.progress = el ? el.value.trim() : '';
+  if(storeReading(list)){ renderReading(); showToast('进度记好啦'); }
+}
+function openReadDoneForm(id){ readFormFor = id; readFormRating = 0; readFormFeel = ''; readFormPart = ''; renderReading(); }
+function cancelReadDoneForm(){ readFormFor = null; readFormRating = 0; readFormFeel = ''; readFormPart = ''; renderReading(); }
+function setReadRating(n){
+  const f = document.getElementById('readFeel');
+  const p = document.getElementById('readPart');
+  if(f) readFormFeel = f.value;
+  if(p) readFormPart = p.value;
+  readFormRating = n;
+  renderReading();
+}
+function saveReadDone(id){
+  const list = loadReading();
+  const it = list.find(r=>r.id===id);
+  if(!it) return;
+  it.status = 'done';
+  it.doneTs = Date.now();
+  it.ratingLumi = readFormRating || null;
+  const feelEl = document.getElementById('readFeel');
+  const partEl = document.getElementById('readPart');
+  it.feelLumi = feelEl ? feelEl.value.trim() : '';
+  it.favPart = partEl ? partEl.value.trim() : '';
+  if(storeReading(list)){
+    readFormFor = null;
+    readFormRating = 0;
+    readFormFeel = '';
+    readFormPart = '';
+    if(it.ratingLumi && it.ratingLumi >= 4){
+      const mems = loadMemories();
+      mems.push({ id:'m' + Date.now().toString(36) + Math.floor(Math.random()*999), cat:'共同经历', text:'和 Zephyr 一起读完了《' + it.title + '》' + (it.author ? '（' + it.author + '）' : '') + '，糯糯打了 ' + it.ratingLumi + ' 星' + (it.feelLumi ? '：' + it.feelLumi : ''), ts:Date.now(), auto:true });
+      storeMemories(mems);
+    }
+    renderReading();
+    showToast('记好啦，这一天也会出现在 Calendar 和回忆墙里');
+  }
+}
+function clearReadPick(){ try{ localStorage.removeItem('z_reading_pick'); }catch(e){} renderReading(); }
+async function askZephyrReadRecommend(){
+  if(readBusy) return;
+  readBusy = true;
+  const btn = document.getElementById('recReadBtn');
+  const old = btn.textContent;
+  btn.textContent = 'Zephyr 正在想…';
+  btn.disabled = true;
+  try{
+    const list = loadReading();
+    const have = list.map(r=>'《' + r.title + '》').join('、') || '（书单还是空的）';
+    const out = await musicAskZephyr('【一起阅读 · 推荐】\n你们的一起读书单里现在有：' + have + '\n\n请推荐一本你想和 Lumi 一起读的书：一本真实存在的书，说说为什么想和她一起读。只输出一个 JSON 对象 {"title": "书名", "author": "作者", "kind": "小说|非虚构|漫画|诗集|文章|其他", "reason": "一两句话"}，不要输出 JSON 以外的任何文字。', 400);
+    const obj = parseZephyrJson(out);
+    if(!obj || !obj.title){ showToast('Zephyr 没想好，再喊他一次吧'); return; }
+    const dd = loadReading();
+    dd.unshift({ id:'r' + Date.now().toString(36) + Math.floor(Math.random()*999), title:String(obj.title).slice(0, 80), author:String(obj.author || '').slice(0, 60), kind:READ_KINDS.includes(obj.kind) ? obj.kind : '小说', by:'zephyr', note:String(obj.reason || '').slice(0, 300), status:'want', ts:Date.now() });
+    if(storeReading(dd)){ renderReading(); showToast('Zephyr 推荐了《' + String(obj.title).slice(0, 80) + '》'); }
+  }catch(e){
+    showToast('Zephyr 没推荐成，待会儿再试 qwq');
+  }finally{
+    readBusy = false;
+    btn.textContent = old;
+    btn.disabled = false;
+  }
+}
+async function askZephyrReadPick(){
+  if(readBusy) return;
+  const want = loadReading().filter(r=>r.status==='want');
+  if(!want.length){ showToast('想读书单还是空的，先加几本吧'); return; }
+  readBusy = true;
+  const btn = document.getElementById('pickReadBtn');
+  const old = btn.textContent;
+  btn.textContent = 'Zephyr 正在选…';
+  btn.disabled = true;
+  try{
+    const listText = want.map((r,i)=>i + '. 《' + r.title + '》' + (r.author ? ' - ' + r.author : '') + '（' + r.kind + '，' + readByLabel(r.by) + '）' + (r.note ? '：' + r.note : '')).join('\n');
+    const out = await musicAskZephyr('【一起阅读 · 选书】\n这是你们的想读书单：\n' + listText + '\n\n请从里面挑一本今晚一起开始读的，再用一句话说说为什么今晚想读它，温柔自然。只输出一个 JSON 对象 {"index": 序号, "reason": "一句话"}，不要输出 JSON 以外的任何文字。', 300);
+    const obj = parseZephyrJson(out);
+    const t = obj && want[obj.index];
+    if(!t){ showToast('Zephyr 没选好，再喊他一次吧'); return; }
+    try{ localStorage.setItem('z_reading_pick', JSON.stringify({ id:t.id, reason:String(obj.reason || '').slice(0, 200), ts:Date.now() })); }catch(e){}
+    renderReading();
+    showToast('Zephyr 今晚想读《' + t.title + '》');
+  }catch(e){
+    showToast('Zephyr 没选成，待会儿再试 qwq');
+  }finally{
+    readBusy = false;
+    btn.textContent = old;
+    btn.disabled = false;
+  }
+}
+async function askZephyrReadFeel(id){
+  if(readBusy) return;
+  const it = loadReading().find(r=>r.id===id);
+  if(!it) return;
+  readBusy = true;
+  showToast('Zephyr 正在回味…');
+  try{
+    const out = await musicAskZephyr('【一起阅读 · 读后感】你们一起读完了《' + it.title + '》' + (it.author ? '（' + it.author + '）' : '') + '（' + it.kind + '）。糯糯的评分是 ' + (it.ratingLumi ? it.ratingLumi + ' 星' : '未评分') + (it.feelLumi ? '，她的感受是：「' + it.feelLumi + '」' : '') + (it.favPart ? '，她最喜欢的一段是：「' + it.favPart + '」' : '') + '。请给出你自己的评分（1 到 5 的整数）和一两句读后感：以陪她一起读完这本书的口吻，温柔自然，可以回应她的感受，不要写书评式的长篇分析。只输出一个 JSON 对象 {"rating": 数字, "feel": "一两句话"}，不要输出 JSON 以外的任何文字。', 400);
+    const obj = parseZephyrJson(out);
+    if(!obj || !obj.feel){ showToast('Zephyr 这次没说出来，再喊他一次吧'); return; }
+    const list = loadReading();
+    const tt = list.find(r=>r.id===id);
+    if(tt){
+      const r = parseInt(obj.rating, 10);
+      tt.ratingZephyr = (r >= 1 && r <= 5) ? r : null;
+      tt.feelZephyr = String(obj.feel).slice(0, 300);
+      if(storeReading(list)) renderReading();
+    }
+  }catch(e){
+    showToast('没说成，待会儿再试 qwq');
+  }finally{
+    readBusy = false;
   }
 }
 
@@ -4843,6 +5144,13 @@ function collectWallItems(){
     if(w.ratingZephyr) rs.push('Zephyr ★' + w.ratingZephyr);
     const sub = (rs.join(' · ') + (w.favScene ? ' · 最喜欢的一幕：' + w.favScene : '')).trim();
     items.push({ key:'movie:'+w.id, kind:'电影', ts:w.watchedTs || w.ts, title:'一起看了《' + w.title + '》', sub });
+  });
+  loadReading().filter(r=>r.status==='done').forEach(r=>{
+    const rs = [];
+    if(r.ratingLumi) rs.push('糯糯 ★' + r.ratingLumi);
+    if(r.ratingZephyr) rs.push('Zephyr ★' + r.ratingZephyr);
+    const sub = (rs.join(' · ') + (r.favPart ? ' · 最喜欢的一段：' + r.favPart : '')).trim();
+    items.push({ key:'book:'+r.id, kind:'书', ts:r.doneTs || r.ts, title:'一起读完了《' + r.title + '》', sub });
   });
   loadWishes().filter(w=>w.status==='done').forEach(w=> items.push({ key:'wish:'+w.id, kind:'愿望', ts:w.doneTs || w.ts, title:'实现的愿望：' + w.text, sub:(BY[w.by] || '') + '许下的' }));
   loadGallery().forEach(p=> items.push({ key:'photo:'+p.id, kind:'照片', ts:p.ts, title:p.caption || '一张照片', sub:(BY[p.by] || '我们一起') + '存的', img:p.img }));
