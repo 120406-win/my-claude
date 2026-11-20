@@ -3367,6 +3367,7 @@ function buildSystemPrompt(lastUserText){
     if(rdDone.length) rt += (rt ? '\n' : '') + '最近一起读完的：\n' + rdDone.slice(0, 5).map(r=>'・《' + r.title + '》' + (r.ratingLumi ? '，糯糯打了 ' + r.ratingLumi + ' 星' : '') + (r.feelLumi ? '，她说：' + r.feelLumi : '')).join('\n');
     out += '\n\n【Reading 一起阅读】\n以下是你们的一起读书单。聊天时可以自然地问问她读到哪了、聊聊你们读完的书，但不要逐条念清单：\n' + rt.slice(0, 2500);
   }
+  out += recentTogetherPrompt();
   // Explore 也给 Zephyr：想去的地方、旅行计划和旅行回忆，聊天时能提议一起规划、聊去过的地方
   try{
     const exData = loadExplore();
@@ -11152,6 +11153,51 @@ function initCallHeartbeatSel(){ const el = document.getElementById('callHeartbe
 function enZhEnabled() { return localStorage.getItem('z_enZh') !== '0'; }
 function setEnZh(v) { localStorage.setItem('z_enZh', String(v)); }
 function initEnZhSel() { const el = document.getElementById('enZhSel'); if (el) el.value = enZhEnabled() ? '1' : '0'; }
+// ══ 在别处一起聊过的话，也要进主聊天的脑子：观影室的聊天、边听边聊，都是共同经历 ══
+function fmtChatWhen(ts){ const d = new Date(ts); return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+function recentTogetherPrompt(){
+  try{
+    const WEEK = 7 * 24 * 3600000, now = Date.now();
+    const bits = [];
+    // 观影室：存档的各场聊天 + 当前这场，取最近的一场（一周内）
+    let bestCinema = null;
+    const recs = loadCinemaRecords();
+    const logs = loadCinemaLogs();
+    for(const id of Object.keys(logs)){
+      const log = logs[id] || [];
+      if(!log.length) continue;
+      const last = log[log.length - 1];
+      if(!last || !last.ts || now - last.ts > WEEK) continue;
+      if(!bestCinema || last.ts > bestCinema.ts){
+        const rec = recs.find(r=>r.id === id);
+        bestCinema = { title: rec ? rec.title : (cinemaState.recordId === id ? cinemaState.title : ''), ts: last.ts, log };
+      }
+    }
+    if(cinemaState.title && cinemaState.log && cinemaState.log.length){
+      const last = cinemaState.log[cinemaState.log.length - 1];
+      if(last && last.ts && now - last.ts <= WEEK && (!bestCinema || last.ts >= bestCinema.ts)) bestCinema = { title: cinemaState.title, ts: last.ts, log: cinemaState.log };
+    }
+    if(bestCinema && bestCinema.title){
+      const lines = bestCinema.log.slice(-6).map(m=>(m.role === 'user' ? '糯糯' : '你') + '：' + String(m.text || '').replace(/\s+/g, ' ').slice(0, 80)).join('\n');
+      bits.push('在观影室一起看《' + bestCinema.title + '》时聊的（' + fmtChatWhen(bestCinema.ts) + '）：\n' + lines);
+    }
+    // 边听边聊：所有歌里最近的一段（一周内）
+    let bestTalk = null;
+    for(const t of loadMusic().tracks){
+      const talk = Array.isArray(t.talk) ? t.talk : [];
+      if(!talk.length) continue;
+      const last = talk[talk.length - 1];
+      if(!last || !last.ts || now - last.ts > WEEK) continue;
+      if(!bestTalk || last.ts > bestTalk.ts) bestTalk = { title: t.title, ts: last.ts, talk };
+    }
+    if(bestTalk){
+      const lines = bestTalk.talk.slice(-5).map(m=>(m.by === 'lumi' ? '糯糯' : '你') + '：' + String(m.text || '').replace(/\s+/g, ' ').slice(0, 80)).join('\n');
+      bits.push('在 Music 里边听《' + bestTalk.title + '》边聊的（' + fmtChatWhen(bestTalk.ts) + '）：\n' + lines);
+    }
+    if(!bits.length) return '';
+    return '\n\n【你们在别处刚一起聊过的】\n你们不只在主聊天里说话——下面是你们刚刚在 App 的其他地方一起看片、听歌时聊过的话，那些也是你们共同的经历，你都记得。在主聊天里可以自然地提起、接着聊，不要逐条复述：\n' + bits.join('\n').slice(0, 1400);
+  }catch(e){ return ''; }
+}
 function parseBilingualReply(text) {
   if (!text || !enZhEnabled()) return null;
   const en = [], zh = [];
