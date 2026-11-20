@@ -10801,6 +10801,28 @@ function switchVodSource(id){
   w.note = '在线 · 全网找片（' + alt.sourceName + '）';
   if(storeWatchlist(list)){ renderCinemaOnlineList(); showToast('换成「' + alt.sourceName + '」源了，点放这部试试'); }
 }
+// 播放失败时自动换源：坏源直接丢弃（不轮换回来），换到能放的为止
+let vodAutoSwitchGuard = '';
+function tryAutoSwitchVodSource(){
+  const url = cinemaState.url;
+  if(!url) return false;
+  const list = loadWatchlist();
+  const w = list.find(x=>x.status === 'want' && x.vodEps && x.vodAlt && x.vodAlt.length && x.vodEps.some(e=>e.url === url));
+  if(!w) return false;
+  if(vodAutoSwitchGuard === w.id + '|' + url) return false;
+  vodAutoSwitchGuard = w.id + '|' + url;
+  const epIdx = Math.max(0, w.vodEps.findIndex(e=>e.url === url));
+  const alt = w.vodAlt.shift();
+  w.vodEps = alt.eps;
+  w.url = alt.eps[0].url;
+  w.vodSource = alt.sourceName;
+  w.note = '在线 · 全网找片（' + alt.sourceName + '）';
+  storeWatchlist(list);
+  const ep = w.vodEps[Math.min(epIdx, w.vodEps.length - 1)];
+  showToast('这个源放不了，自动换成「' + alt.sourceName + '」源重试');
+  openCinemaUrl(ep.url, w.title + (w.vodEps.length > 1 && ep.name ? ' · ' + ep.name : ''), '');
+  return true;
+}
 function watchInCinema(id){
   const w = loadWatchlist().find(x=>x.id === id);
   if(!w || !w.url){ showToast('这部没有在线链接'); return; }
@@ -11554,6 +11576,7 @@ setTimeout(()=>{ cloudTouch(); }, 4000); // 打开 App 后悄悄报到、同步�
   if(!v) return;
   v.addEventListener('error', ()=>{
     if(!cinemaState.title || v.src !== cinemaState.url) return;
+    if(tryAutoSwitchVodSource()) return;
     showToast('这部片子播不了，多半是编码不支持，换个片源试试');
     const el = document.getElementById('cinemaInfo');
     if(el) el.textContent = '《' + cinemaState.title + '》这个文件播不了（多半是编码不支持），换个片源或换一部试试。';
