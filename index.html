@@ -4422,9 +4422,16 @@ async function cloudBootSync(){
         if(raw){
           const obj = JSON.parse(raw);
           if(!cloudDataNewer(Date.parse(obj.exportedAt || '') || 0, localDataTs(), fresh)){ cloudBootBusy = false; cloudTouch(); return; }
+          // 防死循环（2026-11-20 实测无限刷新）：拉取判断用的是云端行的 updated_at，
+          // 「已同步」标记就必须记 updated_at；之前记的是备份里的 exportedAt，两者差着
+          // 一段永远追不上的距离，每次开机都误判「云端更新」→ 恢复 → 刷新 → 再误判。
+          // 再加一道会话标记兜底：同一行 updated_at 在一次打开里最多自动续上一次。
+          let pulledMark = '';
+          try{ pulledMark = sessionStorage.getItem('z_bootPulled') || ''; }catch(e){}
+          if(String(row.updated_at) === pulledMark){ cloudBootBusy = false; cloudTouch(); return; }
           showToast('云端有更新的数据，正在续上 ~');
-          const ok = await applyBackupObject(obj, { silent: true, cloudTs: Date.parse(obj.exportedAt || '') || row.updated_at });
-          if(ok) return;
+          const ok = await applyBackupObject(obj, { silent: true, cloudTs: row.updated_at });
+          if(ok){ try{ sessionStorage.setItem('z_bootPulled', String(row.updated_at)); }catch(e){} return; }
         }
         cloudBootBusy = false;
       }
