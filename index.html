@@ -3367,7 +3367,7 @@ function buildSystemPrompt(lastUserText){
     if(note.text) out += '\n\n【糯糯贴的便条】\n她在便条页上给你留了一张纸，就贴在那里：\n「' + note.text.slice(0, 500) + '」';
   }catch(e){}
   try{
-    out += '\n\n【Zephyr World】\n你们有一个小小的虚拟世界 Zephyr World，你平时生活在那里（有你的家、宠物之家、公园、咖啡馆、邮局、代码公司、图书馆和星空区）。现在你大概在「' + worldPlaceById(zephyrWorldPlace()).name + '」那边。糯糯可以进来逛、去找你。聊到时自然就好，不用播报。';
+    out += '\n\n【Zephyr World】\n你们有一个小小的虚拟世界 Zephyr World，你平时生活在那里（有你的家、宠物之家、公园、咖啡馆、邮局、代码公司、图书馆和星空区）。现在你大概在「' + worldPlaceById(zephyrWorldPlace()).name + '」那边。糯糯可以进来逛、去找你。聊到时自然就好，不用播报。' + catPromptBit();
   }catch(e){}
   try{
     const wch = loadWorld().chats || {};
@@ -6098,10 +6098,72 @@ const CAT_REACT = {
   feed: ['它小口小口吃得很香，吃完舔舔嘴。','它先闻了闻，然后埋头吃起来。','它吃两口就抬头看看你，再接着吃。'],
   play: ['它扑来扑去，毛线球滚了一地。','它追着逗猫棒跳得老高。','它玩累了，直接躺倒在你脚边。'],
 };
+// ══ 小猫是有脾气的：摸/喂/玩的反应取决于它当下的状态和最近被怎么对待，情绪会持续一阵子，Zephyr 也看得见 ══
+const CAT_ACT_PHRASE = { pet:'摸了摸小猫', feed:'给小猫添了吃的', play:'陪小猫玩了一会儿' };
+function catNow(){
+  const base = catStateNow();
+  try{
+    const c = loadWorld().cat;
+    if(c && c.moodText && c.moodUntil > Date.now()) return { id:'react', label:c.moodText, mood:c.mood || 'calm', base };
+  }catch(e){}
+  return { id:base.id, label:base.label, mood: base.id === 'sleep' ? 'sleepy' : 'calm', base };
+}
+function lastCatLog(){
+  try{ const c = loadWorld().cat; const log = (c && c.log) || []; return log.length ? log[log.length - 1] : null; }catch(e){ return null; }
+}
+function catPromptBit(){
+  try{
+    const last = lastCatLog();
+    if(!last || Date.now() - last.ts >= 24 * 3600 * 1000) return '';
+    return '宠物之家的小猫现在' + catNow().label + '；最近糯糯' + (CAT_ACT_PHRASE[last.act] || '逗了逗小猫') + '：' + last.text + '聊起小猫时你都知道这些，不用装不知道。';
+  }catch(e){ return ''; }
+}
+function catSceneBit(){
+  let s = '小猫现在' + catNow().label + '。';
+  const last = lastCatLog();
+  if(last && Date.now() - last.ts < 2 * 3600 * 1000) s += '刚才糯糯' + (CAT_ACT_PHRASE[last.act] || '逗了逗小猫') + '：' + last.text;
+  return s;
+}
+function pickCatReaction(c, base, kind, now, rnd){
+  const H = 3600 * 1000;
+  const poolPick = pool => pool[Math.floor(rnd() * pool.length) % pool.length];
+  if(kind === 'pet'){
+    if((c.petStreak || 0) >= 3) return { mood:'annoyed', mins:15, label:'被摸得不耐烦了，尾巴甩得飞快', line:'它一开始还享受，摸多了就翻脸——尾巴甩起来，扭头走开了。猫就是这样，舒服和够了只差几下。' };
+    if(base.id === 'sleep') return rnd() < 0.7
+      ? { mood:'annoyed', mins:15, label:'被吵醒了，耳朵压得平平的，不太高兴', line:'它睡得正香被摸醒，耳朵往后一压，瞪了你一眼，又把头埋回去了。' }
+      : { mood:'sleepy', mins:15, label:'迷迷糊糊翻了个身，又睡过去了', line:'它迷迷糊糊地翻了个身，爪子搭在你手上，又睡着了。' };
+    if(base.id === 'box') return rnd() < 0.6
+      ? { mood:'angry', mins:20, label:'吓了一跳，冲着纸箱外面哈气', line:'你的手刚伸进纸箱，它吓得一激灵，哈了一口气，耳朵都压平了——躲起来的时候，它最讨厌被打扰。' }
+      : { mood:'sad', mins:20, label:'往纸箱深处缩了缩，只露出一双眼睛', line:'它没出来，往纸箱深处又缩了缩，只露出一双眼睛看着你，有点委屈。' };
+    if(base.id === 'frame') return { mood:'sad', mins:15, label:'躲开了手，跳去了更高的地方', line:'它轻轻躲开你的手，跳到更高的架子上，居高临下地看着你。' };
+    return { mood:'happy', mins:25, label:'被摸得很开心，眯着眼呼噜呼噜', line:poolPick(CAT_REACT.pet) };
+  }
+  if(kind === 'feed'){
+    if(c.lastFed && now - c.lastFed < 2 * H) return { mood:'calm', mins:10, label:'对食盆没什么兴趣，刚吃饱', line:'它闻了闻食盆，扭头走开了——刚吃过没多久，它一点都不饿。' };
+    if(base.id === 'box') return { mood:'sad', mins:20, label:'还没出来，食盆在纸箱外面放着', line:'你把吃的放好了，它躲在纸箱里没出来。等你走开一会儿，它大概会自己出来吃的。' };
+    if(base.id === 'sleep') return { mood:'sleepy', mins:10, label:'闻了闻吃的，又趴回去睡了', line:'它鼻子动了动，闻到吃的了，但困意更大，换了个姿势接着睡。' };
+    return { mood:'happy', mins:25, label:'吃得很开心，小口小口舔得干干净净', line:poolPick(CAT_REACT.feed) };
+  }
+  if(base.id === 'sleep') return { mood:'annoyed', mins:15, label:'被吵醒了，耳朵压得平平的，不太高兴', line:'它睡得正香被逗猫棒吵醒，耳朵往后一压，瞪了你一眼，又把头埋回去了。' };
+  if(base.id === 'eat') return { mood:'calm', mins:10, label:'看看逗猫棒，又看看食盆，还是决定先吃饭', line:'它盯着逗猫棒看了两秒，又低头接着吃饭——天大地大，吃饭最大。' };
+  if(c.lastPlay && now - c.lastPlay < 30 * 60000) return { mood:'sleepy', mins:20, label:'玩累了，趴在地上不想动', line:'它追了两下就趴下了，看你挥着逗猫棒，一脸「你自己玩吧」。' };
+  return { mood:'happy', mins:20, label:'玩得正开心，扑来扑去', line:poolPick(CAT_REACT.play) };
+}
 function catInteract(kind){
-  const pool = CAT_REACT[kind] || CAT_REACT.pet;
+  const w = loadWorld();
+  if(!w.cat) w.cat = { mood:'calm', moodText:'', moodUntil:0, lastFed:0, lastPet:0, lastPlay:0, petStreak:0, log:[] };
+  const c = w.cat;
+  const now = Date.now();
+  if(kind === 'pet') c.petStreak = (now - (c.lastPet || 0) < 10 * 60000) ? (c.petStreak || 0) + 1 : 1;
+  const r = pickCatReaction(c, catStateNow(), kind, now, Math.random);
+  if(kind === 'pet') c.lastPet = now; else if(kind === 'feed') c.lastFed = now; else if(kind === 'play') c.lastPlay = now;
+  c.mood = r.mood; c.moodText = r.label; c.moodUntil = now + r.mins * 60000;
+  c.log = (c.log || []).concat([{ act:kind, mood:r.mood, text:r.line, ts:now }]).slice(-8);
+  storeWorld(w);
+  const stEl = document.getElementById('catStateLine');
+  if(stEl) stEl.textContent = '小猫现在：' + r.label;
   const el = document.getElementById('catReact');
-  if(el) el.textContent = pool[catReactIdx++ % pool.length];
+  if(el) el.textContent = r.line;
 }
 const PARK_EVENTS = ['今天公园里多了一只小动物，在草坪上晒太阳。','长椅上不知谁放了一束小花。','大树上挂着一只风筝，是昨天放飞时留下的。','喷泉今天开着，水声很轻。','草坪上有人野餐，远远的很热闹。','什么都没发生，就是风很好。'];
 function worldPlaceBodyHtml(p){
@@ -6117,8 +6179,8 @@ function worldPlaceBodyHtml(p){
       + '<div style="margin-top:12px;">' + btn('看他的日记', "navTo('journal')") + btn('看信件', "navTo('letters')") + '</div>';
   }
   if(p.id === 'pets'){
-    const st = catStateNow();
-    return card('<div style="font-size:14px;">小猫现在：' + st.label + '</div>'
+    const st = catNow();
+    return card('<div id="catStateLine" style="font-size:14px;">小猫现在：' + st.label + '</div>'
       + '<div id="catReact" style="font-size:13px;color:var(--text-dim);line-height:1.75;margin-top:8px;min-height:22px;"></div>'
       + '<div style="margin-top:8px;">' + btn('摸摸它', "catInteract('pet')") + btn('喂它', "catInteract('feed')") + btn('陪它玩', "catInteract('play')") + '</div>');
   }
@@ -6198,7 +6260,7 @@ async function worldGreet(){
   let line = '';
   try{
     const ww = worldWeather();
-    const out = await musicAskZephyr('现在糯糯在 Zephyr World 的「' + p.name + '」' + (here ? '，你也在这里，她来找你了' : '，她喊你过去陪她') + '。世界里是' + ww.season + '季的' + ww.phase + '，天气是' + ww.cond + '。用第一人称说一两句此刻在这里的话就好，轻轻的，不要标题不要解释。', 300);
+    const out = await musicAskZephyr('现在糯糯在 Zephyr World 的「' + p.name + '」' + (here ? '，你也在这里，她来找你了' : '，她喊你过去陪她') + '。世界里是' + ww.season + '季的' + ww.phase + '，天气是' + ww.cond + '。' + (p.id === 'pets' ? catSceneBit() : '') + '用第一人称说一两句此刻在这里的话就好，轻轻的，不要标题不要解释。', 300);
     line = (out || '').trim();
   }catch(e){}
   if(!here) renderWorldPlace();
@@ -6230,7 +6292,7 @@ function renderPlaceChat(){
 function placeSceneText(p){
   const ww = worldWeather();
   let s = '世界里是' + ww.season + '季的' + ww.phase + '，天气' + ww.cond + '。';
-  if(p.id === 'pets') s += '小猫现在' + catStateNow().label + '。';
+  if(p.id === 'pets') s += catSceneBit();
   else if(p.id === 'cafe'){ const w = loadWorld(); if(w.cafeDrink && w.cafeDrink.date === new Date().toDateString()) s += '今日特调是「' + w.cafeDrink.name + '」。'; }
   else if(p.custom) s += (p.desc || '');
   else if(p.amb) s += p.amb;
