@@ -1292,6 +1292,13 @@
           <div class="s-row-label">访问令牌</div>
           <input class="s-input" type="password" id="backendToken" placeholder="待填">
         </div>
+        <div class="s-row">
+          <div class="s-row-label">MCP 工具</div>
+          <select class="s-input" id="mcpSel" onchange="setMcpEnabled(this.value)">
+            <option value="on">开（聊天时他能用工具）</option>
+            <option value="off">关</option>
+          </select>
+        </div>
         <div style="display:flex;gap:8px;padding:12px 16px 4px;">
           <button onclick="cloudSyncUpload()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">同步到云端</button>
           <button onclick="cloudSyncDownload()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">从云端恢复</button>
@@ -2686,6 +2693,8 @@ function loadSettings(){
   if(buEl) buEl.value = cfg.backendUrl||'';
   const btEl=document.getElementById('backendToken');
   if(btEl) btEl.value = cfg.backendToken||'';
+  const mcpSelEl=document.getElementById('mcpSel');
+  if(mcpSelEl) mcpSelEl.value = mcpEnabled() ? 'on' : 'off';
 
   const ts=document.getElementById('tempSlider');
   ts.value=cfg.temperature; document.getElementById('tempVal').textContent=cfg.temperature;
@@ -4095,6 +4104,11 @@ async function backendGet(path){
   const out = await resp.json().catch(()=>({}));
   if(!resp.ok || !out.ok) throw new Error(out.error || ('HTTP ' + resp.status));
   return out;
+}
+function mcpEnabled(){ return localStorage.getItem('z_mcpEnabled') !== 'off'; }
+function setMcpEnabled(v){
+  localStorage.setItem('z_mcpEnabled', v === 'off' ? 'off' : 'on');
+  showToast(v === 'off' ? 'MCP 工具已关，聊天时他不会再用工具' : 'MCP 工具已开，聊天时他能用后端连着的工具啦');
 }
 async function getMcpTools(){
   const base = backendBase(), tok = backendTok();
@@ -9226,7 +9240,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     const toolList = [];
     if(searchOn) toolList.push(SEARCH_WEB_TOOL);
     // MCP 工具：后端连着的 MCP 服务器的工具也交给他，调用时经后端转发执行
-    const mcpPack = await getMcpTools().catch(()=>null);
+    const mcpPack = mcpEnabled() ? await getMcpTools().catch(()=>null) : null;
     if(mcpPack && mcpPack.tools.length) toolList.push(...mcpPack.tools);
     if(toolList.length) reqBody.tools = toolList;
     const sendReq = () => fetch(base+'/messages',{
