@@ -2240,8 +2240,7 @@
     <div class="settings-topbar-title">观影室</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">本地视频或在线找的片都能看；视频和字幕不存进 App。</div>
-    <div id="cinemaStage" onclick="cinemaStageTap()" style="position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:16/9;margin-bottom:12px;">
+    <div id="cinemaStage" onclick="cinemaStageTap()" style="position:sticky;top:0;z-index:8;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:16/9;margin-bottom:12px;">
       <video id="cinemaVideo" style="width:100%;height:100%;display:block;" controls playsinline></video>
       <div id="cinemaDanmaku" style="position:absolute;inset:0;overflow:hidden;pointer-events:none;"></div>
       <div id="cinemaMiniBar" style="display:none;position:absolute;top:6px;right:6px;gap:6px;z-index:6;">
@@ -8114,6 +8113,17 @@ function renderMusicTalk(){
   log.innerHTML = arr.map(chatBubbleHtml).join('');
   log.scrollTop = log.scrollHeight;
 }
+// 边听边聊里他写的控歌标记：执行并抹掉，别漏给她看
+function musicTalkApplyMarks(text){
+  let t = String(text || '');
+  const acts = [];
+  t = t.replace(/\[\[(暂停音乐|暂停|继续播放|继续|播放|下一首|上一首|切歌|换一首)\]\]/g, (m, a)=>{
+    acts.push(a === '暂停' ? '暂停音乐' : (a === '继续' || a === '播放') ? '继续播放' : (a === '切歌' || a === '换一首') ? '下一首' : a);
+    return '';
+  });
+  if(acts.length) setTimeout(()=>{ try{ zephyrControlMusic(acts[0]); }catch(e){} }, 200);
+  return t.replace(/\n{3,}/g, '\n\n').trim();
+}
 async function musicTalkSend(){
   if(musicTalkBusy) return;
   const cur = currentTrack();
@@ -8138,7 +8148,7 @@ async function musicTalkSend(){
     const state = a && !a.paused ? '正在播放' : '已暂停';
     const hist = ((tt && tt.talk) || []).slice(-9, -1).map(m => (m.by === 'lumi' ? '糯糯' : '你') + '：' + m.text).join('\n');
     const out = await musicAskZephyr('【一起听歌 · 边听边聊】\n你们正在一起听《' + cur.title + '》' + (cur.artist ? ' - ' + cur.artist : '') + '（现在' + state + '）。你们刚才边听边聊了这些：\n' + (hist || '（刚开始聊）') + '\n糯糯现在说：' + text + '\n\n请以正陪她一起听歌的口吻直接回她，1 到 3 句，温柔自然，可以聊这首歌、聊歌词、聊此刻的心情。不要写歌曲百科，不要说「作为 AI」，不要标题、不要解释。', 400);
-    const reply = (out || '').trim();
+    const reply = musicTalkApplyMarks(cleanBilingualText((out || '').trim()));
     if(reply){
       const d2 = loadMusic();
       const t2 = d2.tracks.find(x => x.id === cur.id);
@@ -12009,6 +12019,21 @@ async function cinemaAsk(content, frame){
   recordUsage(data.usage, cfg.model);
   return (data.content || []).filter(b=>b.type === 'text').map(b=>b.text).join('').trim();
 }
+// 观影室聊天里他写的播放控制标记（多半是顺手用了主聊天的说法）：执行到视频上并抹掉，别漏给她看
+function cinemaApplyControlMarks(text){
+  let t = String(text || '');
+  const v = document.getElementById('cinemaVideo');
+  const seek = t.match(/\[\[回退[:：](\d+)\]\]/);
+  if(seek){
+    const s = Math.min(120, parseInt(seek[1], 10) || 0);
+    if(v && s){ try{ v.currentTime = Math.max(0, v.currentTime - s); }catch(e){} }
+    t = t.replace(seek[0], '');
+  }
+  if(/\[\[(暂停|暂停音乐)\]\]/.test(t)){ if(v){ try{ v.pause(); }catch(e){} } t = t.replace(/\[\[(暂停|暂停音乐)\]\]/g, ''); }
+  if(/\[\[(继续|继续播放|播放)\]\]/.test(t)){ if(v){ try{ v.play().catch(()=>{}); }catch(e){} } t = t.replace(/\[\[(继续|继续播放|播放)\]\]/g, ''); }
+  t = t.replace(/\[\[(下一首|上一首|切歌|换一首|换歌)\]\]/g, ''); // 切歌那套在观影室没有意义，直接抹掉
+  return t.replace(/\n{3,}/g, '\n\n').trim();
+}
 async function cinemaSend(){
   if(cinemaBusy) return;
   const input = document.getElementById('cinemaInput');
@@ -12025,7 +12050,7 @@ async function cinemaSend(){
     const history = cinemaState.log.slice(-8).map(m=>(m.role === 'user' ? '糯糯：' : '你：') + m.text).join('\n');
     const frame = cinemaState.frame;
     cinemaState.frame = null;
-    const reply = cleanBilingualText(await cinemaAsk(cinemaContext() + '\n\n你们刚刚在观影室聊的（最近几句）：\n' + history + '\n\n请以 Zephyr 的身份自然地接糯糯的话，简短一点，像一起看电影时小声说话。直接用中文说，不要用外语加翻译的双语对照格式（观影室里显示不了小字译文）。' + (frame ? '（附上了她刚留影的当前画面，你能看到这一帧）' : ''), frame));
+    const reply = cinemaApplyControlMarks(cleanBilingualText(await cinemaAsk(cinemaContext() + '\n\n你们刚刚在观影室聊的（最近几句）：\n' + history + '\n\n请以 Zephyr 的身份自然地接糯糯的话，简短一点，像一起看电影时小声说话。直接用中文说，不要用外语加翻译的双语对照格式（观影室里显示不了小字译文）。' + (frame ? '（附上了她刚留影的当前画面，你能看到这一帧）' : ''), frame)));
     if(reply){
       cinemaState.log.push({ role: 'assistant', text: reply, ts: Date.now() });
       renderCinemaLog();
@@ -12069,12 +12094,16 @@ function cinemaSetMini(on){
     if(!cinemaStageHome){ cinemaStageHome = document.createComment('cinema-stage-home'); stage.parentNode.insertBefore(cinemaStageHome, stage); }
     document.body.appendChild(stage);
     stage.classList.add('mini');
-    stage.style.position = 'fixed'; // 舞台自带行内 position:relative，得行内压过它，下面的定位才生效
+    stage.style.position = 'fixed'; // 舞台在家时是行内 sticky 吸顶，搬出来要行内改 fixed 才压得住
+    stage.style.top = 'auto';
+    stage.style.zIndex = '12000';
     if(bar) bar.style.display = 'flex';
     if(v) v.controls = false;
   } else {
     stage.classList.remove('mini');
-    stage.style.position = 'relative';
+    stage.style.position = 'sticky';
+    stage.style.top = '0px';
+    stage.style.zIndex = '8';
     if(bar) bar.style.display = 'none';
     if(v) v.controls = true;
     if(cinemaStageHome && cinemaStageHome.parentNode) cinemaStageHome.parentNode.insertBefore(stage, cinemaStageHome);
@@ -12678,6 +12707,7 @@ function musicDanmaku(text){
 function parsePulseActions(text, media){
   let t = String(text || '').trim();
   if(!t || t.includes('[[不说]]')) return '';
+  t = t.replace(/\[\[继续播放\]\]/g, '[[继续]]').replace(/\[\[暂停音乐\]\]/g, '[[暂停]]'); // 他常把主聊天的说法顺手写过来，一并认
   const m = t.match(/\[\[回退：(\d+)\]\]/);
   if(m){
     const s = Math.min(120, parseInt(m[1], 10) || 0);
