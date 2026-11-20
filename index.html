@@ -4332,15 +4332,20 @@ async function getMcpTools(){
   const base = backendBase(), tok = backendTok();
   if(!base || !tok) return null;
   const ckey = base + '|' + tok;
-  if(mcpToolsCache && mcpToolsCache.key === ckey) return mcpToolsCache;
+  // 缓存里若有上次没连上的服务器，不直接用——只补拉缺的那几台（一次抖动不该让某台服务器整场掉线）
+  if(mcpToolsCache && mcpToolsCache.key === ckey && !(mcpToolsCache.failed && mcpToolsCache.failed.length)) return mcpToolsCache;
   const list = await backendGet('/mcp/servers');
-  const tools = [];
-  const map = {};
-  let n = 0;
+  const tools = (mcpToolsCache && mcpToolsCache.key === ckey) ? mcpToolsCache.tools.slice() : [];
+  const map = (mcpToolsCache && mcpToolsCache.key === ckey) ? Object.assign({}, mcpToolsCache.map) : {};
+  const doneIds = new Set(Object.values(map).map(e => e.server));
+  let n = tools.length;
+  const failed = [];
   for(const s of (list.servers || [])){
+    if(doneIds.has(s.id)) continue;
     let out = null;
-    try{ out = await backendFetch('/mcp/tools', { server: s.id }); }catch(e){ continue; }
-    for(const t of (out.tools || [])){
+    try{ out = await backendFetch('/mcp/tools', { server: s.id }); }catch(e){ failed.push(s.id); continue; }
+    if(!out || !Array.isArray(out.tools)){ failed.push(s.id); continue; }
+    for(const t of out.tools){
       let an = 'mcp__' + s.id + '__' + String(t.name || '');
       if(an.length > 64) an = an.slice(0, 60) + '_' + (++n);
       if(map[an]) continue;
@@ -4352,7 +4357,7 @@ async function getMcpTools(){
       });
     }
   }
-  mcpToolsCache = { key: ckey, tools, map };
+  mcpToolsCache = { key: ckey, tools, map, failed };
   return mcpToolsCache;
 }
 async function executeMcpTool(anthName, input){
@@ -4384,7 +4389,7 @@ async function showMcpTools(){
     if(!pack.tools.length){ cloudStatus('后端连着，但还没有注册任何 MCP 服务器'); return; }
     const byServer = {};
     pack.tools.forEach(t=>{ const e = pack.map[t.name]; const k = e ? e.server : '?'; (byServer[k] = byServer[k] || []).push(e ? e.name : t.name); });
-    cloudStatus(Object.keys(byServer).map(k=>k + '：' + byServer[k].length + ' 个工具（' + byServer[k].join('、') + '）').join('；'));
+    cloudStatus(Object.keys(byServer).map(k=>k + '：' + byServer[k].length + ' 个工具（' + byServer[k].join('、') + '）').join('；') + ((pack.failed && pack.failed.length) ? '；这次没连上的服务器：' + pack.failed.join('、') + '（下次聊天时会自动再试）' : ''));
   }catch(e){ cloudStatus(''); showToast('没查到：' + e.message); }
 }
 
