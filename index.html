@@ -1336,11 +1336,15 @@
             <option value="16">16 次</option>
             <option value="24">24 次</option>
             <option value="30">30 次</option>
+            <option value="48">48 次</option>
+            <option value="96">96 次</option>
+            <option value="200">200 次（基本不限）</option>
           </select>
         </div>
         <div class="s-row">
           <div class="s-row-label">两次间隔至少</div>
           <select class="s-input" id="hbGapSel" onchange="setHeartbeatGap(this.value)">
+            <option value="0.25">15 分钟</option>
             <option value="0.5">半小时</option>
             <option value="1">1 小时</option>
             <option value="2">2 小时</option>
