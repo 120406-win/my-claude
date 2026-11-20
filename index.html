@@ -1296,6 +1296,9 @@
           <button onclick="cloudSyncUpload()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">同步到云端</button>
           <button onclick="cloudSyncDownload()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">从云端恢复</button>
         </div>
+        <div style="padding:0 16px 4px;">
+          <button onclick="showMcpTools()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">看看他能用的 MCP 工具</button>
+        </div>
         <div id="cloudSyncStatus" style="font-size:11.5px;color:var(--text-pale);line-height:1.7;padding:6px 16px 12px;"></div>
       </div>
     </div>
@@ -4080,6 +4083,77 @@ async function cloudSyncDownload(){
     cloudStatus('');
     await applyBackupObject(obj);
   }catch(e){ cloudStatus(''); showToast('恢复失败：' + e.message); }
+}
+
+// ══ MCP 工具：后端连着的 MCP 服务器，把它们的工具借给 Zephyr 在聊天里用 ══
+let mcpToolsCache = null;
+async function backendGet(path){
+  const base = backendBase(), tok = backendTok();
+  if(!base) throw new Error('先填后端地址');
+  if(!tok) throw new Error('先填访问令牌');
+  const resp = await fetch(base + path, { headers:{ 'Authorization':'Bearer ' + tok } });
+  const out = await resp.json().catch(()=>({}));
+  if(!resp.ok || !out.ok) throw new Error(out.error || ('HTTP ' + resp.status));
+  return out;
+}
+async function getMcpTools(){
+  const base = backendBase(), tok = backendTok();
+  if(!base || !tok) return null;
+  const ckey = base + '|' + tok;
+  if(mcpToolsCache && mcpToolsCache.key === ckey) return mcpToolsCache;
+  const list = await backendGet('/mcp/servers');
+  const tools = [];
+  const map = {};
+  let n = 0;
+  for(const s of (list.servers || [])){
+    let out = null;
+    try{ out = await backendFetch('/mcp/tools', { server: s.id }); }catch(e){ continue; }
+    for(const t of (out.tools || [])){
+      let an = 'mcp__' + s.id + '__' + String(t.name || '');
+      if(an.length > 64) an = an.slice(0, 60) + '_' + (++n);
+      if(map[an]) continue;
+      map[an] = { server: s.id, name: t.name };
+      tools.push({
+        name: an,
+        description: ('[' + (s.name || s.id) + '] ' + String(t.description || '')).slice(0, 400),
+        input_schema: t.inputSchema || { type:'object', properties:{} }
+      });
+    }
+  }
+  mcpToolsCache = { key: ckey, tools, map };
+  return mcpToolsCache;
+}
+async function executeMcpTool(anthName, input){
+  const entry = mcpToolsCache && mcpToolsCache.map[anthName];
+  if(!entry) return '工具不存在（MCP 工具列表可能已过期），请坦白告诉糯糯这次没用成。';
+  try{
+    const out = await backendFetch('/mcp/call', { server: entry.server, name: entry.name, arguments: input || {} });
+    const r = out.result || {};
+    const parts = [];
+    for(const c of (r.content || [])){
+      if(c.type === 'text' && c.text) parts.push(c.text);
+      else if(c.type === 'image') parts.push('[图片内容已省略]');
+      else if(c.text) parts.push(String(c.text));
+    }
+    if(!parts.length && r.structuredContent) parts.push(JSON.stringify(r.structuredContent));
+    let text = parts.join('\n') || '（工具没有返回文字内容）';
+    if(text.length > 8000) text = text.slice(0, 8000) + '\n…（内容太长，已截断）';
+    return r.isError ? ('工具返回了错误：' + text) : text;
+  }catch(e){
+    return '工具调用失败（' + e.message + '）。请坦白告诉糯糯这次没成功，不要编造结果。';
+  }
+}
+async function showMcpTools(){
+  try{
+    cloudStatus('正在问后端…');
+    mcpToolsCache = null;
+    const pack = await getMcpTools();
+    if(!pack) throw new Error('后端没连上或没填令牌');
+    if(!pack.tools.length){ cloudStatus('后端连着，但还没有注册任何 MCP 服务器'); return; }
+    const byServer = {};
+    pack.tools.forEach(t=>{ const e = pack.map[t.name]; const k = e ? e.server : '?'; (byServer[k] = byServer[k] || []).push(e ? e.name : t.name); });
+    cloudStatus(Object.keys(byServer).map(k=>k + '：' + byServer[k].length + ' 个工具（' + byServer[k].join('、') + '）').join('；'));
+  }catch(e){ cloudStatus(''); showToast('没查到：' + e.message); }
 }
 
 // ══ Calendar：Zephyr 的历史时间线。里程碑从愿望/信件/日记/重要事件里自动汇集，也可以手动补记 ══
@@ -9149,10 +9223,12 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       delete reqBody.top_p;
     }
     const searchOn = webSearchEnabled();
-    if(searchOn){
-      // 联网搜索走客户端工具：模型开口要搜，App 自己执行搜索再把结果回喂给他（和 Kelivo 同款机制）
-      reqBody.tools = [SEARCH_WEB_TOOL];
-    }
+    const toolList = [];
+    if(searchOn) toolList.push(SEARCH_WEB_TOOL);
+    // MCP 工具：后端连着的 MCP 服务器的工具也交给他，调用时经后端转发执行
+    const mcpPack = await getMcpTools().catch(()=>null);
+    if(mcpPack && mcpPack.tools.length) toolList.push(...mcpPack.tools);
+    if(toolList.length) reqBody.tools = toolList;
     const sendReq = () => fetch(base+'/messages',{
       method:'POST',
       headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
@@ -9251,7 +9327,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       }
 
       if(roundUsage) recordUsage(roundUsage, cfg.model);
-      const toolUses = blocks.filter(b=>b && b.type === 'tool_use' && b.name === 'search_web');
+      const toolUses = blocks.filter(b=>b && b.type === 'tool_use' && (b.name === 'search_web' || b.name.startsWith('mcp__')));
       if(stopReason !== 'tool_use' || !toolUses.length || round === 3) break;
 
       // 把他这轮的话和工具调用原样记进工作历史（思考块不回传：中转常把思考压扁、签名对不上，硬回传容易整段失败）
@@ -9268,15 +9344,25 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       workMsgs.push({ role:'assistant', content:assistantContent });
       if(!searchStatus) searchStatus = makeSearchStatus(col, bubble);
       const resultBlocks = [];
+      let didSearch = false;
       for(const tu of toolUses){
-        let q = '';
-        try{ q = String(JSON.parse(tu.json || '{}').query || ''); }catch(e){}
-        if(searchStatus) searchStatus.textContent = '正在联网搜索：' + (q || '…');
-        const out = await executeWebSearch(q);
-        out.items.forEach(it=>{ if(it.url && !sources.some(s=>s.url === it.url)) sources.push({ title:String(it.title || '').slice(0, 80), url:it.url }); });
-        resultBlocks.push({ type:'tool_result', tool_use_id:tu.id, content: out.error ? ('搜索没成功（' + out.error + '）。请根据你已有的知识回答糯糯，并坦白这次没搜到。') : JSON.stringify({ items: out.items }) });
+        if(tu.name === 'search_web'){
+          didSearch = true;
+          let q = '';
+          try{ q = String(JSON.parse(tu.json || '{}').query || ''); }catch(e){}
+          if(searchStatus) searchStatus.textContent = '正在联网搜索：' + (q || '…');
+          const out = await executeWebSearch(q);
+          out.items.forEach(it=>{ if(it.url && !sources.some(s=>s.url === it.url)) sources.push({ title:String(it.title || '').slice(0, 80), url:it.url }); });
+          resultBlocks.push({ type:'tool_result', tool_use_id:tu.id, content: out.error ? ('搜索没成功（' + out.error + '）。请根据你已有的知识回答糯糯，并坦白这次没搜到。') : JSON.stringify({ items: out.items }) });
+        } else {
+          let input = {};
+          try{ input = JSON.parse(tu.json || '{}'); }catch(e){}
+          if(searchStatus) searchStatus.textContent = '正在用工具：' + tu.name.replace(/^mcp__/, '').replace('__', ' · ');
+          const text = await executeMcpTool(tu.name, input);
+          resultBlocks.push({ type:'tool_result', tool_use_id:tu.id, content: text });
+        }
       }
-      if(searchStatus) searchStatus.textContent = '联网搜到了 ' + sources.length + ' 条结果，正在整理…';
+      if(searchStatus) searchStatus.textContent = didSearch ? ('联网搜到了 ' + sources.length + ' 条结果，正在整理…') : '工具结果回来了，正在整理…';
       workMsgs.push({ role:'user', content:resultBlocks });
     }
 
