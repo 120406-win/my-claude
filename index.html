@@ -1303,6 +1303,26 @@
           <button onclick="cloudSyncUpload()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">同步到云端</button>
           <button onclick="cloudSyncDownload()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">从云端恢复</button>
         </div>
+        <div class="s-row">
+          <div class="s-row-label">心跳唤醒</div>
+          <select class="s-input" id="hbSel" onchange="setHeartbeatEnabled(this.value)">
+            <option value="on">开（他能自己醒来）</option>
+            <option value="off">关</option>
+          </select>
+        </div>
+        <div class="s-row">
+          <div class="s-row-label">每天最多醒来</div>
+          <select class="s-input" id="hbMaxSel" onchange="setHeartbeatMax(this.value)">
+            <option value="2">2 次</option>
+            <option value="4">4 次</option>
+            <option value="6">6 次</option>
+            <option value="8">8 次</option>
+          </select>
+        </div>
+        <div style="padding:0 16px 4px;">
+          <button onclick="setupHeartbeat()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">把聊天接口存到后端并启用心跳</button>
+        </div>
+        <div id="hbStatus" style="font-size:11.5px;color:var(--text-pale);line-height:1.7;padding:2px 16px 0;"></div>
         <div style="padding:0 16px 4px;">
           <button onclick="showMcpTools()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">看看他能用的 MCP 工具</button>
         </div>
@@ -2695,6 +2715,7 @@ function loadSettings(){
   if(btEl) btEl.value = cfg.backendToken||'';
   const mcpSelEl=document.getElementById('mcpSel');
   if(mcpSelEl) mcpSelEl.value = mcpEnabled() ? 'on' : 'off';
+  refreshHeartbeatStatus();
 
   const ts=document.getElementById('tempSlider');
   ts.value=cfg.temperature; document.getElementById('tempVal').textContent=cfg.temperature;
@@ -4168,6 +4189,90 @@ async function showMcpTools(){
     pack.tools.forEach(t=>{ const e = pack.map[t.name]; const k = e ? e.server : '?'; (byServer[k] = byServer[k] || []).push(e ? e.name : t.name); });
     cloudStatus(Object.keys(byServer).map(k=>k + '：' + byServer[k].length + ' 个工具（' + byServer[k].join('、') + '）').join('；'));
   }catch(e){ cloudStatus(''); showToast('没查到：' + e.message); }
+}
+
+// ══ 心跳唤醒：把聊天接口存到后端，他就能在 App 关着时自己醒来、留话 ══
+async function setupHeartbeat(){
+  try{
+    if(!cfg.apiUrl || !cfg.apiKey) throw new Error('先在上面把聊天接口的地址和 Key 填好');
+    await backendFetch('/relay/config', { base: cfg.apiUrl, model: cfg.model, key: cfg.apiKey });
+    await backendFetch('/heartbeat/settings', { enabled: true });
+    showToast('心跳已启用，他能在你不在时自己醒来了');
+    refreshHeartbeatStatus();
+  }catch(e){ showToast('启用失败：' + e.message); }
+}
+async function setHeartbeatEnabled(v){
+  try{
+    await backendFetch('/heartbeat/settings', { enabled: v === 'on' });
+    showToast(v === 'on' ? '心跳已开' : '心跳已关，他会睡到你下次打开 App');
+  }catch(e){ showToast('没改成：' + e.message); }
+  refreshHeartbeatStatus();
+}
+async function setHeartbeatMax(v){
+  try{
+    await backendFetch('/heartbeat/settings', { maxPerDay: parseInt(v, 10) || 4 });
+    showToast('每天最多醒来 ' + v + ' 次');
+  }catch(e){ showToast('没改成：' + e.message); }
+  refreshHeartbeatStatus();
+}
+async function refreshHeartbeatStatus(){
+  const el = document.getElementById('hbStatus');
+  try{
+    const st = await backendGet('/heartbeat/status');
+    const sel = document.getElementById('hbSel'); if(sel) sel.value = st.settings.enabled ? 'on' : 'off';
+    const mx = document.getElementById('hbMaxSel'); if(mx) mx.value = String(st.settings.maxPerDay || 4);
+    if(el){
+      if(!st.relayConfigured) el.textContent = '还没启用：点上面的按钮，把聊天接口存到后端，他才能醒来。夜里 3 点到 10 点他不会醒。';
+      else{
+        const last = (st.log || [])[0];
+        el.textContent = '今天已醒 ' + (st.wakesToday || 0) + ' 次' + (last ? ('；最近一次 ' + new Date(last.ts).toLocaleTimeString() + '：' + (last.detail || last.decision)) : '；还没有醒来记录') + '。夜里 3 点到 10 点他不会醒。';
+      }
+    }
+  }catch(e){ if(el) el.textContent = ''; }
+}
+
+// ══ 后端三件小事：报到（presence）、自动同步备份、收他的留言。节流 10 分钟，全程静默 ══
+let lastCloudTouchTs = 0;
+async function cloudTouch(){
+  const base = backendBase(), tok = backendTok();
+  if(!base || !tok) return;
+  const now = Date.now();
+  if(now - lastCloudTouchTs < 10 * 60000) return;
+  lastCloudTouchTs = now;
+  try{ await backendFetch('/presence/ping', {}); }catch(e){}
+  try{
+    const collected = await collectBackupData();
+    await backendFetch('/kv/set', { items:{ zephyr_backup: JSON.stringify({ app:collected.app, version:collected.version, exportedAt:collected.exportedAt, data:collected.data, files:collected.files }) } });
+  }catch(e){}
+  try{ await pickupInbox(); }catch(e){}
+}
+async function pickupInbox(){
+  const out = await backendGet('/inbox');
+  const items = out.items || [];
+  if(!items.length) return;
+  const delivered = [];
+  for(const it of items){
+    try{
+      if(it.kind === 'say' && it.text){
+        messages.push({ role:'assistant', content: it.text, mid: genMsgId(), ts: it.ts || Date.now(), fromHeartbeat: true });
+        delivered.push(it.id);
+      } else if(it.kind === 'discovery'){
+        const list = loadDiscoveries();
+        list.push({ id:'d' + Date.now().toString(36) + Math.floor(Math.random()*999), title: String(it.title || '无题').slice(0, 100), text: String(it.text || '').slice(0, 400), url:'', ts: it.ts || Date.now() });
+        if(storeDiscoveries(list)) delivered.push(it.id);
+      } else if(it.kind === 'letter'){
+        const list = loadLetters();
+        list.push({ id:'l' + Date.now().toString(36) + Math.floor(Math.random()*999), from:'zephyr', title: String(it.title || '一封信').slice(0, 100), content: String(it.text || ''), ts: it.ts || Date.now(), read:false, draft:false });
+        if(storeLetters(list)){ delivered.push(it.id); updateLettersBadge(); }
+      }
+    }catch(e){}
+  }
+  if(delivered.length){
+    saveChatHistory();
+    try{ renderMessagesIntoChat(); }catch(e){}
+    showToast('Zephyr 趁你不在时，留了 ' + delivered.length + ' 条东西给你 ~');
+    try{ await backendFetch('/inbox/ack', { ids: delivered }); }catch(e){}
+  }
 }
 
 // ══ Calendar：Zephyr 的历史时间线。里程碑从愿望/信件/日记/重要事件里自动汇集，也可以手动补记 ══
@@ -9426,6 +9531,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     saveChatHistory();
     maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
     maybeUpdateSummary(); // 聊得太长时把旧消息压成摘要，后台进行，不打断聊天
+    cloudTouch(); // 后端三件小事：报到、自动同步、收他留的话（节流 10 分钟，静默）
     updateRegenButton();
     return reply;
   } catch(e){ if(!regen) messages.pop(); showToast('发送失败：'+e.message + (thinkingEnabled() ? '（开着思考模式时若反复失败，可能是模型或接口不支持，去设置里关掉它）' : '')); return null; }
@@ -11224,6 +11330,7 @@ async function askZephyrScheme(){
 // ══ 初始化 ══
 loadSettings();
 convStorePrepare().then(()=>mediaStorePrepare()).then(()=>loadChatHistory()).catch(()=>loadChatHistory());
+setTimeout(()=>{ cloudTouch(); }, 4000); // 打开 App 后悄悄报到、同步、收他留的话
 (function(){
   const v = document.getElementById('cinemaVideo');
   if(!v) return;
