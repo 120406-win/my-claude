@@ -4245,6 +4245,7 @@ async function cloudTouch(){
     await backendFetch('/kv/set', { items:{ zephyr_backup: JSON.stringify({ app:collected.app, version:collected.version, exportedAt:collected.exportedAt, data:collected.data, files:collected.files }) } });
   }catch(e){}
   try{ await pickupInbox(); }catch(e){}
+  try{ await applyWorldState(); }catch(e){}
 }
 async function pickupInbox(){
   const out = await backendGet('/inbox');
@@ -4273,6 +4274,15 @@ async function pickupInbox(){
     showToast('Zephyr 趁你不在时，留了 ' + delivered.length + ' 条东西给你 ~');
     try{ await backendFetch('/inbox/ack', { ids: delivered }); }catch(e){}
   }
+}
+async function applyWorldState(){
+  const out = await backendGet('/world/state');
+  const ws = out.state;
+  if(!ws || !ws.place) return;
+  const w = loadWorld();
+  if(w.serverPlace && (w.serverPlace.ts || 0) >= (ws.ts || 0)) return;
+  w.serverPlace = { place: ws.place, note: ws.note || '', ts: ws.ts || Date.now(), until: ws.until || (Date.now() + 6 * 3600000) };
+  storeWorld(w);
 }
 
 // ══ Calendar：Zephyr 的历史时间线。里程碑从愿望/信件/日记/重要事件里自动汇集，也可以手动补记 ══
@@ -5529,6 +5539,7 @@ function worldPlaceById(id){ return allWorldPlaces().find(p=>p.id===id) || WORLD
 function zephyrWorldPlace(){
   const w = loadWorld();
   if(w.guest && w.guest.until > Date.now()) return w.guest.place;
+  if(w.serverPlace && w.serverPlace.until > Date.now()) return w.serverPlace.place;
   const h = new Date().getHours();
   const day = Math.floor(Date.now() / 86400000);
   const pick = arr => arr[day % arr.length];
@@ -5554,7 +5565,9 @@ function renderWorld(){
   const ww = worldWeather();
   setHomeText('worldMeta', ww.season + '季 · ' + ww.phase + ' · ' + ww.cond);
   const zp = zephyrWorldPlace();
-  setHomeText('worldZephyrAt', 'Zephyr 在' + worldPlaceById(zp).name);
+  const wNow = loadWorld();
+  const spNote = (wNow.serverPlace && wNow.serverPlace.until > Date.now() && wNow.serverPlace.note) ? '（' + wNow.serverPlace.note + '）' : '';
+  setHomeText('worldZephyrAt', 'Zephyr 在' + worldPlaceById(zp).name + spNote);
   const map = document.getElementById('worldMapNodes');
   if(map){
     map.innerHTML = allWorldPlaces().map(p => {
