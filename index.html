@@ -1790,6 +1790,13 @@
           <button onclick="searchOnlineFilms()" style="flex:none;padding:9px 16px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">搜一搜</button>
         </div>
         <div id="filmResults"></div>
+        <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">
+          <div style="display:flex;gap:8px;">
+            <input id="vodQ" type="text" placeholder="全网找片：片名，如：流浪地球" style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;padding:2px 0;">
+            <button onclick="searchVodFilms()" style="flex:none;padding:9px 16px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">全网搜</button>
+          </div>
+          <div id="vodResults"></div>
+        </div>
       </div>
     </div>
     <div class="s-section">
@@ -5231,6 +5238,37 @@ function addOnlineFilm(i, vi){
   if(list.some(w=>w.url === url)){ showToast('这部已经在清单里啦'); return; }
   const sub = got.subs && got.subs[0];
   list.unshift({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), title: fixMojibake(it.title || f.title).slice(0, 120), kind:'电影', by:'lumi', note:'在线 · 互联网档案馆', status:'want', ts:Date.now(), url, subUrl: sub ? archiveFileUrl(it.identifier, sub.name) : '', subName: sub ? sub.name : '' });
+  if(storeWatchlist(list)){ renderWatchlist(); showToast('加进想看啦，去观影室就能看'); }
+}
+// ══ 全网找片：影视资源站经后端中转搜索（源站不开放跨域）；加进想看时存分集与备用源 ══
+let vodItems = [], vodBusy = false;
+async function searchVodFilms(){
+  if(vodBusy) return;
+  const q = document.getElementById('vodQ').value.trim();
+  const box = document.getElementById('vodResults');
+  if(!q){ showToast('先写片名呀 ~'); return; }
+  if(!backendTok()){ showToast('全网找片要先连上云端后端（设置 → 云端后端）'); return; }
+  vodBusy = true;
+  box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:10px 0 2px;">正在全网翻…</div>';
+  try{
+    const out = await backendFetch('/vod/search', { keywords: q });
+    vodItems = (out && out.results) || [];
+    if(!vodItems.length){ box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:10px 0 2px;">没找到，换个片名试试</div>'; return; }
+    box.innerHTML = vodItems.map((it, i)=>'<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px dashed var(--border);">'
+      + '<div style="flex:1;min-width:0;"><div style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">《' + escapeHtml(it.title) + '》</div>'
+      + '<div style="font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml([it.year, it.type, it.remarks, (it.eps && it.eps.length > 1) ? it.eps.length + ' 集' : '', '源：' + it.sourceName].filter(Boolean).join(' · ')) + '</div></div>'
+      + '<button onclick="addVodFilm(' + i + ')" style="flex:none;padding:6px 11px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">加进想看</button></div>').join('');
+  }catch(e){
+    box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:10px 0 2px;">没搜成，待会儿再试 qwq</div>';
+  }finally{ vodBusy = false; }
+}
+function addVodFilm(i){
+  const it = vodItems[i];
+  if(!it || !it.eps || !it.eps.length) return;
+  const list = loadWatchlist();
+  if(list.some(w=>w.title === it.title && w.url === it.eps[0].url)){ showToast('这部已经在清单里啦'); return; }
+  const kind = /动(画|漫)/.test(it.type || '') ? '动画' : (/剧/.test(it.type || '') || it.eps.length > 1) ? '电视剧' : '电影';
+  list.unshift({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), title: String(it.title).slice(0, 120), kind, by:'lumi', note:'在线 · 全网找片（' + it.sourceName + '）', status:'want', ts:Date.now(), url: it.eps[0].url, vodEps: it.eps, vodAlt: it.alts || [], vodSource: it.sourceName });
   if(storeWatchlist(list)){ renderWatchlist(); showToast('加进想看啦，去观影室就能看'); }
 }
 function renderWatchlist(){
@@ -10733,9 +10771,35 @@ function renderCinemaOnlineList(){
   if(!box) return;
   const list = loadWatchlist().filter(w=>w.url && w.status === 'want');
   if(!list.length){ box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:4px 0;">想看清单里还没有在线的片，去 Watchlist 的「在线找片」加几部</div>'; return; }
-  box.innerHTML = list.map(w=>'<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--border);">'
-    + '<div style="flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">《' + escapeHtml(w.title) + '》' + (w.subUrl ? ' <span style="font-size:11px;color:var(--text-pale);">带字幕</span>' : '') + '</div>'
-    + '<button onclick="watchInCinema(\'' + w.id + '\')" style="flex:none;padding:7px 13px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">放这部</button></div>').join('');
+  box.innerHTML = list.map(w=>{
+    let h = '<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--border);">'
+      + '<div style="flex:1;min-width:0;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">《' + escapeHtml(w.title) + '》' + (w.vodEps && w.vodEps.length > 1 ? ' <span style="font-size:11px;color:var(--text-pale);">共 ' + w.vodEps.length + ' 集</span>' : '') + (w.subUrl ? ' <span style="font-size:11px;color:var(--text-pale);">带字幕</span>' : '') + '</div>'
+      + (w.vodAlt && w.vodAlt.length ? '<button onclick="switchVodSource(\'' + w.id + '\')" style="flex:none;padding:7px 11px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">换源</button>' : '')
+      + '<button onclick="watchInCinema(\'' + w.id + '\')" style="flex:none;padding:7px 13px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">放这部</button></div>';
+    if(w.vodEps && w.vodEps.length > 1){
+      h += '<div style="display:flex;gap:6px;flex-wrap:wrap;padding:0 0 8px;">' + w.vodEps.slice(0, 60).map((e, ei)=>'<button onclick="watchInCinemaEp(\'' + w.id + '\',' + ei + ')" style="padding:5px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:11.5px;cursor:pointer;">' + escapeHtml(e.name || ('第' + (ei + 1) + '集')) + '</button>').join('')
+        + (w.vodEps.length > 60 ? '<span style="font-size:11px;color:var(--text-pale);align-self:center;">还有 ' + (w.vodEps.length - 60) + ' 集</span>' : '') + '</div>';
+    }
+    return h;
+  }).join('');
+}
+function watchInCinemaEp(id, idx){
+  const w = loadWatchlist().find(x=>x.id === id);
+  if(!w || !w.vodEps || !w.vodEps[idx]){ showToast('这一集找不到了'); return; }
+  navTo('cinema');
+  openCinemaUrl(w.vodEps[idx].url, w.title + ' · ' + (w.vodEps[idx].name || ''), '');
+}
+function switchVodSource(id){
+  const list = loadWatchlist();
+  const w = list.find(x=>x.id === id);
+  if(!w || !w.vodAlt || !w.vodAlt.length){ showToast('没有备用源了'); return; }
+  const alt = w.vodAlt.shift();
+  w.vodAlt.push({ sourceName: w.vodSource || '原源', eps: w.vodEps || [{ name:'正片', url: w.url }] });
+  w.vodEps = alt.eps;
+  w.url = alt.eps[0].url;
+  w.vodSource = alt.sourceName;
+  w.note = '在线 · 全网找片（' + alt.sourceName + '）';
+  if(storeWatchlist(list)){ renderCinemaOnlineList(); showToast('换成「' + alt.sourceName + '」源了，点放这部试试'); }
 }
 function watchInCinema(id){
   const w = loadWatchlist().find(x=>x.id === id);
