@@ -4,6 +4,14 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>Zephyr</title>
+  <link rel="manifest" href="manifest.webmanifest"/>
+  <meta name="theme-color" content="#0a1030"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Zephyr"/>
+  <link rel="apple-touch-icon" href="icon-180.png"/>
+  <link rel="icon" type="image/png" href="icon-192.png"/>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- 字体异步加载：先渲染页面，字体下好后自动替换，避免 Google 字体慢时白屏 -->
@@ -12025,6 +12033,8 @@ initCallHeartbeatSel();
 initEnZhSel();
 initLock(); // 必须放在初始化区：锁屏状态是后段才声明的 const，提前调用会让整个脚本在启动时崩掉
 refreshWeatherSnapshot(); // 天气快照超过半小时就后台悄悄刷新，让 Zephyr 知道糯糯那边的天气
+// PWA：注册 Service Worker（网络优先，改版刷新即新版；不支持的环境静默跳过）
+if ('serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {} }
 </script>
 </body>
 </html>
