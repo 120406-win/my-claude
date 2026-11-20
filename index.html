@@ -7526,21 +7526,38 @@ function renderMusic(){
     list.appendChild(row);
   });
 }
-async function playTrack(id){
+async function playTrack(id, keepPos){
   const d = loadMusic();
   const t = d.tracks.find(x=>x.id===id);
   if(!t) return;
   if(!hasPlayable(t)){ fillTrackUrl(id); return; }
   const a = musicAudioEl();
   bindMusicAudio();
+  const pos = (keepPos && d.lastId === id) ? (a.currentTime || 0) : 0;
   const src = await resolveTrackSrc(t);
   if(!src){ showToast(t.local ? '这个文件找不到了，可能被浏览器清理了 qwq' : '这首歌的链接取不到 qwq 换个来源试试'); return; }
-  if(t.local || t.gdSource || d.lastId !== id || !a.src) a.src = src;
+  if(t.local || t.gdSource || d.lastId !== id || !a.src){
+    a.src = src;
+    if(pos > 0){
+      const sk = ()=>{ try{ a.currentTime = pos; }catch(e){} };
+      if(a.readyState >= 1) sk(); else a.addEventListener('loadedmetadata', sk, { once:true });
+    }
+  }
   d.lastId = id;
   storeMusic(d);
   a.play().catch(()=>showToast('这首歌放不出来 qwq 换个来源试试'));
   renderMusic();
   if(!t.synced && !t.plain && t.title && !(t.url && t.url.indexOf('somafm.com') >= 0)) fetchLyrics(false);
+}
+// 暂停后继续播放：gd 直链会过期、本地文件地址是一次性的，对着旧地址硬放必然放不出声。
+// 续播统一走这里：易失效的歌先重取新地址、带着暂停时的进度接着放；普通链接先直接续，失败再重载兜底。
+async function resumeMusic(){
+  const a = musicAudioEl(); if(!a) return;
+  bindMusicAudio();
+  const cur = currentTrack(); if(!cur || !a.paused) return;
+  if(cur.gdSource || cur.local || !a.src || a.error){ playTrack(cur.id, true); return; }
+  try{ await a.play(); }
+  catch(e){ try{ a.load(); await a.play(); }catch(_){ playTrack(cur.id, true); } }
 }
 function togglePlay(){
   const a = musicAudioEl();
@@ -7552,11 +7569,8 @@ function togglePlay(){
     else showToast('歌单里还没有能放的歌 ~');
     return;
   }
-  if(a.paused){
-    if(!a.src && cur.gdSource){ playTrack(cur.id); return; }
-    if(!a.src) a.src = cur.url;
-    a.play().catch(()=>showToast('这首歌的链接打不开 qwq'));
-  } else a.pause();
+  if(a.paused) resumeMusic();
+  else a.pause();
 }
 function playStep(step){
   const d = loadMusic();
@@ -9239,9 +9253,7 @@ function zephyrControlMusic(act){
   } else if(act === '继续播放'){
     const cur = currentTrack();
     if(cur && a.paused){
-      // gd 直链会过期、本地文件要重取：这类一律走 playTrack 重新解析地址，别对着旧地址硬放
-      if(cur.gdSource || cur.local || !a.src || loadMusic().lastId !== cur.id) playTrack(cur.id);
-      else a.play().catch(()=>{ try{ playTrack(cur.id); }catch(e){} });
+      resumeMusic();
       showToast('Zephyr 把歌继续放啦');
     }
   } else if(act === '下一首'){ playStep(1); showToast('Zephyr 切了下一首'); }
@@ -10143,7 +10155,7 @@ function toggleSongCard(trackId){
   const d = loadMusic();
   const a = musicAudioEl();
   bindMusicAudio();
-  if(d.lastId === trackId && a && a.src){ if(a.paused) a.play().catch(()=>showToast('这首歌放不出来 qwq')); else a.pause(); }
+  if(d.lastId === trackId && a && a.src){ if(a.paused) resumeMusic(); else a.pause(); }
   else playTrack(trackId);
   setTimeout(updateSongCards, 250);
 }
@@ -12501,7 +12513,7 @@ function parsePulseActions(text, media){
     t = t.replace(m[0], '').trim();
   }
   if(t.includes('[[暂停]]')){ if(media){ try{ media.pause(); }catch(e){} } t = t.replace(/\[\[暂停\]\]/g, '').trim(); }
-  if(t.includes('[[继续]]')){ if(media){ try{ media.play().catch(()=>{}); }catch(e){} } t = t.replace(/\[\[继续\]\]/g, '').trim(); }
+  if(t.includes('[[继续]]')){ if(media){ try{ if(media === musicAudioEl()) resumeMusic(); else media.play().catch(()=>{}); }catch(e){} } t = t.replace(/\[\[继续\]\]/g, '').trim(); }
   return t.slice(0, 300);
 }
 const pulseState = { cinema: { next: 0, busy: false, checks: 0, recId: '' }, music: { next: 0, busy: false, checks: 0, trackId: '' } };
