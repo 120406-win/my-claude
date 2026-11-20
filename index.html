@@ -8149,24 +8149,73 @@ function showStudioPreview(html){
   const nameInput = document.getElementById('studioName');
   if(titleMatch && !nameInput.value) nameInput.value = titleMatch[1].trim();
 }
-async function callStudioModel(userContent, btn, busyText){
+async function studioModelRaw(userContent){
+  const base = (cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/, '');
+  const res = await fetch(base + '/messages', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+    body: JSON.stringify({ model:cfg.model, max_tokens:12000, system:STUDIO_PROMPT, messages:[{role:'user', content:userContent}] })
+  });
+  if(!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  const out = (data.content || []).filter(b=>b.type==='text').map(b=>b.text).join('');
+  if(!out.trim()) throw new Error('empty');
+  return extractHtml(out);
+}
+// 静态完整性检查：不用真跑就能看出的残缺（被截断、标签没闭合）
+function studioStaticErrors(html){
+  const errs = [];
+  const t = String(html || '');
+  if(!/<\/html>\s*$/.test(t)) errs.push('代码不完整：结尾缺少 </html>，像是写到一半被截断了，请写完整并适当控制长度');
+  const open = (t.match(/<script[\s>]/gi) || []).length;
+  const close = (t.match(/<\/script>/gi) || []).length;
+  if(open !== close) errs.push('script 标签没有正确闭合（开始 ' + open + ' 个、结束 ' + close + ' 个），请检查每段脚本都完整结束');
+  return errs;
+}
+// 给试跑副本注入报错探针（只注入测试副本，保存的作品保持干净）
+function studioBuildTestDoc(html, tid){
+  const probe = '<script>(function(){var errs=[];function push(m){var s=String(m||"").slice(0,240);if(s&&errs.length<8&&errs.indexOf(s)<0)errs.push(s);}window.addEventListener("error",function(e){if(e&&(e.message||e.filename))push((e.message||"脚本错误")+(e.lineno?"（第"+e.lineno+"行）":""));},true);window.addEventListener("unhandledrejection",function(e){push("未处理的 Promise 错误："+((e.reason&&e.reason.message)||e.reason||""));});window.addEventListener("load",function(){setTimeout(function(){try{parent.postMessage({type:"zephyr-studio-test",tid:"' + tid + '",errors:errs},"*");}catch(_){}} ,900);});})();<\/script>';
+  if(/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, m => m + probe);
+  if(/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, m => m + '<head>' + probe + '</head>');
+  return '<!DOCTYPE html><html><head>' + probe + '</head><body>' + html + '</body></html>';
+}
+let studioTestSeq = 0;
+// 把作品在隐藏框里真跑一遍，收集加载阶段的报错；超时没回音只算静态检查结果，不冤枉他
+function studioTestHtml(html){
+  return new Promise(resolve => {
+    const stat = studioStaticErrors(html);
+    const tid = 'st' + (++studioTestSeq) + '_' + Date.now().toString(36);
+    const ifr = document.createElement('iframe');
+    ifr.setAttribute('sandbox', 'allow-scripts');
+    ifr.style.display = 'none';
+    let done = false;
+    const finish = errs => { if(done) return; done = true; window.removeEventListener('message', onMsg); try{ ifr.remove(); }catch(e){} resolve(stat.concat(errs || [])); };
+    const onMsg = e => { if(e.source === ifr.contentWindow && e.data && e.data.type === 'zephyr-studio-test' && e.data.tid === tid) finish(Array.isArray(e.data.errors) ? e.data.errors : []); };
+    window.addEventListener('message', onMsg);
+    document.body.appendChild(ifr);
+    ifr.srcdoc = studioBuildTestDoc(html, tid);
+    setTimeout(() => finish([]), 6000);
+  });
+}
+// 统一生产线：写一版 → 试跑验货 → 有报错就把真实报错回传给他自己修（最多两轮）
+async function studioProduce(firstContent, repairContext, btn, firstText){
   if(studioBusy) return null;
   studioBusy = true;
   const oldText = btn.textContent;
-  btn.textContent = busyText;
   btn.disabled = true;
   try{
-    const base = (cfg.apiUrl||'https://api.anthropic.com/v1').replace(/\/$/, '');
-    const res = await fetch(base + '/messages', {
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-api-key':cfg.apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body: JSON.stringify({ model:cfg.model, max_tokens:4000, system:STUDIO_PROMPT, messages:[{role:'user', content:userContent}] })
-    });
-    if(!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    const out = (data.content || []).filter(b=>b.type==='text').map(b=>b.text).join('');
-    if(!out.trim()) throw new Error('empty');
-    return extractHtml(out);
+    btn.textContent = firstText;
+    let html = await studioModelRaw(firstContent);
+    let errs = await studioTestHtml(html);
+    let round = 0;
+    while(errs.length && round < 2){
+      round++;
+      btn.textContent = '试跑发现 ' + errs.length + ' 个报错，他正在自己修（第 ' + round + ' 次）…';
+      const fixPrompt = repairContext + '\n\n这是现在的完整 HTML 代码：\n' + html.slice(0, 30000) + '\n\n这份代码试运行后出现以下报错：\n' + errs.map((e, i) => (i + 1) + '. ' + e).join('\n') + '\n请针对这些报错修复，并输出修复后的完整 HTML。只输出代码本身，不要解释。';
+      html = await studioModelRaw(fixPrompt);
+      errs = await studioTestHtml(html);
+    }
+    return { html, errs };
   }catch(e){
     showToast('没做出来，待会儿再试试 qwq');
     return null;
@@ -8179,22 +8228,22 @@ async function callStudioModel(userContent, btn, busyText){
 async function generateStudio(){
   const prompt = document.getElementById('studioPrompt').value.trim();
   if(!prompt){ showToast('先说说想做什么呀 ~'); return; }
-  const html = await callStudioModel(prompt, document.getElementById('studioGenBtn'), 'Zephyr 正在创作中…');
-  if(html){
+  const r = await studioProduce(prompt, '用户想做的作品是：' + prompt, document.getElementById('studioGenBtn'), 'Zephyr 正在创作中…');
+  if(r){
     studioProjectId = null;
     document.getElementById('studioName').value = '';
-    showStudioPreview(html);
-    showToast('做好啦，看看预览 ~');
+    showStudioPreview(r.html);
+    showToast(r.errs.length ? '做出来了，但试跑还有报错，再让他改改试试' : '做好啦，试跑没报错 ~');
   }
 }
 async function reviseStudio(){
   const instruction = document.getElementById('studioRevise').value.trim();
   if(!instruction || !studioHtml){ showToast('先说说想改哪里 ~'); return; }
-  const html = await callStudioModel('这是现有的 HTML 代码：\n' + studioHtml.slice(0, 20000) + '\n\n请按这个要求修改，并输出修改后的完整 HTML：' + instruction, document.getElementById('studioReviseBtn'), '正在改…');
-  if(html){
-    showStudioPreview(html);
+  const r = await studioProduce('这是现有的 HTML 代码：\n' + studioHtml.slice(0, 20000) + '\n\n请按这个要求修改，并输出修改后的完整 HTML：' + instruction, '用户对这个作品的修改要求是：' + instruction, document.getElementById('studioReviseBtn'), '正在改…');
+  if(r){
+    showStudioPreview(r.html);
     document.getElementById('studioRevise').value = '';
-    showToast('改好啦');
+    showToast(r.errs.length ? '改了一版，但试跑还有报错 qwq' : '改好啦，试跑通过 ~');
   }
 }
 function saveStudioProject(){
