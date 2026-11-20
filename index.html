@@ -1735,17 +1735,10 @@
       <div class="s-section-title">在线找歌</div>
       <div class="s-card" style="padding:14px 16px;">
         <div style="display:flex;gap:8px;">
-          <input id="onlineQ" type="text" placeholder="搜档案馆里的歌，如：邓丽君、贝多芬、jazz" style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;padding:2px 0;">
-          <button onclick="searchOnlineMusic()" style="flex:none;padding:9px 16px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">搜一搜</button>
+          <input id="gdQ" type="text" placeholder="全网找歌：歌名或歌手，如：周杰伦 屋顶" style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;padding:2px 0;">
+          <button onclick="searchGdMusic()" style="flex:none;padding:9px 16px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">全网搜</button>
         </div>
-        <div id="onlineResults"></div>
-        <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">
-          <div style="display:flex;gap:8px;">
-            <input id="gdQ" type="text" placeholder="全网找歌：歌名或歌手，如：周杰伦 屋顶" style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;padding:2px 0;">
-            <button onclick="searchGdMusic()" style="flex:none;padding:9px 16px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">全网搜</button>
-          </div>
-          <div id="gdResults"></div>
-        </div>
+        <div id="gdResults"></div>
       </div>
     </div>
     <button id="recBtn" onclick="askZephyrRecommend()" style="width:100%;padding:13px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:14px;cursor:pointer;margin-bottom:18px;">请 Zephyr 推荐一首歌</button>
@@ -7269,32 +7262,7 @@ function clearLyrics(){
   renderLyrics();
   showToast('歌词清掉啦');
 }
-// ══ 在线找歌：互联网档案馆（archive.org）的音频，能直接放的才列出来 ══
-let onlineBusy = false, onlineItems = [], onlineFilesById = {};
-async function searchOnlineMusic(){
-  if(onlineBusy) return;
-  const q = document.getElementById('onlineQ').value.trim();
-  const box = document.getElementById('onlineResults');
-  if(!q){ showToast('先写想搜什么呀 ~'); return; }
-  onlineBusy = true;
-  box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:10px 0 2px;">正在档案馆里翻…</div>';
-  try{
-    const query = '(title:(' + q + ') OR creator:(' + q + ')) AND mediatype:audio';
-    const url = 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent(query) + '&fl[]=identifier&fl[]=title&fl[]=creator&rows=15&page=1&output=json';
-    const r = await fetch(url);
-    const j = await r.json();
-    onlineItems = (j && j.response && j.response.docs) || [];
-    onlineFilesById = {};
-    if(!onlineItems.length){ box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:10px 0 2px;">没翻到，换个关键词试试（公版和独立音乐比较多）</div>'; return; }
-    box.innerHTML = onlineItems.map((it, i)=>'<div style="border-top:1px solid var(--border);padding:10px 0 2px;">'
-      + '<div style="display:flex;gap:8px;align-items:center;"><div style="flex:1;min-width:0;"><div style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(it.title || it.identifier) + '</div>'
-      + '<div style="font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(it.creator || '') + '</div></div>'
-      + '<button onclick="expandOnlineItem(' + i + ', this)" style="flex:none;padding:7px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;">看曲目</button></div>'
-      + '<div class="online-files"></div></div>').join('');
-  }catch(e){
-    box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:10px 0 2px;">没搜成，待会儿再试 qwq</div>';
-  }finally{ onlineBusy = false; }
-}
+// ══ 乱码修复：档案馆标题的 GBK 乱码还原（在线找片在用）══
 function fixMojibake(s){
   const str = String(s || '');
   if(!str || /\s/.test(str) || /[一-龥]/.test(str)) return str;
@@ -7327,45 +7295,6 @@ function fixMojibake(s){
     }catch(e){}
   }
   return str;
-}
-function pickAudioFiles(files){
-  if(!Array.isArray(files)) return [];
-  const ok = files.filter(f=>f && f.name && /\.(mp3|ogg|m4a|flac|wav)$/i.test(f.name) && !/sample|preview/i.test(f.name));
-  const main = ok.filter(f=>f.source === 'original');
-  return (main.length ? main : ok).slice(0, 12).map(f=>({ name: f.name, title: fixMojibake(String(f.title || f.name.replace(/\.[^.]+$/, '').replace(/_/g, ' '))).slice(0, 120) }));
-}
-async function expandOnlineItem(i, btn){
-  const it = onlineItems[i];
-  if(!it) return;
-  const holder = btn.parentElement.parentElement.querySelector('.online-files');
-  if(!holder) return;
-  if(holder.dataset.done){ holder.style.display = holder.style.display === 'none' ? '' : 'none'; return; }
-  btn.textContent = '取曲目中…';
-  btn.disabled = true;
-  try{
-    const r = await fetch('https://archive.org/metadata/' + encodeURIComponent(it.identifier));
-    const j = await r.json();
-    const files = pickAudioFiles(j && j.files);
-    onlineFilesById[it.identifier] = files;
-    holder.dataset.done = '1';
-    if(!files.length){ holder.innerHTML = '<div style="font-size:12px;color:var(--text-pale);padding:6px 0;">这个条目里没有能直接放的音频文件</div>'; return; }
-    holder.innerHTML = files.map((f, fi)=>'<div style="display:flex;gap:8px;align-items:center;padding:7px 0;border-top:1px dashed var(--border);">'
-      + '<div style="flex:1;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(f.title) + '</div>'
-      + '<button onclick="addOnlineTrack(' + i + ', ' + fi + ')" style="flex:none;padding:6px 11px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">加进歌单</button></div>').join('');
-  }catch(e){
-    holder.innerHTML = '<div style="font-size:12px;color:var(--text-pale);padding:6px 0;">曲目没取到，待会儿再试</div>';
-  }finally{ btn.textContent = '看曲目'; btn.disabled = false; }
-}
-function addOnlineTrack(i, fi){
-  const it = onlineItems[i];
-  if(!it) return;
-  const f = (onlineFilesById[it.identifier] || [])[fi];
-  if(!f) return;
-  const url = 'https://archive.org/download/' + encodeURIComponent(it.identifier) + '/' + f.name.split('/').map(encodeURIComponent).join('/');
-  const d = loadMusic();
-  if(d.tracks.some(t=>t.url === url)){ showToast('这首已经在歌单里啦'); return; }
-  d.tracks.unshift({ id:'t' + Date.now().toString(36) + Math.floor(Math.random()*999), title: f.title, artist: String(it.creator || '').slice(0, 80), url, by:'lumi', ts:Date.now(), notes:[] });
-  if(storeMusic(d)){ renderMusic(); showToast('加进歌单啦，点它就能放'); }
 }
 // ══ 全网找歌：聚合接口（GD Studio）跨网易云/QQ 音乐多源搜索；直链会过期，存源+id，播放时现取 ══
 let gdItems = [], gdBusy = false;
