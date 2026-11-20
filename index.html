@@ -9271,6 +9271,19 @@ function zephyrNoteMusic(text){
   renderMusic();
   showToast('Zephyr 给《' + t.title + '》留了言');
 }
+// 他写的表情包名字未必和库里一模一样：精确 → 包含 → 去掉标点空格后比对 → 按说明找，逐级放宽
+function resolveStickerByName(want){
+  const allSt = loadStickers();
+  if(!want || !allSt.length) return null;
+  const strip = s => String(s || '').replace(/[\s·・、。，！？!?；;：:~～…—\-_=+*#@\/\\|（）()【】\[\]「」『』"'']/g, '').toLowerCase();
+  const w = strip(want);
+  return allSt.find(s=>s.name === want)
+    || allSt.find(s=>s.name && (s.name.includes(want) || want.includes(s.name)))
+    || allSt.find(s=>strip(s.name) && strip(s.name) === w)
+    || allSt.find(s=>strip(s.name) && w && (w.includes(strip(s.name)) || strip(s.name).includes(w)))
+    || allSt.find(s=>s.desc && s.desc.includes(want))
+    || null;
+}
 function processZephyrActions(reply, bubble){
   if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0 && reply.indexOf('[[来电') < 0 && reply.indexOf('[[表情') < 0 && reply.indexOf('[[兴趣') < 0 && reply.indexOf('[[语音') < 0 && reply.indexOf('[[暂停音乐') < 0 && reply.indexOf('[[继续播放') < 0 && reply.indexOf('[[继续') < 0 && reply.indexOf('[[播放') < 0 && reply.indexOf('[[下一首') < 0 && reply.indexOf('[[上一首') < 0 && reply.indexOf('[[切歌') < 0 && reply.indexOf('[[换一首') < 0 && reply.indexOf('[[歌曲留言') < 0)) return reply;
   const found = [];
@@ -9394,9 +9407,13 @@ function processZephyrActions(reply, bubble){
     }
   }
   if(foundSt.length){
-    const allSt = loadStickers();
-    const hitSt = allSt.find(s=>s.name === foundSt[0]) || allSt.find(s=>s.name && (s.name.includes(foundSt[0]) || foundSt[0].includes(s.name)));
+    const hitSt = resolveStickerByName(foundSt[0]);
     if(hitSt) pendingSticker = { name: hitSt.name, img: hitSt.img };
+    else {
+      // 以前这里是静默丢失：只剩一句「（发来一个表情包）」、图没有，她还以为发出去了
+      if(cleaned === '（发来一个表情包）') cleaned = '（想发「' + foundSt[0].slice(0, 20) + '」表情包，但库里没有这张，没发出来）';
+      setTimeout(()=>showToast('他想发的表情包「' + foundSt[0].slice(0, 20) + '」在库里没找到，没发出来'), 350);
+    }
   }
   if(bubble) bubble.textContent = cleaned;
   return cleaned;
