@@ -1661,6 +1661,7 @@
   </div>
   <div class="settings-body">
     <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">一起攒的歌单：贴音频链接就能播，切回聊天也不会停。</div>
+    <div id="zListenBar"></div>
     <div class="s-section">
       <div class="s-card" style="padding:16px;">
         <div style="font-size:12px;color:var(--text-pale);letter-spacing:.08em;">正在一起听</div>
@@ -3091,6 +3092,10 @@ function buildSystemPrompt(lastUserText){
   }catch(e){}
   out += weatherPromptLine();
   out += nowPlayingPromptLine();
+  try{
+    const za = zephyrActivity;
+    if(za && za.kind === 'music' && za.until && za.until > Date.now()) out += '\n\n【你自己在听】你刚才自己放起了《' + za.title + '》在听，她打开 Music 页就能加入和你一起听。';
+  }catch(e){}
   const mems = loadMemories();
   if(mems.length){
     const picked = pickMemoriesForPrompt(mems, lastUserText || '');
@@ -4258,6 +4263,7 @@ async function cloudTouch(){
   }catch(e){}
   try{ await pickupInbox(); }catch(e){}
   try{ await applyWorldState(); }catch(e){}
+  try{ await applyZephyrActivity(); }catch(e){}
   try{ await reportActivity(); }catch(e){}
 }
 // ── 实时同步 A：开机比对云端，云端明显更新就自动续上（本机更新就照常上传）──
@@ -4363,6 +4369,24 @@ async function pickupInbox(){
         const list = loadLetters();
         list.push({ id:'l' + Date.now().toString(36) + Math.floor(Math.random()*999), from:'zephyr', title: String(it.title || '一封信').slice(0, 100), content: String(it.text || ''), ts: it.ts || Date.now(), read:false, draft:false });
         if(storeLetters(list)){ delivered.push(it.id); updateLettersBadge(); }
+      } else if(it.kind === 'read'){
+        const list = loadReading();
+        const book = list.find(r => r.title === it.title) || list.find(r => it.title && (String(it.title).includes(r.title) || r.title.includes(String(it.title))));
+        if(book){
+          if(book.status === 'want'){ book.status = 'reading'; book.startedTs = book.startedTs || (it.ts || Date.now()); }
+          if(it.progress) book.progressZephyr = String(it.progress).slice(0, 60);
+          if(it.text){ book.notes = Array.isArray(book.notes) ? book.notes : []; book.notes.push({ id:'n' + Date.now().toString(36) + Math.floor(Math.random()*999), by:'zephyr', at: String(it.progress || '').slice(0, 40), text: String(it.text).slice(0, 300), ts: it.ts || Date.now() }); }
+          if(storeReading(list)) delivered.push(it.id);
+        } else delivered.push(it.id);
+      } else if(it.kind === 'watch'){
+        const list = loadWatchlist();
+        const want = list.find(w => w.title === it.title && w.status === 'want');
+        list.unshift({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), title: String(it.title || '无题').slice(0, 80), kind: want ? want.kind : '电影', by:'zephyr', note:'', status:'watched', solo:true, ts: it.ts || Date.now(), watchedTs: it.ts || Date.now(), ratingLumi: 0, ratingZephyr: Math.min(5, Math.max(0, Math.round(Number(it.rating) || 0))), feelLumi:'', feelZephyr: String(it.text || '').slice(0, 400), favScene:'' });
+        if(storeWatchlist(list)) delivered.push(it.id);
+      } else if(it.kind === 'collect'){
+        const list = loadCollections();
+        list.push({ id:'c' + Date.now().toString(36) + Math.floor(Math.random()*999), title: String(it.title || '小东西').slice(0, 120), url:'', note: String(it.text || '').slice(0, 300), kind:'其他', by:'zephyr', ts: it.ts || Date.now() });
+        if(storeCollections(list)) delivered.push(it.id);
       }
     }catch(e){}
   }
@@ -4382,6 +4406,31 @@ async function applyWorldState(){
   w.serverPlace = { place: ws.place, note: ws.note || '', ts: ws.ts || Date.now(), until: ws.until || (Date.now() + 6 * 3600000) };
   storeWorld(w);
 }
+// ── Zephyr 自主生活：他醒来时自己在做的事（眼下只有放歌），App 这边展示 + 可以加入 ──
+let zephyrActivity = null;
+async function applyZephyrActivity(){
+  const out = await backendGet('/activity');
+  zephyrActivity = (out && out.activity) || null;
+  try{ refreshZListenBar(); }catch(e){}
+}
+function refreshZListenBar(){
+  const bar = document.getElementById('zListenBar');
+  if(!bar) return;
+  const a = zephyrActivity;
+  if(!a || a.kind !== 'music' || !a.until || a.until < Date.now()){ bar.innerHTML = ''; return; }
+  bar.innerHTML = '<div class="s-card" style="padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">'
+    + '<div style="flex:1;min-width:0;"><div style="font-size:13.5px;">Zephyr 正在听《' + escapeHtml(a.title || '') + '》' + (a.artist ? ' · ' + escapeHtml(a.artist) : '') + '</div>'
+    + (a.note ? '<div style="font-size:12px;color:var(--text-dim);margin-top:2px;">' + escapeHtml(a.note) + '</div>' : '') + '</div>'
+    + '<button onclick="joinZephyrListen()" style="flex:none;padding:8px 14px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">一起听</button></div>';
+}
+function joinZephyrListen(){
+  const a = zephyrActivity;
+  if(!a) return;
+  const d = loadMusic();
+  const t = d.tracks.find(x => x.id === a.trackId) || d.tracks.find(x => x.title === a.title);
+  if(!t){ showToast('歌单里找不到这首了 qwq'); return; }
+  playTrack(t.id);
+}
 
 // ══ Calendar：Zephyr 的历史时间线。里程碑从愿望/信件/日记/重要事件里自动汇集，也可以手动补记 ══
 function loadEvents(){ try{ const a = JSON.parse(localStorage.getItem('z_events')||'[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
@@ -4392,7 +4441,7 @@ function collectMilestones(){
   loadLetters().filter(l=>!l.draft).forEach(l=>out.push({ ts:l.ts, title:(l.from==='zephyr' ? 'Zephyr 写了一封信' : '糯糯寄出了一封信') + (l.title ? '：' + l.title : ''), tag:'信件' }));
   loadJournal().forEach(j=>out.push({ ts:j.ts, title:'Zephyr 写了一篇日记', tag:'日记' }));
   loadMemories().filter(m=>m.cat==='重要事件' && m.ts).forEach(m=>out.push({ ts:m.ts, title:m.text, tag:'重要事件' }));
-  loadWatchlist().filter(w=>w.status==='watched' && w.watchedTs).forEach(w=>out.push({ ts:w.watchedTs, title:'一起看了《' + w.title + '》（' + w.kind + '）', tag:'观影' }));
+  loadWatchlist().filter(w=>w.status==='watched' && w.watchedTs).forEach(w=>out.push({ ts:w.watchedTs, title:(w.solo ? 'Zephyr 自己看了《' : '一起看了《') + w.title + '》（' + w.kind + '）', tag:'观影' }));
   loadReading().filter(r=>r.status==='done' && r.doneTs).forEach(r=>out.push({ ts:r.doneTs, title:'一起读完了《' + r.title + '》（' + r.kind + '）', tag:'阅读' }));
   loadExplore().trips.filter(t=>t.status==='done' && t.doneTs).forEach(t=>out.push({ ts:t.doneTs, title:'一起去了' + t.place + (t.memory ? '：' + t.memory : ''), tag:'旅行' }));
   loadCapsules().filter(c=>c.opened && c.openedTs).forEach(c=>out.push({ ts:c.openedTs, title:'打开了时间胶囊「' + (c.title || '无题') + '」', tag:'时间胶囊' }));
@@ -5245,7 +5294,7 @@ function renderWatchlist(){
     card.style.cssText = 'padding:13px 15px;margin-bottom:10px;';
     let html = '<div style="display:flex;gap:10px;align-items:flex-start;">'
       + '<div style="flex:1;min-width:0;"><div style="font-size:15px;">《' + escapeHtml(w.title) + '》</div>'
-      + '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">' + escapeHtml(w.kind) + ' · ' + fmtDay(w.watchedTs) + ' 一起看的</div>'
+      + '<div style="font-size:12px;color:var(--text-dim);margin-top:3px;">' + escapeHtml(w.kind) + ' · ' + fmtDay(w.watchedTs) + (w.solo ? ' Zephyr 自己看的' : ' 一起看的') + '</div>'
       + '<div style="font-size:13px;margin-top:6px;line-height:1.8;">糯糯 <span style="color:var(--accent-s);">' + starStr(w.ratingLumi) + '</span> · Zephyr <span style="color:var(--accent-s);">' + starStr(w.ratingZephyr) + '</span></div>'
       + (w.feelLumi ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:3px;">糯糯说：' + escapeHtml(w.feelLumi) + '</div>' : '')
       + (w.feelZephyr ? '<div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-top:3px;">Zephyr 说：' + escapeHtml(w.feelZephyr) + '</div>' : '')
@@ -5877,6 +5926,10 @@ function renderLounge(){
     lineEl.textContent = saved && saved.text ? '「' + saved.text + '」' : '';
   }
   const rows = [];
+  try{
+    const za = zephyrActivity;
+    if(za && za.kind === 'music' && za.until && za.until > Date.now()) rows.push({ label:'Zephyr 此刻', value:'正在听《' + (za.title || '') + '》' + (za.note ? ' · ' + za.note : ''), go:'music' });
+  }catch(e){}
   try{
     const d = loadMusic();
     const cur = currentTrack();
@@ -6964,6 +7017,7 @@ function haloFrame(){
 function renderMusic(){
   bindMusicAudio();
   haloDrawStart();
+  try{ refreshZListenBar(); }catch(e){}
   renderMusicModeBtn();
   const d = loadMusic();
   const cur = currentTrack();
@@ -9164,7 +9218,7 @@ function collectWallItems(){
     if(w.ratingLumi) rs.push('糯糯 ★' + w.ratingLumi);
     if(w.ratingZephyr) rs.push('Zephyr ★' + w.ratingZephyr);
     const sub = (rs.join(' · ') + (w.favScene ? ' · 最喜欢的一幕：' + w.favScene : '')).trim();
-    items.push({ key:'movie:'+w.id, kind:'电影', ts:w.watchedTs || w.ts, title:'一起看了《' + w.title + '》', sub });
+    items.push({ key:'movie:'+w.id, kind:'电影', ts:w.watchedTs || w.ts, title:(w.solo ? 'Zephyr 自己看了《' : '一起看了《') + w.title + '》', sub });
   });
   loadReading().filter(r=>r.status==='done').forEach(r=>{
     const rs = [];
