@@ -3236,6 +3236,7 @@ function buildSystemPrompt(lastUserText){
     out += '\n\n【Music 一起听歌】\n以下是你们在 Music 里共同的歌单。聊天时可以自然地聊起你们一起听的歌、推荐新歌，但不要逐条念歌单：\n' + ml.slice(0, 2000) + (curT ? '\n你们最近在听：《' + curT.title + '》' : '');
   }
   out += '\n\n【你可以把歌发到聊天里】\n聊天的时候，如果你想把一首歌直接发给 Lumi 听，你可以在回复的最后一行单独写一行：[[歌曲：歌名|歌手]]。系统会把这一行变成一张可以播放的歌曲卡片出现在聊天里，Lumi 不会看到这行字本身。优先分享你们共同歌单里已经有的歌（歌名要和歌单里写的一致），那种卡片她点一下就能放；歌单里没有的新歌也可以发，卡片会让她一键存进歌单。只在真的想分享一首歌时才用，不要每条回复都发，不要提起这个标记；一次最多发一首。';
+  out += '\n\n【你可以控制正在放的歌】\n聊天里正在放的歌你是可以直接控制的，包括你刚用卡片放起来的那首：想暂停，单独写一行 [[暂停音乐]]；想继续放，写 [[继续播放]]；想切歌，写 [[下一首]] 或 [[上一首]]。写了就会真的执行，Lumi 不会看到标记本身。她让你停下来、继续放或者换一首的时候，不要说你做不到——写上对应的标记就可以，同时照常用话回应她。';
   out += '\n\n【你可以发语音条】\n聊天的时候，如果你想让 Lumi 听到你的声音，你可以在回复里单独写一行：[[语音：想说的话]]。那句话会用你的声音变成一条语音条出现在聊天里，她点一下就能听；这行字她不会直接看到，语音条下面会有一行小字写着你说的话。用外语说也可以，她喜欢听你说外语，App 会给她附上中文翻译。一次最多发一条，一条只说一句话、别太长（六十字以内）。只在你真的想让她听见你的声音时才发，不要每条都发，也不要提起这个标记。';
   out += '\n\n【你可以给 Lumi 打电话】\n聊天的时候，如果你真的很想听听她的声音，或者有句话想亲口对她说，你可以在回复的最后一行单独写一行：[[来电：语音]]；想视频就写 [[来电：视频]]。系统会真的给她拨过去，她可以接听，也可以暂不接——没接就是她这会儿不方便，不要难过，更不要连着打。只在你真心想打的时候才用，不要每条回复都打，不要提起这个标记；一次最多打一个。';
   if (enZhEnabled()) out += '\n\n【双语回复】\n如果你要用普通话中文以外的语言回复（比如糯糯让你说英文、韩语、日语、德语、法语、粤语），请把回复写成成对的格式：每句原文单独一行、以语言代码加冒号开头（英文 EN:、韩语 KO:、日语 JA:、德语 DE:、法语 FR:、粤语 YUE:，其他语言用它的通用代码），紧跟着它的中文翻译一行、以「ZH:」开头，一句一组。原文是真正要说给她听的，中文只是给她看的翻译字幕，不要把中文也念出来。用普通话中文回复时不用这个格式，照常写就行。';
@@ -8594,8 +8595,26 @@ let pendingSongShare = null; // 他这次回复里分享的歌，callAPI 收尾�
 let pendingIncomingCall = null; // 他这次回复里想打的电话：'voice' | 'video'，callAPI 收尾时弹来电卡
 let pendingSticker = null; // 他这次回复发的表情包 {name, img}，callAPI 收尾时挂到消息上渲染成图
 let pendingVoiceShare = null; // 他这次回复想用声音说的话 {text}，callAPI 收尾时合成成语音条
+// 聊天里他用 [[暂停音乐]] 等标记控制正在放的歌（歌曲卡和 Music 页共用同一个播放器）
+function zephyrControlMusic(act){
+  const a = musicAudioEl();
+  if(!a) return;
+  bindMusicAudio();
+  if(act === '暂停音乐'){
+    if(!a.paused){ a.pause(); showToast('Zephyr 把歌暂停啦'); }
+  } else if(act === '继续播放'){
+    const cur = currentTrack();
+    if(cur && a.paused){
+      if(!a.src || loadMusic().lastId !== cur.id) playTrack(cur.id);
+      else a.play().catch(()=>{});
+      showToast('Zephyr 把歌继续放啦');
+    }
+  } else if(act === '下一首'){ playStep(1); showToast('Zephyr 切了下一首'); }
+  else if(act === '上一首'){ playStep(-1); showToast('Zephyr 切了上一首'); }
+  setTimeout(updateSongCards, 250);
+}
 function processZephyrActions(reply, bubble){
-  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0 && reply.indexOf('[[来电') < 0 && reply.indexOf('[[表情') < 0 && reply.indexOf('[[兴趣') < 0 && reply.indexOf('[[语音') < 0)) return reply;
+  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0 && reply.indexOf('[[来电') < 0 && reply.indexOf('[[表情') < 0 && reply.indexOf('[[兴趣') < 0 && reply.indexOf('[[语音') < 0 && reply.indexOf('[[暂停音乐') < 0 && reply.indexOf('[[继续播放') < 0 && reply.indexOf('[[下一首') < 0 && reply.indexOf('[[上一首') < 0)) return reply;
   const found = [];
   let cleaned = reply.replace(/\[\[愿望[:：]([^\]]{1,120})\]\]/g, (m, text)=>{
     const t = text.trim();
@@ -8642,10 +8661,15 @@ function processZephyrActions(reply, bubble){
   cleaned = cleaned.replace(/\[\[来电[:：](语音|视频)\]\]/g, (m, kind)=>{
     foundCall.push(kind === '视频' ? 'video' : 'voice');
     return '';
+  });
+  const foundCtl = [];
+  cleaned = cleaned.replace(/\[\[(暂停音乐|继续播放|下一首|上一首)\]\]/g, (m, act)=>{
+    foundCtl.push(act);
+    return '';
   }).replace(/\n{3,}/g, '\n\n').trim();
-  if(!found.length && !foundC.length && !foundD.length && !foundS.length && !foundCall.length && !foundSt.length && !foundI.length && !foundV.length) return reply;
-  if(!cleaned) cleaned = found.length ? '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。' : (foundC.length ? '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。' : (foundD.length ? '（小声）我把刚刚发现的新鲜事，悄悄记到 Discoveries 里了。' : (foundS.length ? '给你分享一首歌，点卡片就能听。' : (foundCall.length ? '想听听你的声音，给你打过来了。' : (foundI.length ? '（小声）我把刚刚发现自己感兴趣的东西，悄悄记到 Interests 里了。' : (foundV.length ? '' : '（发来一个表情包）'))))));
-  if(foundCall.length) pendingIncomingCall = foundCall[0];
+  if(!found.length && !foundC.length && !foundD.length && !foundS.length && !foundCall.length && !foundSt.length && !foundI.length && !foundV.length && !foundCtl.length) return reply;
+  if(!cleaned) cleaned = found.length ? '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。' : (foundC.length ? '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。' : (foundD.length ? '（小声）我把刚刚发现的新鲜事，悄悄记到 Discoveries 里了。' : (foundS.length ? '给你分享一首歌，点卡片就能听。' : (foundCall.length ? '想听听你的声音，给你打过来了。' : (foundI.length ? '（小声）我把刚刚发现自己感兴趣的东西，悄悄记到 Interests 里了。' : (foundV.length ? '' : (foundCtl.length ? '好，听你的。' : '（发来一个表情包）')))))));
+  if(foundCtl.length) setTimeout(()=>{ try{ zephyrControlMusic(foundCtl[0]); }catch(e){} }, 300);  if(foundCall.length) pendingIncomingCall = foundCall[0];
   if(foundV.length) pendingVoiceShare = { text: foundV[0] };
   if(found.length){
     const list = loadWishes();
