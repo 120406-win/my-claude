@@ -4112,7 +4112,30 @@ async function exportData(){
 async function applyBackupObject(obj, opts){
   if(!obj || obj.app !== 'zephyr' || !obj.data || typeof obj.data !== 'object') throw new Error('这不是 Zephyr 的备份');
   if(!(opts && opts.silent) && !confirm('导入会用备份覆盖当前全部数据（对话、记忆、日记、愿望、信件、设置），确定继续吗？')) return false;
-  Object.keys(obj.data).forEach(k=>{ if(k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey' && k !== 'z_bochaKey' && k !== 'z_backendToken') localStorage.setItem(k, obj.data[k]); });
+  // 大块数据（对话/相册/表情包/胶囊）直接写进 IndexedDB 大仓库，绝不能塞 localStorage：
+  // localStorage 总共只有约 5MB，光对话就 3MB，全塞进去必然报「The quota has been exceeded」
+  // 让整次恢复失败（2026-11-20 她在栖 PWA 里恢复时实测踩中）。其余小键逐个写，
+  // 单个写不下就跳过并记下来，别让一颗坏键毁掉整次恢复。
+  const BIG_NAMES = { z_conversations: '对话', z_gallery: '相册', z_stickers: '表情包', z_capsules: '时间胶囊' };
+  const skippedKeys = [];
+  for(const k of Object.keys(obj.data)){
+    if(!k.startsWith('z_') || k === 'z_apiKey' || k === 'z_searchKey' || k === 'z_bochaKey' || k === 'z_backendToken') continue;
+    const v = obj.data[k];
+    if(typeof v !== 'string') continue;
+    if(k === 'z_conversations' || MEDIA_KEYS.includes(k)){
+      if(convDb){
+        const ok = await convIdbPut(k, v);
+        if(ok){
+          if(k === 'z_conversations') convSnapshot = v; else mediaSnapshot[k] = v;
+          try{ localStorage.removeItem(k); }catch(e){}
+        } else skippedKeys.push(BIG_NAMES[k] || k);
+      } else {
+        try{ localStorage.setItem(k, v); }catch(e){ skippedKeys.push(BIG_NAMES[k] || k); }
+      }
+      continue;
+    }
+    try{ localStorage.setItem(k, v); }catch(e){ skippedKeys.push(k); }
+  }
   // 备份里带了本地书籍/歌曲文件的话，一并恢复进各自的 IndexedDB（旧备份没有这部分，跳过即可）
   if(obj.files){
     try{
@@ -4132,7 +4155,7 @@ async function applyBackupObject(obj, opts){
     }catch(e){}
   }
   if(opts && opts.cloudTs){ try{ localStorage.setItem('z_cloudMeta', JSON.stringify({ up: opts.cloudTs, down: opts.cloudTs })); }catch(e){} }
-  showToast('恢复完成，正在刷新 ~');
+  showToast(skippedKeys.length ? ('恢复完成，但这些没写进去：' + skippedKeys.join('、') + '，正在刷新 ~') : '恢复完成，正在刷新 ~');
   setTimeout(()=>location.reload(), 600);
   return true;
 }
