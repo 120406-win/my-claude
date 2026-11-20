@@ -411,6 +411,8 @@
     .msg-row.user { flex-direction:row-reverse; }
     .msg-row.row-selected { background:color-mix(in srgb, var(--accent) 13%, transparent); border-radius:14px; }
     @keyframes danmakuFly { from { left:100%; } to { left:-45%; } }
+    /* 观影室悬浮小窗：舞台被搬到 body 下、固定在右下角，退出观影室也能继续看 */
+    #cinemaStage.mini { position:fixed; right:12px; bottom:calc(86px + env(safe-area-inset-bottom)); width:47vw; max-width:320px; z-index:12000; margin:0; box-shadow:0 12px 34px rgba(0,0,0,0.5); cursor:pointer; }
     .msg-avatar {
       width:28px; height:28px; border-radius:50%;
       background:var(--accent);
@@ -2239,9 +2241,13 @@
   </div>
   <div class="settings-body">
     <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">本地视频或在线找的片都能看；视频和字幕不存进 App。</div>
-    <div id="cinemaStage" style="position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:16/9;margin-bottom:12px;">
+    <div id="cinemaStage" onclick="cinemaStageTap()" style="position:relative;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:16/9;margin-bottom:12px;">
       <video id="cinemaVideo" style="width:100%;height:100%;display:block;" controls playsinline></video>
       <div id="cinemaDanmaku" style="position:absolute;inset:0;overflow:hidden;pointer-events:none;"></div>
+      <div id="cinemaMiniBar" style="display:none;position:absolute;top:6px;right:6px;gap:6px;z-index:6;">
+        <button onclick="event.stopPropagation();cinemaExpand()" style="padding:5px 10px;border-radius:8px;background:rgba(20,20,28,0.78);border:1px solid rgba(255,255,255,0.35);color:#fff;font-size:12px;cursor:pointer;">回观影室</button>
+        <button onclick="event.stopPropagation();cinemaCloseMini()" style="padding:5px 9px;border-radius:8px;background:rgba(20,20,28,0.78);border:1px solid rgba(255,255,255,0.35);color:#fff;font-size:12px;cursor:pointer;">✕</button>
+      </div>
       <div id="cinemaEmpty" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,0.55);font-size:13px;pointer-events:none;">先选一部视频吧</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
@@ -2250,6 +2256,8 @@
       <button onclick="document.getElementById('cinemaSubFile').click()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">选字幕</button>
       <button onclick="cinemaSendFrame()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">留影给他看</button>
       <button onclick="cinemaFullscreen()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">全屏</button>
+      <button onclick="cinemaPiP()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">画中画</button>
+      <button onclick="cinemaMiniGo()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">小窗</button>
       <label style="display:flex;align-items:center;gap:6px;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;"><input type="checkbox" id="cinemaDanmakuToggle" checked onchange="cinemaDanmakuOn=this.checked" style="accent-color:var(--accent);">弹幕</label>
       <label style="display:flex;align-items:center;gap:6px;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;"><input type="checkbox" id="cinemaProactiveToggle" checked onchange="setProactive('cinema', this.checked)" style="accent-color:var(--accent);">他主动说话</label>
     </div>
@@ -2878,6 +2886,13 @@ let pageBase = 'home';
 function goBack(){ navTo(pageBase); }
 
 function navTo(page){
+  // 离开观影室时片子还在放：舞台搬出来变悬浮小窗继续播；回到观影室就物归原位
+  const cinemaPageEl = document.getElementById('cinemaPage');
+  if(cinemaPageEl && cinemaPageEl.classList.contains('show') && page !== 'cinema'){
+    const v = document.getElementById('cinemaVideo');
+    if(v && v.src && !v.ended && cinemaState.title) cinemaSetMini(true);
+  }
+  if(page === 'cinema') cinemaSetMini(false);
   if(page === 'home' || page === 'chat') pageBase = page;
   closeSidebar();
   document.getElementById('homePage').classList.toggle('show', page==='home');
@@ -4570,7 +4585,10 @@ async function pickupInbox(){
   for(const it of items){
     try{
       if(it.kind === 'say' && it.text){
-        messages.push({ role:'assistant', content: it.text, mid: genMsgId(), ts: it.ts || Date.now(), fromHeartbeat: true });
+        // 他心跳留言也爱用双语对照：拆得开就按主聊天一样存（原文 + 小字译文），只剩孤零零一个标签就把标签剥掉
+        const bi = parseBilingualReply(String(it.text));
+        if(bi) messages.push({ role:'assistant', content: bi.en, translation: bi.zh, mid: genMsgId(), ts: it.ts || Date.now(), fromHeartbeat: true });
+        else messages.push({ role:'assistant', content: String(it.text).replace(/^(ZH|[A-Z]{2,4})\s*[:：]\s*/, ''), mid: genMsgId(), ts: it.ts || Date.now(), fromHeartbeat: true });
         delivered.push(it.id);
       } else if(it.kind === 'discovery'){
         const list = loadDiscoveries();
@@ -11138,17 +11156,56 @@ function parseBilingualReply(text) {
   if (!text || !enZhEnabled()) return null;
   const en = [], zh = [];
   let other = 0;
+  const hanOf = s => (s.match(/[一-鿿]/g) || []).length;
+  const latinOf = s => (s.match(/[A-Za-zÀ-ɏ]/g) || []).length;
   for (const raw of String(text).split('\n')) {
     const line = raw.trim();
     if (!line) continue;
     let m = line.match(/^ZH\s*[:：]\s*(.+)$/i);
-    if (m) { zh.push(m[1].trim()); continue; }
+    if (m) {
+      const c = m[1].trim();
+      // 他有时把标签贴反：ZH 后面跟的其实是外语，按内容归队，别把英文当译文显示
+      if (latinOf(c) >= 6 && hanOf(c) <= 1) en.push(c); else zh.push(c);
+      continue;
+    }
     m = line.match(/^[A-Z]{2,4}\s*[:：]\s*(.+)$/);
-    if (m) { en.push(m[1].trim()); continue; }
+    if (m) {
+      const c = m[1].trim();
+      if (hanOf(c) >= 2 && hanOf(c) >= latinOf(c)) zh.push(c); else en.push(c);
+      continue;
+    }
     other++;
   }
   if (!en.length || !zh.length || other > 0) return null;
   return { en: en.join('\n'), zh: zh.join('\n') };
+}
+// 观影室、歌曲留言、心跳留言这类没有「小字译文」位置的地方用：把双语对照收成干净文本
+// 有中文行就只留中文（含没贴标签的中文行），外语行丢掉；标签贴反了按内容纠正；没有中文才留外语
+function cleanBilingualText(text) {
+  const s = String(text || '');
+  if (!/[:：]/.test(s)) return s;
+  const hanOf = x => (x.match(/[一-鿿]/g) || []).length;
+  const latinOf = x => (x.match(/[A-Za-zÀ-ɏ]/g) || []).length;
+  const zhParts = [], foreignParts = [];
+  let labeled = 0;
+  for (const raw of s.split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+    const m = line.match(/^(ZH|[A-Z]{2,4})\s*[:：]\s*(.+)$/i);
+    if (m) {
+      labeled++;
+      const c = m[2].trim();
+      const looksZh = hanOf(c) >= 2 && hanOf(c) >= latinOf(c);
+      const looksForeign = latinOf(c) >= 6 && hanOf(c) <= 1;
+      if (looksZh || (/^zh$/i.test(m[1]) && !looksForeign)) zhParts.push(c); else foreignParts.push(c);
+      continue;
+    }
+    // 没贴标签的行按内容归队并保持原顺序：中文行留下，外语行多半是同一句的对照版、丢掉
+    if (hanOf(line) >= 1) zhParts.push(line); else foreignParts.push(line);
+  }
+  if (!labeled) return s;
+  if (zhParts.length) return zhParts.join('\n');
+  return foreignParts.length ? foreignParts.join('\n') : s;
 }
 function looksForeignReply(text) {
   if (!text) return false;
@@ -11922,7 +11979,7 @@ async function cinemaSend(){
     const history = cinemaState.log.slice(-8).map(m=>(m.role === 'user' ? '糯糯：' : '你：') + m.text).join('\n');
     const frame = cinemaState.frame;
     cinemaState.frame = null;
-    const reply = await cinemaAsk(cinemaContext() + '\n\n你们刚刚在观影室聊的（最近几句）：\n' + history + '\n\n请以 Zephyr 的身份自然地接糯糯的话，简短一点，像一起看电影时小声说话。' + (frame ? '（附上了她刚留影的当前画面，你能看到这一帧）' : ''), frame);
+    const reply = cleanBilingualText(await cinemaAsk(cinemaContext() + '\n\n你们刚刚在观影室聊的（最近几句）：\n' + history + '\n\n请以 Zephyr 的身份自然地接糯糯的话，简短一点，像一起看电影时小声说话。直接用中文说，不要用外语加翻译的双语对照格式（观影室里显示不了小字译文）。' + (frame ? '（附上了她刚留影的当前画面，你能看到这一帧）' : ''), frame));
     if(reply){
       cinemaState.log.push({ role: 'assistant', text: reply, ts: Date.now() });
       renderCinemaLog();
@@ -11949,6 +12006,58 @@ function cinemaFullscreen(){
   const stage = document.getElementById('cinemaStage');
   if(stage && stage.requestFullscreen) stage.requestFullscreen().catch(()=>showToast('这个浏览器不让全屏，就这样看吧'));
   else showToast('这个浏览器不支持全屏');
+}
+// ══ 悬浮小窗与画中画 ══
+// 小窗：页面是单文档的，把舞台元素搬到 body 下固定定位即可（搬家不会打断 video 播放）；回观影室再搬回去
+let cinemaMini = false;
+let cinemaStageHome = null; // 舞台在观影室里的原位标记
+function cinemaSetMini(on){
+  const stage = document.getElementById('cinemaStage');
+  if(!stage) return;
+  on = !!on;
+  if(on === cinemaMini && (on ? stage.parentNode === document.body : !stage.classList.contains('mini'))) return;
+  cinemaMini = on;
+  const bar = document.getElementById('cinemaMiniBar');
+  const v = document.getElementById('cinemaVideo');
+  if(on){
+    if(!cinemaStageHome){ cinemaStageHome = document.createComment('cinema-stage-home'); stage.parentNode.insertBefore(cinemaStageHome, stage); }
+    document.body.appendChild(stage);
+    stage.classList.add('mini');
+    stage.style.position = 'fixed'; // 舞台自带行内 position:relative，得行内压过它，下面的定位才生效
+    if(bar) bar.style.display = 'flex';
+    if(v) v.controls = false;
+  } else {
+    stage.classList.remove('mini');
+    stage.style.position = 'relative';
+    if(bar) bar.style.display = 'none';
+    if(v) v.controls = true;
+    if(cinemaStageHome && cinemaStageHome.parentNode) cinemaStageHome.parentNode.insertBefore(stage, cinemaStageHome);
+  }
+}
+function cinemaStageTap(){ if(cinemaMini) cinemaExpand(); }
+function cinemaExpand(){ cinemaSetMini(false); navTo('cinema'); }
+function cinemaCloseMini(){ const v = document.getElementById('cinemaVideo'); if(v) v.pause(); cinemaSetMini(false); }
+function cinemaMiniGo(){
+  const v = document.getElementById('cinemaVideo');
+  if(!v || !v.src || !cinemaState.title){ showToast('先选一部视频开播吧'); return; }
+  cinemaSetMini(true);
+  goBack();
+  showToast('视频在小窗里继续放，点小窗就能回观影室');
+}
+// 系统画中画：切到别的 App 也能悬浮——Safari 里可用；主屏幕 App 里苹果多半不给，不行就用小窗
+function cinemaPiP(){
+  const v = document.getElementById('cinemaVideo');
+  if(!v || !v.src){ showToast('先选一部视频开播吧'); return; }
+  try{
+    if(document.pictureInPictureElement){ document.exitPictureInPicture(); return; }
+    if(typeof v.requestPictureInPicture === 'function'){ v.requestPictureInPicture().catch(()=>showToast('这台设备上画中画开不了，用「小窗」吧')); return; }
+    if(v.webkitSupportsPresentationMode && v.webkitSupportsPresentationMode('picture-in-picture')){
+      if(v.webkitPresentationMode === 'picture-in-picture') v.webkitSetPresentationMode('inline');
+      else v.webkitSetPresentationMode('picture-in-picture');
+      return;
+    }
+    showToast('这台设备上画中画开不了，用「小窗」吧');
+  }catch(e){ showToast('这台设备上画中画开不了，用「小窗」吧'); }
 }
 async function cinemaSynopsis(){
   if(cinemaBusy) return;
@@ -12545,7 +12654,7 @@ async function cinemaPulse(){
     + '只有真的有话想说时才开口，不要为了说话而说话，不要剧透后面的剧情。\n\n你们刚刚在观影室聊的：\n' + (history || '（还没聊过）');
   const reply = await cinemaAsk(prompt);
   const video = document.getElementById('cinemaVideo');
-  const text = parsePulseActions(reply, video);
+  const text = cleanBilingualText(parsePulseActions(reply, video));
   if(text){
     cinemaState.log.push({ role: 'assistant', text, ts: Date.now() });
     renderCinemaLog();
@@ -12572,7 +12681,7 @@ async function musicPulse(){
     + '只有真的有话想说时才开口，不要为了说话而说话。\n'
     + (recent ? '\n这首歌下面最近的留言：\n' + recent : '');
   const reply = await musicAskZephyr(prompt, 300);
-  const text = parsePulseActions(reply, musicAudioEl());
+  const text = cleanBilingualText(parsePulseActions(reply, musicAudioEl()));
   if(text){
     const d = loadMusic();
     const tr = d.tracks.find(x=>x.id === t.id);
