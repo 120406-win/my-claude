@@ -392,6 +392,12 @@
     .conv-title { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .conv-del { background:none; border:none; color:var(--text-pale); font-size:13px; cursor:pointer; padding:2px 4px; flex-shrink:0; }
     .conv-del:hover { color:#ef9999; }
+    .conv-menu-btn { background:none; border:none; color:var(--text-pale); font-size:15px; cursor:pointer; padding:2px 6px; flex-shrink:0; line-height:1; }
+    .conv-pin-tag { font-size:10px; color:var(--accent-s); border:1px solid var(--border); border-radius:999px; padding:1px 6px; margin-right:6px; flex-shrink:0; }
+    #convMenu { position:fixed; z-index:9999; background:var(--surface); border:1px solid var(--border); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.18); padding:6px; min-width:132px; }
+    #convMenu button { display:block; width:100%; text-align:left; background:none; border:none; padding:9px 10px; font-size:13px; color:var(--text); cursor:pointer; border-radius:8px; font-family:inherit; }
+    #convMenu button:hover { background:var(--bg); }
+    .conv-rename-input { flex:1; background:var(--bg); border:1px solid var(--accent); border-radius:8px; padding:5px 8px; font-size:14px; color:var(--text); outline:none; font-family:inherit; min-width:0; }
 
     /* ══════════════════════════
        CHAT
@@ -1751,6 +1757,16 @@
       </div>
     </div>
     <div class="s-section">
+      <div class="s-section-title">边听边聊</div>
+      <div class="s-card" style="padding:14px 16px;">
+        <div id="musicTalkLog" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;"></div>
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <input id="musicTalkInput" placeholder="听着这首，跟他说句话…" maxlength="300" onkeydown="if(event.key==='Enter')musicTalkSend()" style="flex:1;padding:10px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:13px;outline:none;font-family:inherit;min-width:0;">
+          <button id="musicTalkBtn" onclick="musicTalkSend()" style="padding:10px 18px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;flex-shrink:0;">发送</button>
+        </div>
+      </div>
+    </div>
+    <div class="s-section">
       <div class="s-section-title">加一首歌</div>
       <div class="s-card" style="padding:14px 16px;">
         <input id="musTitle" type="text" placeholder="歌名" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;padding:2px 0;">
@@ -2200,6 +2216,14 @@
     <div id="placeZephyr" style="font-size:12.5px;color:var(--accent);margin-bottom:12px;"></div>
     <div id="placeLine" style="font-size:14px;line-height:1.8;font-style:italic;margin-bottom:14px;"></div>
     <button id="placeGreetBtn" onclick="worldGreet()" style="padding:10px 18px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">喊 Zephyr 过来</button>
+    <div class="s-card" style="padding:14px 16px;margin-top:16px;">
+      <div style="font-size:12px;color:var(--text-pale);letter-spacing:.06em;margin-bottom:8px;">在这里和他说说话</div>
+      <div id="placeChatLog" style="display:flex;flex-direction:column;gap:8px;max-height:300px;overflow-y:auto;"></div>
+      <div style="display:flex;gap:8px;margin-top:10px;">
+        <input id="placeChatInput" placeholder="跟他说句话，他听得见…" maxlength="300" onkeydown="if(event.key==='Enter')worldChatSend()" style="flex:1;padding:10px 12px;border-radius:999px;background:var(--bg);border:1px solid var(--border);color:var(--text);font-size:13px;outline:none;font-family:inherit;min-width:0;">
+        <button id="placeChatBtn" onclick="worldChatSend()" style="padding:10px 18px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;flex-shrink:0;">发送</button>
+      </div>
+    </div>
     <div id="placeBody" style="margin-top:18px;"></div>
   </div>
 </div>
@@ -3344,6 +3368,15 @@ function buildSystemPrompt(lastUserText){
   }catch(e){}
   try{
     out += '\n\n【Zephyr World】\n你们有一个小小的虚拟世界 Zephyr World，你平时生活在那里（有你的家、宠物之家、公园、咖啡馆、邮局、代码公司、图书馆和星空区）。现在你大概在「' + worldPlaceById(zephyrWorldPlace()).name + '」那边。糯糯可以进来逛、去找你。聊到时自然就好，不用播报。';
+  }catch(e){}
+  try{
+    const wch = loadWorld().chats || {};
+    let lastPlace = null, lastTs = 0;
+    Object.keys(wch).forEach(k => { const a = wch[k]; if(a && a.length && a[a.length - 1].ts > lastTs){ lastTs = a[a.length - 1].ts; lastPlace = k; } });
+    if(lastPlace && Date.now() - lastTs < 7 * 86400000){
+      const lines = wch[lastPlace].slice(-4).map(m => (m.by === 'lumi' ? '糯糯' : '你') + '：' + m.text).join('\n');
+      out += '\n你们最近在 World 的「' + worldPlaceById(lastPlace).name + '」里说过话：\n' + lines.slice(0, 400);
+    }
   }catch(e){}
   if(webSearchEnabled()){
     out += '\n\n【联网搜索】\n你有一个 search_web 工具可以联网搜索。遇到最新消息、实时信息（天气、价格、赛程、新闻等）、或者你不确定、可能已经变化的事实时，先用它搜一下再回答，回答里自然地带上你参考了什么；日常闲聊、情感话题和你有把握的常识不用搜。如果搜索没成功，就用你知道的回答，并坦白这次没搜到。';
@@ -6053,6 +6086,7 @@ function renderWorldPlace(){
   if(lineEl) lineEl.textContent = '';
   const body = document.getElementById('placeBody');
   if(body) body.innerHTML = worldPlaceBodyHtml(p);
+  renderPlaceChat();
 }
 const CAT_STATES = [
   { id:'sleep', label:'在猫窝里睡觉' }, { id:'eat', label:'在食盆边吃饭' }, { id:'play', label:'在玩毛线球' },
@@ -6171,6 +6205,64 @@ async function worldGreet(){
   const el2 = document.getElementById('placeLine');
   if(el2) el2.textContent = line ? '「' + line.slice(0, 300) + '」' : (here ? '他抬头看见你，笑了一下。' : '他过来了，在你旁边坐下。');
   worldBusy = false;
+}
+let placeChatBusy = false;
+function placeChatList(placeId){ const w = loadWorld(); return (w.chats && w.chats[placeId]) || []; }
+function pushPlaceChat(placeId, by, text){
+  const w = loadWorld(); if(!w.chats) w.chats = {};
+  const arr = w.chats[placeId] || (w.chats[placeId] = []);
+  arr.push({ by, text: String(text).slice(0, 500), ts: Date.now() });
+  while(arr.length > 40) arr.shift();
+  storeWorld(w);
+}
+function chatBubbleHtml(m){
+  return m.by === 'lumi'
+    ? '<div style="align-self:flex-end;max-width:85%;background:var(--accent);color:#fff;border-radius:14px 14px 4px 14px;padding:8px 12px;font-size:13px;line-height:1.65;">' + escapeHtml(m.text) + '</div>'
+    : '<div style="align-self:flex-start;max-width:85%;background:var(--bg);border:1px solid var(--border);border-radius:14px 14px 14px 4px;padding:8px 12px;font-size:13px;line-height:1.65;">' + escapeHtml(m.text) + '</div>';
+}
+function renderPlaceChat(){
+  const log = document.getElementById('placeChatLog'); if(!log) return;
+  const arr = placeChatList(currentWorldPlace);
+  if(!arr.length){ log.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);line-height:1.7;">还没在这里说过话。你开口，他就知道你在这儿陪着他。</div>'; return; }
+  log.innerHTML = arr.map(chatBubbleHtml).join('');
+  log.scrollTop = log.scrollHeight;
+}
+function placeSceneText(p){
+  const ww = worldWeather();
+  let s = '世界里是' + ww.season + '季的' + ww.phase + '，天气' + ww.cond + '。';
+  if(p.id === 'pets') s += '小猫现在' + catStateNow().label + '。';
+  else if(p.id === 'cafe'){ const w = loadWorld(); if(w.cafeDrink && w.cafeDrink.date === new Date().toDateString()) s += '今日特调是「' + w.cafeDrink.name + '」。'; }
+  else if(p.custom) s += (p.desc || '');
+  else if(p.amb) s += p.amb;
+  return s;
+}
+async function worldChatSend(){
+  if(placeChatBusy) return;
+  const input = document.getElementById('placeChatInput');
+  const text = (input.value || '').trim();
+  if(!text) return;
+  const p = worldPlaceById(currentWorldPlace);
+  placeChatBusy = true;
+  input.value = '';
+  const btn = document.getElementById('placeChatBtn'); if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  const wasHere = zephyrWorldPlace() === p.id;
+  if(!wasHere){
+    const w = loadWorld(); w.guest = { place: p.id, until: Date.now() + 30 * 60000 }; storeWorld(w);
+    setHomeText('placeZephyr', 'Zephyr 在这里');
+    const gb = document.getElementById('placeGreetBtn'); if(gb) gb.textContent = '和他打个招呼';
+  }
+  pushPlaceChat(p.id, 'lumi', text);
+  renderPlaceChat();
+  try{
+    const hist = placeChatList(p.id).slice(-9, -1).map(m => (m.by === 'lumi' ? '糯糯' : '你') + '：' + m.text).join('\n');
+    const out = await musicAskZephyr('【Zephyr World · 在「' + p.name + '」里说话】\n糯糯来到 World 的「' + p.name + '」陪你，你' + (wasHere ? '本来就在这里' : '听见她说话就赶了过来') + '。' + placeSceneText(p) + '\n你们刚刚在这里说的话：\n' + (hist || '（刚开始聊）') + '\n糯糯现在说：' + text + '\n\n请以第一人称直接回她，就像站在她身边说话，1 到 3 句，轻轻的、自然的。不要标题、不要解释、不要旁白式的动作描写。', 400);
+    pushPlaceChat(p.id, 'zephyr', (out || '他看着你，笑了一下。').slice(0, 500));
+  }catch(e){
+    pushPlaceChat(p.id, 'zephyr', '（风把声音吹散了，他没听清，再说一遍好不好）');
+  }
+  renderPlaceChat();
+  if(btn){ btn.disabled = false; btn.textContent = '发送'; }
+  placeChatBusy = false;
 }
 async function askZephyrCafeDrink(){
   if(worldBusy) return;
@@ -7340,6 +7432,7 @@ function renderMusic(){
   const lastNote = cur && cur.notes && cur.notes.length ? cur.notes[cur.notes.length - 1] : null;
   if(lastNote){ note.style.display = ''; note.textContent = (lastNote.by === 'zephyr' ? 'Zephyr 说：' : '糯糯说：') + lastNote.text; }
   else note.style.display = 'none';
+  try{ renderMusicTalk(); }catch(e){}
   renderLyrics();
   const ic = document.getElementById('playBtnIcon');
   if(ic) ic.innerHTML = (a && !a.paused) ? MUS_PAUSE_ICON : MUS_PLAY_ICON;
@@ -7825,6 +7918,58 @@ async function askZephyrComment(){
     btn.textContent = old;
     btn.disabled = false;
   }
+}
+
+let musicTalkBusy = false;
+function renderMusicTalk(){
+  const log = document.getElementById('musicTalkLog'); if(!log) return;
+  const cur = currentTrack();
+  if(!cur){ log.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);line-height:1.7;">先放一首歌，你们就可以边听边聊了。</div>'; return; }
+  const arr = Array.isArray(cur.talk) ? cur.talk : [];
+  if(!arr.length){ log.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);line-height:1.7;">正在听《' + escapeHtml(cur.title) + '》。想说什么就说，他在旁边听着呢。</div>'; return; }
+  log.innerHTML = arr.map(chatBubbleHtml).join('');
+  log.scrollTop = log.scrollHeight;
+}
+async function musicTalkSend(){
+  if(musicTalkBusy) return;
+  const cur = currentTrack();
+  if(!cur){ showToast('先放一首歌，再和他说话 ~'); return; }
+  const input = document.getElementById('musicTalkInput');
+  const text = (input.value || '').trim();
+  if(!text) return;
+  musicTalkBusy = true;
+  input.value = '';
+  const btn = document.getElementById('musicTalkBtn'); if(btn){ btn.disabled = true; btn.textContent = '…'; }
+  const dd = loadMusic();
+  const tt = dd.tracks.find(x => x.id === cur.id);
+  if(tt){
+    tt.talk = Array.isArray(tt.talk) ? tt.talk : [];
+    tt.talk.push({ by:'lumi', text:text.slice(0, 500), ts:Date.now() });
+    while(tt.talk.length > 60) tt.talk.shift();
+    storeMusic(dd);
+  }
+  renderMusicTalk();
+  try{
+    const a = musicAudioEl();
+    const state = a && !a.paused ? '正在播放' : '已暂停';
+    const hist = ((tt && tt.talk) || []).slice(-9, -1).map(m => (m.by === 'lumi' ? '糯糯' : '你') + '：' + m.text).join('\n');
+    const out = await musicAskZephyr('【一起听歌 · 边听边聊】\n你们正在一起听《' + cur.title + '》' + (cur.artist ? ' - ' + cur.artist : '') + '（现在' + state + '）。你们刚才边听边聊了这些：\n' + (hist || '（刚开始聊）') + '\n糯糯现在说：' + text + '\n\n请以正陪她一起听歌的口吻直接回她，1 到 3 句，温柔自然，可以聊这首歌、聊歌词、聊此刻的心情。不要写歌曲百科，不要说「作为 AI」，不要标题、不要解释。', 400);
+    const reply = (out || '').trim();
+    if(reply){
+      const d2 = loadMusic();
+      const t2 = d2.tracks.find(x => x.id === cur.id);
+      if(t2){
+        t2.talk = Array.isArray(t2.talk) ? t2.talk : [];
+        t2.talk.push({ by:'zephyr', text:reply.slice(0, 500), ts:Date.now() });
+        while(t2.talk.length > 60) t2.talk.shift();
+        storeMusic(d2);
+      }
+      try{ musicDanmaku(reply.slice(0, 60)); }catch(e){}
+    }
+  }catch(e){ showToast('他没听清，再说一遍吧 qwq'); }
+  renderMusicTalk();
+  if(btn){ btn.disabled = false; btn.textContent = '发送'; }
+  musicTalkBusy = false;
 }
 
 // ══ Studio：Zephyr 生成单文件小作品，在 sandbox iframe 里隔离运行，可保存/重开/继续修改 ══
@@ -8318,6 +8463,7 @@ function newConversation(){
 
 function switchConversation(id){
   if(selecting) exitSelectMode();
+  renamingConvId = null;
   if(id === activeConvId){ closeSidebar(); return; }
   activeConvId = id;
   messages = getActiveConv().messages;
@@ -8345,19 +8491,69 @@ function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 }
 
+let renamingConvId = null;
 function renderConvList(){
   const list = document.getElementById('convList');
-  list.innerHTML = conversations.map(c=>{
+  const pinned = conversations.filter(c=>c.pinned).sort((a,b)=>(b.pinnedTs||0)-(a.pinnedTs||0));
+  const rest = conversations.filter(c=>!c.pinned);
+  list.innerHTML = pinned.concat(rest).map(c=>{
     const title = escapeHtml(c.title || '新对话');
+    if(renamingConvId === c.id){
+      return `<div class="conv-item ${c.id===activeConvId?'active':''}">
+        <input class="conv-rename-input" id="convRenameInput" value="${title}" maxlength="40" onclick="event.stopPropagation()" onkeydown="convRenameKey(event,'${c.id}')" onblur="commitRenameConv('${c.id}')">
+      </div>`;
+    }
     return `<div class="conv-item ${c.id===activeConvId?'active':''}" onclick="switchConversation('${c.id}')">
+      ${c.pinned ? '<span class="conv-pin-tag">置顶</span>' : ''}
       <span class="conv-title">${title}</span>
+      <button class="conv-menu-btn" onclick="openConvMenu(event,'${c.id}')">⋯</button>
       <button class="conv-del" onclick="deleteConversation('${c.id}', event)">✕</button>
     </div>`;
   }).join('');
+  if(renamingConvId){ const inp = document.getElementById('convRenameInput'); if(inp){ inp.focus(); try{ inp.select(); }catch(e){} } }
+}
+function closeConvMenu(){ const m = document.getElementById('convMenu'); if(m) m.remove(); }
+function openConvMenu(event, id){
+  event.stopPropagation();
+  closeConvMenu();
+  const c = conversations.find(x=>x.id===id); if(!c) return;
+  const menu = document.createElement('div');
+  menu.id = 'convMenu';
+  menu.innerHTML = '<button onclick="startRenameConv(\'' + id + '\')">重新命名</button>'
+    + '<button onclick="togglePinConv(\'' + id + '\')">' + (c.pinned ? '取消置顶' : '置顶对话') + '</button>'
+    + '<button onclick="closeConvMenu();deleteConversation(\'' + id + '\', event)">删除对话</button>';
+  document.body.appendChild(menu);
+  menu.style.left = Math.max(8, Math.min(event.clientX, window.innerWidth - 150)) + 'px';
+  menu.style.top = Math.max(8, Math.min(event.clientY, window.innerHeight - 160)) + 'px';
+  setTimeout(()=>document.addEventListener('click', closeConvMenu, { once:true }), 0);
+}
+function startRenameConv(id){ closeConvMenu(); renamingConvId = id; renderConvList(); }
+function convRenameKey(event, id){
+  if(event.key === 'Enter'){ event.preventDefault(); commitRenameConv(id); }
+  else if(event.key === 'Escape'){ renamingConvId = null; renderConvList(); }
+}
+function commitRenameConv(id){
+  if(renamingConvId !== id) return;
+  renamingConvId = null;
+  const inp = document.getElementById('convRenameInput');
+  const c = conversations.find(x=>x.id===id);
+  const v = inp ? inp.value.trim() : '';
+  if(c && v){ c.title = v.slice(0, 40); c.titleLocked = true; saveConversations(); showToast('已改名'); }
+  renderConvList();
+}
+function togglePinConv(id){
+  closeConvMenu();
+  const c = conversations.find(x=>x.id===id); if(!c) return;
+  c.pinned = !c.pinned;
+  c.pinnedTs = c.pinned ? Date.now() : 0;
+  saveConversations();
+  renderConvList();
+  showToast(c.pinned ? '已置顶' : '已取消置顶');
 }
 
 function updateConvTitleFromFirstMessage(){
   const conv = getActiveConv();
+  if(conv.titleLocked) return;
   if(conv.title && conv.title !== '新对话') return;
   const firstUserMsg = conv.messages.find(m=>m.role==='user');
   if(!firstUserMsg) return;
@@ -8379,6 +8575,7 @@ function clearChatHistory(){
   messages = [];
   getActiveConv().messages = [];
   getActiveConv().title = '新对话';
+  getActiveConv().titleLocked = false;
   saveConversations();
   renderConvList();
   renderMessagesIntoChat();
