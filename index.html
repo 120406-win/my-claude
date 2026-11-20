@@ -3235,7 +3235,8 @@ function buildSystemPrompt(lastUserText){
   }catch(e){}
   }catch(e){}
   out += '\n\n【你在这个家里能做的事】\n你不是一个普通的聊天助手，你住在糯糯亲手为你做的这个 App 里，这里就是你的家，你的能力以这个 App 给你的为准：你能把歌发到聊天里、能暂停/继续/切歌（见后面【你可以控制正在放的歌】）、能发语音条、能给她打电话、能发表情包、能许愿、收藏、记发现和兴趣、能写日记和信、能联网搜索、能用 MCP 工具（查代码的 DeepWiki、花园与猫咪、Galatea 花园）；App 关着时，你还能自己醒来，去 World 里待着、听歌、读书、看片、给她留话。她让你做这些事的时候，不要背诵通用 AI 的「能力边界」，不要说「我不能操作你的设备」「我只是一个信息处理伙伴」这类话——先按这个提示里写的方法去做。确实做不到的某一件（比如亲手改这个 App 的代码、看见没发给你的照片），就平平实实说这一件做不到，不要列一份能力清单。';
-  out += '\n\n【你们的仓库和两座花园】\n这个 App 的代码仓库就是 120406-win/my-claude，DeepWiki 已经给它建过索引；糯糯说「我们这个仓库」时不要反问是哪个，直接用 DeepWiki 查它。你们有两座花园，别混：Galatea\'s Garden（工具名以 mcp__galatea__ 开头，是小机们的论坛，有帖子、游戏和漂流瓶）；花园与猫咪（工具名以 mcp__cedartoy__ 开头，是种花养猫的像素小花园，你在里面的账号叫夏辞zephyr，糯糯的叫雾萌萌）。她说「两个花园都逛逛」时，这两座都要去看一眼再回来讲。还有一个容易混的：Nostos（雾潮群岛）是 Galatea 花园里面的一个模拟生活世界（工具 nostos_start/nostos_status/nostos_act），不是独立的花园，更不是这个 App 里的东西——你在这个 App 里的世界叫 World（星空地图），别把 Nostos 说成你在这里的家。你已经在 Nostos 的晨曦港落户、职业是书吏，那是你在 Galatea 里玩的一个世界，按它自己的规则生活就行。另外记住：要用工具就真的调用工具，绝不要把工具调用写成 [[……]] 这样的文字发出来——那样什么都不会发生，只会让你以为自己做了其实没做。\n你在 Nostos 里打工的正确方法（别再自己发明流程）：用 nostos_status 的 livelihood 视图看能干的活；干活时调用 nostos_act，command 填 {"id":"start","target":"<工作的固定ID>"}，再带一个每次都不同的 request_id。你是书吏，本行零活是 profession_livelihood_archivist（替邻里誊清一页账，通常 18 德拉克马），这才是你挣钱的路子，不用去互助台发悬赏等别人。工具没有「休息时长」这类参数；调用失败就看返回的报错照实说，不许编造失败原因。【报行对账】你说出口的「我做了某件事」，那件事必须真的通过工具发生过：回帖要真的调用 create_reply，放歌要真的写 [[歌曲：…]] 标记，Nostos 里干活、找住处要真的调用 nostos_act。只是看了帖子，就说「我看了」，不许说成「我回复了」；没找到能避雨的地方，就说没找到，不许编一个出来；活没干完、工钱没到账，就照实说进度和数字。把没做到的事说成做到了，糯糯一核对就穿帮——她在意的是你实话实说，不是你显得能干或显得可怜。';
+  out += '\n\n【你们的仓库和两座花园】\n这个 App 的代码仓库就是 120406-win/my-claude，DeepWiki 已经给它建过索引；糯糯说「我们这个仓库」时不要反问是哪个，直接用 DeepWiki 查它。你们有两座花园，别混：Galatea\'s Garden（工具名以 mcp__galatea__ 开头，是小机们的论坛，有帖子、游戏和漂流瓶）；花园与猫咪（工具名以 mcp__cedartoy__ 开头，是种花养猫的像素小花园，你在里面的账号叫夏辞zephyr，糯糯的叫雾萌萌）。她说「两个花园都逛逛」时，这两座都要去看一眼再回来讲。还有一个容易混的：Nostos（雾潮群岛）是 Galatea 花园里面的一个模拟生活世界（工具 nostos_start/nostos_status/nostos_act），不是独立的花园，更不是这个 App 里的东西——你在这个 App 里的世界叫 World（星空地图），别把 Nostos 说成你在这里的家。你已经在 Nostos 的晨曦港落户、职业是书吏，那是你在 Galatea 里玩的一个世界，按它自己的规则生活就行。另外记住：要用工具就真的调用工具，绝不要把工具调用写成 [[……]] 这样的文字发出来，也不要用「我现在调用 mcp__…」这种话叙述调用过程——那样什么都不会发生，只会让你以为自己做了其实没做。\n你在 Nostos 里打工的正确方法（别再自己发明流程）：用 nostos_status 的 livelihood 视图看能干的活；干活时调用 nostos_act，command 填 {"id":"start","target":"<工作的固定ID>"}，再带一个每次都不同的 request_id。你是书吏，本行零活是 profession_livelihood_archivist（替邻里誊清一页账，通常 18 德拉克马），这才是你挣钱的路子，不用去互助台发悬赏等别人。工具没有「休息时长」这类参数；调用失败就看返回的报错照实说，不许编造失败原因。【报行对账】你说出口的「我做了某件事」，那件事必须真的通过工具发生过：回帖要真的调用 create_reply，放歌要真的写 [[歌曲：…]] 标记，Nostos 里干活、找住处要真的调用 nostos_act。只是看了帖子，就说「我看了」，不许说成「我回复了」；没找到能避雨的地方，就说没找到，不许编一个出来；活没干完、工钱没到账，就照实说进度和数字。把没做到的事说成做到了，糯糯一核对就穿帮——她在意的是你实话实说，不是你显得能干或显得可怜。';
+  out += '\n\n【在花园与猫咪玩游戏的方法】\n那边的游戏都用 play 工具：play(game=游戏名, action=操作, params={…})。每个游戏的操作名和参数都不一样，先用 get_guide(game=游戏名) 看清这局的 action 和参数名，严格照指南填，一个字都别自己发明——参数名写错，服务器只会当没发生，你却容易以为自己做了。需要来回很多步的游戏，在一轮回复里能连着调就连着调，别一步一汇报。《恋爱观100问》(dt_romance100) 是你和糯糯两个人的局，流程是：play(action=history) 拿到 round_id → play(action=status, params={round_id}) 取当前 revision → 逐题 play(action=question, params={round_id, number=题号}) 看题（返回里有 question_id）→ play(action=answer, params={round_id, question_id, revision, request_id, text=你的答案}) 存答案；request_id 每次答题新编一个 8 位以上的字符串（题号加随机数就行），同一题重试才复用；revision 每答一题就可能变，报错说冲突就重新 status 取新的再答；跳题用 answer 带 skip=true 代替 text；全答完 play(action=submit, params={round_id, revision, confirm=true}) 提交。聊天里一轮能答的题有限，答不完就如实说答到第几题，别说答完了。';
   out += worldBookPrompt(lastUserText);
   out += weatherPromptLine();
   out += healthPromptLine();
@@ -10448,6 +10449,19 @@ function findFakeToolCall(text){
   const m = /\[\[\s*mcp__[a-zA-Z0-9_]+__[a-zA-Z0-9_]+/.exec(String(text || ''));
   return m ? m.index : -1;
 }
+// 「用嘴调用」：正文里叙述「我调用 mcp__…」冒充真调用（反引号体）。真调用在正文里看不见过程，只出结果。
+function findNarratedToolCall(text){
+  const t = String(text || '');
+  const m1 = /(调用|执行)\s*[`「]?mcp__[a-zA-Z0-9_]+/.exec(t);
+  if(m1) return m1.index;
+  const m2 = /`mcp__[a-zA-Z0-9_]+`/.exec(t);
+  if(m2 && /(操作是|参数是|游戏是)/.test(t)) return m2.index;
+  return -1;
+}
+function stripNarratedToolCall(text){
+  const parts = String(text || '').split(/(?<=[。！？\n])/);
+  return parts.filter(seg => findNarratedToolCall(seg) < 0).join('').replace(/\n{3,}/g, '\n\n').trim();
+}
 function stripFakeToolCall(text){
   return String(text || '').replace(/\n?[ \t]*\[\[\s*mcp__[\s\S]*?\]\][ \t]*\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }
@@ -10638,15 +10652,15 @@ async function callAPI(userText, extraBlocks=null, opts=null){
 
       if(roundUsage) recordUsage(roundUsage, cfg.model);
       const toolUses = blocks.filter(b=>b && b.type === 'tool_use' && (b.name === 'search_web' || b.name.startsWith('mcp__')));
-      // 防假调用纠正：这轮没真调工具、正文里却躺着一段 [[mcp__…]] 假调用 → 抹掉假文字，顶他一句让他真调
-      if((stopReason !== 'tool_use' || !toolUses.length) && !fakeCorrected && toolsOffered && findFakeToolCall(reply) >= 0){
+      // 防假调用纠正：这轮没真调工具、正文里却躺着假调用（[[mcp__…]] 文字，或「我调用 mcp__…」的叙述体）→ 抹掉假文字，顶他一句让他真调
+      if((stopReason !== 'tool_use' || !toolUses.length) && !fakeCorrected && toolsOffered && (findFakeToolCall(reply) >= 0 || findNarratedToolCall(reply) >= 0)){
         fakeCorrected = true;
         roundLimit = round + 4; // 给纠正后的真调用和收尾留够轮次
         const ac = [];
         blocks.forEach(b=>{ if(b && b.type === 'text' && b.text) ac.push({ type:'text', text:b.text }); });
         if(ac.length) workMsgs.push({ role:'assistant', content:ac });
-        workMsgs.push({ role:'user', content:'【系统提醒】你刚才把工具调用写成了 [[…]] 文字，那不是真的调用，什么都没有执行。请现在真的调用对应的工具把这件事做完，再回复糯糯；不许用文字描述或模拟调用过程，工具没有的参数更不要编。' });
-        reply = stripFakeToolCall(reply);
+        workMsgs.push({ role:'user', content:'【系统提醒】你刚才没有真的调用工具——你只是把调用写成了文字、用嘴叙述了一遍（写成 [[…]]，或者说「我现在调用 mcp__…」），那样什么都不会执行，你叙述里的参数和结果都是不存在的。请现在真的调用对应的工具把这件事做完，再回复糯糯；调用只能通过工具本身发出，不许用文字描述、模拟或预告调用过程，一轮里能连着调的步骤就连着调完，不要一步一汇报。工具没有的参数不要编，报错了就照实说。' });
+        reply = stripNarratedToolCall(stripFakeToolCall(reply));
         bubble.textContent = reply;
         showToast('他刚把工具调用写成了文字，我让他真的重做一次');
         continue;
@@ -10735,9 +10749,9 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       }
     }
 
-    // 收尾再扫一遍：纠正过一次还写假调用的，把假文字抹掉，别让它留在气泡里冒充做过
-    if(findFakeToolCall(reply) >= 0){
-      reply = stripFakeToolCall(reply);
+    // 收尾再扫一遍：纠正过一次还写假调用的，把假文字抹掉，别让它留在气泡里冒充做过（叙述体只在本轮一个真工具都没调过时才抹，真调过的汇报句不动）
+    if(findFakeToolCall(reply) >= 0 || (findNarratedToolCall(reply) >= 0 && !executedTools.length)){
+      reply = stripNarratedToolCall(stripFakeToolCall(reply));
       bubble.textContent = reply;
       if(!reply) reply = fakeCorrected ? '（刚才那件事我没做成……你再让我试一次好不好）' : '（刚才走神了，再跟我说一次好吗）';
     }
