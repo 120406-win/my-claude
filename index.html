@@ -4313,6 +4313,7 @@ async function cloudTouch(){
     cloudMetaSet({ up: Date.now() });
   }catch(e){}
   try{ await pickupInbox(); }catch(e){}
+  try{ syncWeatherLoc(); }catch(e){}
   try{ await applyWorldState(); }catch(e){}
   try{ await applyZephyrActivity(); }catch(e){}
   try{ await reportActivity(); }catch(e){}
@@ -4841,6 +4842,7 @@ async function searchCityWeather(){
     const r = data.results[0];
     const label = r.name + (r.admin1 ? ' · ' + r.admin1 : '');
     localStorage.setItem('z_weatherCity', JSON.stringify({ name: label, lat: r.latitude, lon: r.longitude }));
+    syncWeatherLoc();
     loadRealWeather(r.latitude, r.longitude, label);
   }catch(e){
     if(box) box.textContent = '查找失败，网络好像不太通 qwq';
@@ -4851,11 +4853,24 @@ function useMyLocation(){
   navigator.geolocation.getCurrentPosition(
     pos => {
       localStorage.setItem('z_weatherCity', JSON.stringify({ name: '我的位置', lat: pos.coords.latitude, lon: pos.coords.longitude }));
+      syncWeatherLoc();
       loadRealWeather(pos.coords.latitude, pos.coords.longitude, '我的位置');
     },
     () => showToast('没拿到定位，可以手动输入城市 ~'),
     { timeout: 8000 }
   );
+}
+// 把天气城市坐标同步一份到后端：他半夜自己醒来时，能实时查她那边的天气
+let weatherLocSynced = '';
+function syncWeatherLoc(){
+  try{
+    const c = JSON.parse(localStorage.getItem('z_weatherCity') || 'null');
+    if(!c || !isFinite(c.lat) || !isFinite(c.lon)) return;
+    const sig = c.lat + ',' + c.lon;
+    if(sig === weatherLocSynced) return;
+    weatherLocSynced = sig;
+    backendFetch('/kv/set', { items: { weather_loc: JSON.stringify({ name: c.name || '', lat: c.lat, lon: c.lon }) } }).catch(()=>{ weatherLocSynced = ''; });
+  }catch(e){}
 }
 
 // ══ 导入聊天记录：解析外部记录 → 存为历史对话 / 提取长期记忆 / 两者都要（糯糯在总纲里定的三种模式） ══
