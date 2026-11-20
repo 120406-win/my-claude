@@ -38,3 +38,37 @@ self.addEventListener('fetch', (e) => {
       .catch(() => caches.match(req, { ignoreSearch: true }))
   );
 });
+
+// ── Web Push：他在后端给你留言时，系统弹一条通知，点开回到栖 ──
+self.addEventListener('push', (e) => {
+  let data = { title: '夏辞', body: '' };
+  try {
+    if (e.data) {
+      const j = e.data.json();
+      if (j && (j.title || j.body)) data = { title: j.title || '夏辞', body: j.body || '' };
+      else data.body = e.data.text();
+    }
+  } catch (err) {
+    try { if (e.data) data.body = e.data.text(); } catch (err2) {}
+  }
+  e.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: './icon-192.png',
+      badge: './icon-192.png',
+      tag: 'zephyr-msg',
+      data: { url: './' },
+    })
+  );
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const target = (e.notification.data && e.notification.data.url) || './';
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) { if ('focus' in c) return c.focus(); }
+      if (self.clients.openWindow) return self.clients.openWindow(target);
+    })
+  );
+});

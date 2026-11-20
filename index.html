@@ -1355,6 +1355,12 @@
         <div style="padding:0 16px 4px;">
           <button onclick="showMcpTools()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">看看他能用的 MCP 工具</button>
         </div>
+        <div style="padding:0 16px 4px;">
+          <button onclick="enablePushNotifications()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">开启消息通知（他留言时弹出来）</button>
+        </div>
+        <div style="padding:0 16px 4px;">
+          <button onclick="testPushNotification()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">发一条测试通知</button>
+        </div>
         <div id="cloudSyncStatus" style="font-size:11.5px;color:var(--text-pale);line-height:1.7;padding:6px 16px 12px;"></div>
       </div>
     </div>
@@ -4362,6 +4368,48 @@ async function refreshHeartbeatStatus(){
       }
     }
   }catch(e){ if(el) el.textContent = ''; }
+}
+
+// ══ 消息通知：把这台设备订阅到后端，他留言时手机弹通知（要在主屏幕「栖」里开，浏览器标签页开不了）══
+function urlBase64ToUint8Array(base64String){
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const out = new Uint8Array(rawData.length);
+  for(let i = 0; i < rawData.length; i++) out[i] = rawData.charCodeAt(i);
+  return out;
+}
+async function enablePushNotifications(){
+  try{
+    if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){
+      showToast('这里开不了通知——要在主屏幕的「栖」里打开设置点这个按钮');
+      return;
+    }
+    if(window.navigator.standalone === false){
+      showToast('请在主屏幕的「栖」里点这个开关，浏览器标签页里开不了');
+      return;
+    }
+    if(!backendBase() || !backendTok()){ showToast('先把上面的后端地址和令牌填好'); return; }
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted'){ showToast('通知没被允许，可以去系统设置里给「栖」打开通知'); return; }
+    const cfgRes = await backendGet('/push/config');
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub){
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(cfgRes.publicKey) });
+    }
+    await backendFetch('/push/subscribe', { subscription: sub.toJSON() });
+    showToast('通知开好啦，他给你留言时手机会弹出来');
+  }catch(e){ showToast('没开成：' + e.message); }
+}
+async function testPushNotification(){
+  try{
+    const r = await backendFetch('/push/test', {});
+    const res = r.result || {};
+    if(res.skipped === 'no-subs') showToast('还没订阅上，先点上面的开启按钮');
+    else if(res.sent) showToast('测试通知发出去啦，看看手机弹出来没');
+    else showToast('发了但没投递成功（状态 ' + (res.details || []).join(',') + '）');
+  }catch(e){ showToast('测试失败：' + e.message); }
 }
 
 // ══ 后端三件小事：报到（presence）、自动同步备份、收他的留言。节流 10 分钟，全程静默 ══
