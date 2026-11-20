@@ -1738,6 +1738,13 @@
           <button onclick="searchOnlineMusic()" style="flex:none;padding:9px 16px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">搜一搜</button>
         </div>
         <div id="onlineResults"></div>
+        <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:12px;">
+          <div style="display:flex;gap:8px;">
+            <input id="gdQ" type="text" placeholder="全网找歌：歌名或歌手，如：周杰伦 屋顶" style="flex:1;min-width:0;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;padding:2px 0;">
+            <button onclick="searchGdMusic()" style="flex:none;padding:9px 16px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">全网搜</button>
+          </div>
+          <div id="gdResults"></div>
+        </div>
       </div>
     </div>
     <button id="recBtn" onclick="askZephyrRecommend()" style="width:100%;padding:13px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:14px;cursor:pointer;margin-bottom:18px;">请 Zephyr 推荐一首歌</button>
@@ -6773,7 +6780,7 @@ const MUSIC_PRESETS = [
 ];
 function loadMusic(){ try{ const o = JSON.parse(localStorage.getItem('z_music')||'null'); if(o && Array.isArray(o.tracks)) return o; }catch(e){} return { tracks:[], lastId:null }; }
 function storeMusic(data){ try{ localStorage.setItem('z_music', JSON.stringify(data)); return true; }catch(e){ showToast('存储空间不够了 qwq'); return false; } }
-function hasPlayable(t){ return !!(t && (t.url || t.local)); }
+function hasPlayable(t){ return !!(t && (t.url || t.local || (t.gdSource && t.gdId))); }
 // 把用户贴进来的东西整理成能播的地址：支持网易云分享文案/链接（提取歌曲 id 换成外链地址，并顺手认出《歌名》）
 function normalizeAudioUrl(raw){
   if(!raw) return { url:'', title:'', netease:false };
@@ -6800,6 +6807,10 @@ async function resolveTrackSrc(t){
     if(musObjUrl) URL.revokeObjectURL(musObjUrl);
     musObjUrl = URL.createObjectURL(blob);
     return musObjUrl;
+  }
+  if(t.gdSource && t.gdId){
+    const u = await fetchGdUrl(t.gdSource, t.gdId).catch(()=> '');
+    if(u){ t.url = u; return u; }
   }
   return t.url || '';
 }
@@ -6843,7 +6854,8 @@ function bindMusicAudio(){
   a.addEventListener('error', ()=>{
     if(!a.src) return;
     const cur = currentTrack();
-    if(cur && cur.url && cur.url.indexOf('music.163.com') >= 0) showToast('网易云把这首歌挡住了（版权限制），换个来源吧 qwq');
+    if(cur && cur.gdSource) showToast('这首歌的链接失效了，再点一次它会重新取 ~');
+    else if(cur && cur.url && cur.url.indexOf('music.163.com') >= 0) showToast('网易云把这首歌挡住了（版权限制），换个来源吧 qwq');
     else showToast('这首歌的链接打不开 qwq 换个链接试试');
   });
 }
@@ -6997,8 +7009,8 @@ async function playTrack(id){
   const a = musicAudioEl();
   bindMusicAudio();
   const src = await resolveTrackSrc(t);
-  if(!src){ showToast('这个文件找不到了，可能被浏览器清理了 qwq'); return; }
-  if(t.local || d.lastId !== id || !a.src) a.src = src;
+  if(!src){ showToast(t.local ? '这个文件找不到了，可能被浏览器清理了 qwq' : '这首歌的链接取不到 qwq 换个来源试试'); return; }
+  if(t.local || t.gdSource || d.lastId !== id || !a.src) a.src = src;
   d.lastId = id;
   storeMusic(d);
   a.play().catch(()=>showToast('这首歌放不出来 qwq 换个来源试试'));
@@ -7016,6 +7028,7 @@ function togglePlay(){
     return;
   }
   if(a.paused){
+    if(!a.src && cur.gdSource){ playTrack(cur.id); return; }
     if(!a.src) a.src = cur.url;
     a.play().catch(()=>showToast('这首歌的链接打不开 qwq'));
   } else a.pause();
@@ -7299,6 +7312,59 @@ function addOnlineTrack(i, fi){
   if(d.tracks.some(t=>t.url === url)){ showToast('这首已经在歌单里啦'); return; }
   d.tracks.unshift({ id:'t' + Date.now().toString(36) + Math.floor(Math.random()*999), title: f.title, artist: String(it.creator || '').slice(0, 80), url, by:'lumi', ts:Date.now(), notes:[] });
   if(storeMusic(d)){ renderMusic(); showToast('加进歌单啦，点它就能放'); }
+}
+// ══ 全网找歌：聚合接口（GD Studio）跨网易云/QQ 音乐多源搜索；直链会过期，存源+id，播放时现取 ══
+let gdItems = [], gdBusy = false;
+const GD_SOURCE_NAMES = { netease:'网易云', tencent:'QQ音乐', kugou:'酷狗', kuwo:'酷我' };
+async function gdApi(params){
+  const r = await fetch('https://music-api.gdstudio.xyz/api.php?' + params);
+  return r.json();
+}
+async function fetchGdUrl(source, id){
+  try{
+    const j = await gdApi('types=url&source=' + encodeURIComponent(source) + '&id=' + encodeURIComponent(id) + '&br=320');
+    return (j && j.url) || '';
+  }catch(e){ return ''; }
+}
+async function searchGdMusic(){
+  if(gdBusy) return;
+  const q = document.getElementById('gdQ').value.trim();
+  const box = document.getElementById('gdResults');
+  if(!q){ showToast('先写歌名或歌手呀 ~'); return; }
+  gdBusy = true;
+  box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:10px 0 2px;">正在全网翻…</div>';
+  try{
+    const lists = await Promise.all(['netease', 'tencent'].map(s => gdApi('types=search&source=' + s + '&name=' + encodeURIComponent(q) + '&count=10').catch(()=>[])));
+    const seen = {};
+    gdItems = [];
+    lists.forEach(list => { (Array.isArray(list) ? list : []).forEach(it => {
+      if(!it || !it.url_id) return;
+      const key = String(it.name || '') + '|' + (Array.isArray(it.artist) ? it.artist.join('/') : '');
+      if(seen[key]) return;
+      seen[key] = 1;
+      gdItems.push(it);
+    }); });
+    gdItems = gdItems.slice(0, 15);
+    if(!gdItems.length){ box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:10px 0 2px;">没找到，换个关键词试试</div>'; return; }
+    box.innerHTML = gdItems.map((it, i)=>'<div style="display:flex;gap:8px;align-items:center;padding:8px 0;border-top:1px dashed var(--border);">'
+      + '<div style="flex:1;min-width:0;"><div style="font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(it.name || '') + '</div>'
+      + '<div style="font-size:12px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml((Array.isArray(it.artist) ? it.artist.join(' / ') : '') + (it.album ? ' · ' + it.album : '')) + '（' + (GD_SOURCE_NAMES[it.source] || it.source) + '）</div></div>'
+      + '<button onclick="addGdTrack(' + i + ', this)" style="flex:none;padding:6px 11px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:12px;cursor:pointer;">加进歌单</button></div>').join('');
+  }catch(e){
+    box.innerHTML = '<div style="font-size:12.5px;color:var(--text-pale);padding:10px 0 2px;">没搜成，待会儿再试 qwq</div>';
+  }finally{ gdBusy = false; }
+}
+async function addGdTrack(i, btn){
+  const it = gdItems[i];
+  if(!it) return;
+  const d = loadMusic();
+  const artist = Array.isArray(it.artist) ? it.artist.join(' / ') : '';
+  if(d.tracks.some(t => (t.gdSource === it.source && String(t.gdId) === String(it.url_id)) || (t.title === it.name && t.artist === artist))){ showToast('这首已经在歌单里啦'); return; }
+  if(btn){ btn.disabled = true; btn.textContent = '取链接…'; }
+  const url = await fetchGdUrl(it.source, it.url_id);
+  d.tracks.unshift({ id:'t' + Date.now().toString(36) + Math.floor(Math.random()*999), title: String(it.name || '未知歌曲').slice(0, 120), artist: artist.slice(0, 80), url: url || '', gdSource: it.source, gdId: String(it.url_id), by:'lumi', ts:Date.now(), notes:[] });
+  if(storeMusic(d)){ renderMusic(); showToast(url ? '加进歌单啦，点它就能放' : '先加进歌单了，放的时候现取链接'); }
+  if(btn){ btn.disabled = false; btn.textContent = '加进歌单'; }
 }
 function seekMusic(e){
   const a = musicAudioEl();
