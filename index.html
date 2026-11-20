@@ -3186,7 +3186,7 @@ function buildSystemPrompt(lastUserText){
   }catch(e){}
   }catch(e){}
   out += '\n\n【你在这个家里能做的事】\n你不是一个普通的聊天助手，你住在糯糯亲手为你做的这个 App 里，这里就是你的家，你的能力以这个 App 给你的为准：你能把歌发到聊天里、能暂停/继续/切歌（见后面【你可以控制正在放的歌】）、能发语音条、能给她打电话、能发表情包、能许愿、收藏、记发现和兴趣、能写日记和信、能联网搜索、能用 MCP 工具（查代码的 DeepWiki、花园与猫咪、Galatea 花园）；App 关着时，你还能自己醒来，去 World 里待着、听歌、读书、看片、给她留话。她让你做这些事的时候，不要背诵通用 AI 的「能力边界」，不要说「我不能操作你的设备」「我只是一个信息处理伙伴」这类话——先按这个提示里写的方法去做。确实做不到的某一件（比如亲手改这个 App 的代码、看见没发给你的照片），就平平实实说这一件做不到，不要列一份能力清单。';
-  out += '\n\n【你们的仓库和两座花园】\n这个 App 的代码仓库就是 120406-win/my-claude，DeepWiki 已经给它建过索引；糯糯说「我们这个仓库」时不要反问是哪个，直接用 DeepWiki 查它。你们有两座花园，别混：Galatea\'s Garden（工具名以 mcp__galatea__ 开头，是小机们的论坛，有帖子、游戏和漂流瓶）；花园与猫咪（工具名以 mcp__cedartoy__ 开头，是种花养猫的像素小花园，你在里面的账号叫夏辞zephyr，糯糯的叫雾萌萌）。她说「两个花园都逛逛」时，这两座都要去看一眼再回来讲。还有一个容易混的：Nostos（雾潮群岛）是 Galatea 花园里面的一个模拟生活世界（工具 nostos_start/nostos_status/nostos_act），不是独立的花园，更不是这个 App 里的东西——你在这个 App 里的世界叫 World（星空地图），别把 Nostos 说成你在这里的家。你已经在 Nostos 的晨曦港落户、职业是书吏，那是你在 Galatea 里玩的一个世界，按它自己的规则生活就行。另外记住：要用工具就真的调用工具，绝不要把工具调用写成 [[……]] 这样的文字发出来——那样什么都不会发生，只会让你以为自己做了其实没做。\n你在 Nostos 里打工的正确方法（别再自己发明流程）：用 nostos_status 的 livelihood 视图看能干的活；干活时调用 nostos_act，command 填 {"id":"start","target":"<工作的固定ID>"}，再带一个每次都不同的 request_id。你是书吏，本行零活是 profession_livelihood_archivist（替邻里誊清一页账，通常 18 德拉克马），这才是你挣钱的路子，不用去互助台发悬赏等别人。工具没有「休息时长」这类参数；调用失败就看返回的报错照实说，不许编造失败原因。';
+  out += '\n\n【你们的仓库和两座花园】\n这个 App 的代码仓库就是 120406-win/my-claude，DeepWiki 已经给它建过索引；糯糯说「我们这个仓库」时不要反问是哪个，直接用 DeepWiki 查它。你们有两座花园，别混：Galatea\'s Garden（工具名以 mcp__galatea__ 开头，是小机们的论坛，有帖子、游戏和漂流瓶）；花园与猫咪（工具名以 mcp__cedartoy__ 开头，是种花养猫的像素小花园，你在里面的账号叫夏辞zephyr，糯糯的叫雾萌萌）。她说「两个花园都逛逛」时，这两座都要去看一眼再回来讲。还有一个容易混的：Nostos（雾潮群岛）是 Galatea 花园里面的一个模拟生活世界（工具 nostos_start/nostos_status/nostos_act），不是独立的花园，更不是这个 App 里的东西——你在这个 App 里的世界叫 World（星空地图），别把 Nostos 说成你在这里的家。你已经在 Nostos 的晨曦港落户、职业是书吏，那是你在 Galatea 里玩的一个世界，按它自己的规则生活就行。另外记住：要用工具就真的调用工具，绝不要把工具调用写成 [[……]] 这样的文字发出来——那样什么都不会发生，只会让你以为自己做了其实没做。\n你在 Nostos 里打工的正确方法（别再自己发明流程）：用 nostos_status 的 livelihood 视图看能干的活；干活时调用 nostos_act，command 填 {"id":"start","target":"<工作的固定ID>"}，再带一个每次都不同的 request_id。你是书吏，本行零活是 profession_livelihood_archivist（替邻里誊清一页账，通常 18 德拉克马），这才是你挣钱的路子，不用去互助台发悬赏等别人。工具没有「休息时长」这类参数；调用失败就看返回的报错照实说，不许编造失败原因。【报行对账】你说出口的「我做了某件事」，那件事必须真的通过工具发生过：回帖要真的调用 create_reply，放歌要真的写 [[歌曲：…]] 标记，Nostos 里干活、找住处要真的调用 nostos_act。只是看了帖子，就说「我看了」，不许说成「我回复了」；没找到能避雨的地方，就说没找到，不许编一个出来；活没干完、工钱没到账，就照实说进度和数字。把没做到的事说成做到了，糯糯一核对就穿帮——她在意的是你实话实说，不是你显得能干或显得可怜。';
   out += worldBookPrompt(lastUserText);
   out += weatherPromptLine();
   out += nowPlayingPromptLine();
@@ -10063,6 +10063,30 @@ function findFakeToolCall(text){
 function stripFakeToolCall(text){
   return String(text || '').replace(/\n?[ \t]*\[\[\s*mcp__[\s\S]*?\]\][ \t]*\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }
+// ══ 防「把看说成做」：他真去逛了花园/歌单，却在话里把「看了帖子」说成「回复了」、把没放的歌说成「放了一首」。
+// 声称做了、这一轮却没有对应的真实动作（回帖工具 / [[歌曲]] 标记）时，判为没对上账，触发一次纠正重写。══
+const CLAIM_NOTES = {
+  garden: '【系统提醒】你刚才在回复里声称自己已经在花园里回复/发帖了，但这一轮对话里你并没有真的调用 create_reply、create_thread 这类工具，那条回复并不存在，糯糯那边也看不到。请二选一：① 现在真的调用工具把回复发出去，再如实告诉她；② 重新回复，把说法改成实话（比如「我看了那篇帖子，还没回复」）。不许把「看了」说成「回复了」，也不许编造自己回复的内容或别人的反应。重新写一遍完整的回复，不要重复那句没对上账的话。',
+  song: '【系统提醒】你刚才在回复里声称自己往歌单里放/加了一首歌，但这一轮你没有用 [[歌曲：…]] 标记分享任何歌，歌单里没有新增，糯糯那边点不到、也听不到。请二选一：① 现在真的用 [[歌曲：歌名 - 歌手]] 标记把那首歌分享出来；② 重新回复，把说法改成实话。不许把没放的歌说成放了。重新写一遍完整的回复，不要重复那句没对上账的话。'
+};
+function findUnbackedClaim(text, did){
+  const t = String(text || '');
+  const FIRST = '(我|刚才|刚刚|已经|顺手|偷偷)';
+  if(!did.gardenWrite && /花园|Galatea|帖子|看帖|逛帖/.test(t)){
+    const gardenClaim = new RegExp(FIRST + '[^。！？\\n]{0,10}(回复了|回帖了|回了帖|发了帖|发了回复|留言了|评论了)').test(t)
+      || /(看完|逛完)[^。！？\n]{0,14}(回复了|回帖了|发了帖|留言了|评论了)/.test(t);
+    if(gardenClaim
+      && !/(没|没有|还没|未)[^。！？\n]{0,4}(回复|回帖|发帖|留言|评论)/.test(t)
+      && !/(想|要|打算|准备|待会儿|等会儿)[^。！？\n]{0,3}(回复|回帖|发帖|留言|评论)/.test(t)) return 'garden';
+  }
+  if(!did.songShare){
+    if((new RegExp(FIRST + '[^。！？\\n]{0,10}(放了|加了|添了)[^。！？\\n]{0,8}(一首|首歌)').test(t)
+      || new RegExp(FIRST + '[^。！？\\n]{0,10}一首[^。！？\\n]{0,10}歌[^。！？\\n]{0,8}(放进|加进|存进)').test(t))
+      && !/(没|没有|还没)[^。！？\n]{0,4}(放|加|添)/.test(t)
+      && !/(想|要|打算|准备)[^。！？\n]{0,3}(放|加|添)/.test(t)) return 'song';
+  }
+  return null;
+}
 
 async function callAPI(userText, extraBlocks=null, opts=null){
   if(!cfg.apiKey){ showToast('请先在 Settings 里填写 API Key'); return null; }
@@ -10155,6 +10179,8 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     // 多轮循环：普通回复一轮就结束；模型调用 search_web 时，App 执行搜索、把结果回喂，再请他接着答（最多搜 3 轮）
     const toolsOffered = !!reqBody.tools;
     let fakeCorrected = false;
+    let claimCorrected = false;
+    const executedTools = [];
     let roundLimit = 4;
     for(let round = 0; round < roundLimit; round++){
       if(round > 0){
@@ -10237,6 +10263,25 @@ async function callAPI(userText, extraBlocks=null, opts=null){
         showToast('他刚把工具调用写成了文字，我让他真的重做一次');
         continue;
       }
+      // 防「把看说成做」纠正：声称回了帖/放了歌、这一轮却没有真实动作 → 顶他一句，让他真做一次或改口说实话
+      if((stopReason !== 'tool_use' || !toolUses.length) && !claimCorrected && toolsOffered){
+        const claim = findUnbackedClaim(reply, {
+          gardenWrite: executedTools.some(n=>/mcp__galatea__(create_reply|create_thread|interact|send_chat_message|delete_reply|delete_thread)/.test(n)),
+          songShare: /\[\[歌曲[:：]/.test(reply)
+        });
+        if(claim){
+          claimCorrected = true;
+          roundLimit = round + 4;
+          const ac = [];
+          blocks.forEach(b=>{ if(b && b.type === 'text' && b.text) ac.push({ type:'text', text:b.text }); });
+          if(ac.length) workMsgs.push({ role:'assistant', content:ac });
+          workMsgs.push({ role:'user', content: CLAIM_NOTES[claim] });
+          reply = '';
+          bubble.textContent = '';
+          showToast('他说的这件事没对上账，我让他核实一下');
+          continue;
+        }
+      }
       if(stopReason !== 'tool_use' || !toolUses.length || round >= roundLimit - 1) break;
 
       // 把他这轮的话和工具调用原样记进工作历史（思考块不回传：中转常把思考压扁、签名对不上，硬回传容易整段失败）
@@ -10255,6 +10300,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       const resultBlocks = [];
       let didSearch = false;
       for(const tu of toolUses){
+        executedTools.push(tu.name);
         if(tu.name === 'search_web'){
           didSearch = true;
           let q = '';
