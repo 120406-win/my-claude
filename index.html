@@ -8380,6 +8380,14 @@ function renderMessagesIntoChat(){
         const sp = splitLeakedThinking(dispText);
         if(sp){ dispThinking = sp.thinking; dispText = sp.reply; }
       }
+      // 旧记录里 <|channel> 标记包着的思考同样摘出来折好（截图里那条就会自己归位）
+      if(!isUser){
+        const cs = splitChannelThinking(dispText);
+        if(cs){
+          if(cs.thinking) dispThinking = dispThinking ? (dispThinking + '\n\n' + cs.thinking) : cs.thinking;
+          dispText = cs.reply;
+        }
+      }
       if(!isUser && m.voice && m.voice.data && m.voiceText && dispText.length > m.voiceText.length && dispText.endsWith('\n' + m.voiceText)) dispText = dispText.slice(0, dispText.length - m.voiceText.length - 1);
       let b = null;
       if(isUser && m.voice && m.voice.data) addVoiceBubble('data:' + (m.voice.type || 'audio/mp4') + ';base64,' + m.voice.data, m.voice.dur || 0, true, m.mid);
@@ -9747,6 +9755,37 @@ function splitLeakedThinking(text){
   return { thinking:'', reply: body.trim() };
 }
 
+// 有些中转会把思考包进 <|channel>thought … <channel|> 标记里、混在正文中间返回，
+// 多见于工具调用之后的续轮：原生思考块是空的，上面的 splitLeakedThinking 又只认
+// 开头的 thinking 字样，于是整段推理原样漏进气泡。这里把所有 channel 段摘出来当
+// 思考、标记一律抹掉；<|channel>final 之后的是正文。切错也不要紧，思考块点开能看全。
+function splitChannelThinking(text){
+  if(!text || typeof text !== 'string' || text.indexOf('<|channel>') < 0) return null;
+  const re = /<\|channel>(thought|analysis|commentary)\s*/g;
+  const thinks = [];
+  let reply = '';
+  let last = 0;
+  let m;
+  let found = false;
+  while((m = re.exec(text)) !== null){
+    found = true;
+    reply += text.slice(last, m.index);
+    const segStart = m.index + m[0].length;
+    const closeMatch = /<channel\|>|<\|end\|>/.exec(text.slice(segStart));
+    const segEnd = closeMatch ? segStart + closeMatch.index : text.length;
+    const after = closeMatch ? segEnd + closeMatch[0].length : text.length;
+    const seg = text.slice(segStart, segEnd).trim();
+    if(seg) thinks.push(seg);
+    last = after;
+    re.lastIndex = after;
+  }
+  if(!found) return null;
+  reply += text.slice(last);
+  reply = reply.replace(/<\|channel>final\s*/g, '');
+  reply = reply.replace(/[ ]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  return { thinking: thinks.join('\n\n'), reply };
+}
+
 function makeThinkingBlock(col, beforeEl, startCollapsed){
   const wrap = document.createElement('div');
   wrap.style.cssText = 'margin:2px 0 6px;max-width:100%;';
@@ -9923,7 +9962,9 @@ async function callAPI(userText, extraBlocks=null, opts=null){
                 if(thinkBox && !thinkDone){ thinkDone = true; thinkBox.label.textContent = '思考过程'; thinkBox.setCollapsed(true); }
                 reply += d.text || '';
                 if(blk) blk.text += d.text || '';
-                bubble.textContent = reply;
+                // 流式显示也先摘掉 channel 思考段，别让推理过程在气泡里滚一遍（原文 reply 不动，收尾再正式切分）
+                const dispSplit = splitChannelThinking(reply);
+                bubble.textContent = dispSplit ? dispSplit.reply : reply;
                 chatWrap.scrollTop = chatWrap.scrollHeight;
               } else if(d.type === 'input_json_delta'){
                 if(blk) blk.json += d.partial_json || '';
@@ -9987,6 +10028,18 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       }
       if(searchStatus) searchStatus.textContent = didSearch ? ('联网搜到了 ' + sources.length + ' 条结果，正在整理…') : '工具结果回来了，正在整理…';
       workMsgs.push({ role:'user', content:resultBlocks });
+    }
+
+    // 中转把思考包在 <|channel>thought … <channel|> 里混进正文时（多见于工具续轮），摘出来折进思考块，标记不留在气泡里
+    const chSplit = splitChannelThinking(reply);
+    if(chSplit){
+      reply = chSplit.reply;
+      bubble.textContent = reply;
+      if(chSplit.thinking){
+        thinking = thinking ? (thinking + '\n\n' + chSplit.thinking) : chSplit.thinking;
+        if(!thinkBox) thinkBox = makeThinkingBlock(col, bubble, true);
+        thinkBox.body.textContent = thinking;
+      }
     }
 
     // 接口把思考混进正文返回时（开头带 thinking 字样、没有原生思考块），在这里切开折好
