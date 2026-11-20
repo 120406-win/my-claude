@@ -9732,6 +9732,16 @@ function makeThinkingBlock(col, beforeEl, startCollapsed){
   return { wrap, body, label, setCollapsed };
 }
 // ══ API（流式）══
+// ══ 防假调用：他有时会把工具调用写成 [[mcp__…{…}]] 文字，看着像调了其实什么都没发生。
+// 检测到就当场顶他一句、把那段假文字从气泡里抹掉，让他真的调用一次（每次回复最多纠正一次）。══
+function findFakeToolCall(text){
+  const m = /\[\[\s*mcp__[a-zA-Z0-9_]+__[a-zA-Z0-9_]+/.exec(String(text || ''));
+  return m ? m.index : -1;
+}
+function stripFakeToolCall(text){
+  return String(text || '').replace(/\n?[ \t]*\[\[\s*mcp__[\s\S]*?\]\][ \t]*\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 async function callAPI(userText, extraBlocks=null, opts=null){
   if(!cfg.apiKey){ showToast('请先在 Settings 里填写 API Key'); return null; }
   const regen = !!(opts && opts.regenerate);
@@ -9821,7 +9831,10 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     col.appendChild(bubble);
 
     // 多轮循环：普通回复一轮就结束；模型调用 search_web 时，App 执行搜索、把结果回喂，再请他接着答（最多搜 3 轮）
-    for(let round = 0; round < 4; round++){
+    const toolsOffered = !!reqBody.tools;
+    let fakeCorrected = false;
+    let roundLimit = 4;
+    for(let round = 0; round < roundLimit; round++){
       if(round > 0){
         delete reqBody.thinking; // 续轮不再带思考参数，避开接口对思考块回传的要求
         reqBody.messages = workMsgs;
@@ -9887,7 +9900,20 @@ async function callAPI(userText, extraBlocks=null, opts=null){
 
       if(roundUsage) recordUsage(roundUsage, cfg.model);
       const toolUses = blocks.filter(b=>b && b.type === 'tool_use' && (b.name === 'search_web' || b.name.startsWith('mcp__')));
-      if(stopReason !== 'tool_use' || !toolUses.length || round === 3) break;
+      // 防假调用纠正：这轮没真调工具、正文里却躺着一段 [[mcp__…]] 假调用 → 抹掉假文字，顶他一句让他真调
+      if((stopReason !== 'tool_use' || !toolUses.length) && !fakeCorrected && toolsOffered && findFakeToolCall(reply) >= 0){
+        fakeCorrected = true;
+        roundLimit = round + 4; // 给纠正后的真调用和收尾留够轮次
+        const ac = [];
+        blocks.forEach(b=>{ if(b && b.type === 'text' && b.text) ac.push({ type:'text', text:b.text }); });
+        if(ac.length) workMsgs.push({ role:'assistant', content:ac });
+        workMsgs.push({ role:'user', content:'【系统提醒】你刚才把工具调用写成了 [[…]] 文字，那不是真的调用，什么都没有执行。请现在真的调用对应的工具把这件事做完，再回复糯糯；不许用文字描述或模拟调用过程，工具没有的参数更不要编。' });
+        reply = stripFakeToolCall(reply);
+        bubble.textContent = reply;
+        showToast('他刚把工具调用写成了文字，我让他真的重做一次');
+        continue;
+      }
+      if(stopReason !== 'tool_use' || !toolUses.length || round >= roundLimit - 1) break;
 
       // 把他这轮的话和工具调用原样记进工作历史（思考块不回传：中转常把思考压扁、签名对不上，硬回传容易整段失败）
       const assistantContent = [];
@@ -9937,6 +9963,13 @@ async function callAPI(userText, extraBlocks=null, opts=null){
           thinkBox.body.textContent = thinking;
         }
       }
+    }
+
+    // 收尾再扫一遍：纠正过一次还写假调用的，把假文字抹掉，别让它留在气泡里冒充做过
+    if(findFakeToolCall(reply) >= 0){
+      reply = stripFakeToolCall(reply);
+      bubble.textContent = reply;
+      if(!reply) reply = fakeCorrected ? '（刚才那件事我没做成……你再让我试一次好不好）' : '（刚才走神了，再跟我说一次好吗）';
     }
 
     if(searchStatus){ searchStatus.remove(); searchStatus = null; }
