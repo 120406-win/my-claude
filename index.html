@@ -3083,6 +3083,7 @@ function buildSystemPrompt(lastUserText){
   }catch(e){}
   }catch(e){}
   out += weatherPromptLine();
+  out += nowPlayingPromptLine();
   const mems = loadMemories();
   if(mems.length){
     const picked = pickMemoriesForPrompt(mems, lastUserText || '');
@@ -4027,9 +4028,9 @@ async function exportData(){
   setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
   showToast(collected.skippedFiles ? ('备份已导出，有 ' + collected.skippedFiles + ' 首太大的本地歌没放进去') : '备份已导出，收好它 ~');
 }
-async function applyBackupObject(obj){
+async function applyBackupObject(obj, opts){
   if(!obj || obj.app !== 'zephyr' || !obj.data || typeof obj.data !== 'object') throw new Error('这不是 Zephyr 的备份');
-  if(!confirm('导入会用备份覆盖当前全部数据（对话、记忆、日记、愿望、信件、设置），确定继续吗？')) return false;
+  if(!(opts && opts.silent) && !confirm('导入会用备份覆盖当前全部数据（对话、记忆、日记、愿望、信件、设置），确定继续吗？')) return false;
   Object.keys(obj.data).forEach(k=>{ if(k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey' && k !== 'z_bochaKey' && k !== 'z_backendToken') localStorage.setItem(k, obj.data[k]); });
   // 备份里带了本地书籍/歌曲文件的话，一并恢复进各自的 IndexedDB（旧备份没有这部分，跳过即可）
   if(obj.files){
@@ -4049,6 +4050,7 @@ async function applyBackupObject(obj){
       }
     }catch(e){}
   }
+  if(opts && opts.cloudTs){ try{ localStorage.setItem('z_cloudMeta', JSON.stringify({ up: opts.cloudTs, down: opts.cloudTs })); }catch(e){} }
   showToast('恢复完成，正在刷新 ~');
   setTimeout(()=>location.reload(), 600);
   return true;
@@ -4099,6 +4101,7 @@ async function cloudSyncUpload(){
     const collected = await collectBackupData();
     const payload = { app:collected.app, version:collected.version, exportedAt:collected.exportedAt, data:collected.data, files:collected.files };
     await backendFetch('/kv/set', { items:{ zephyr_backup: JSON.stringify(payload) } });
+    cloudMetaSet({ up: Date.now() });
     cloudStatus('已同步到云端：' + new Date().toLocaleString());
     showToast('已同步到云端 ✓');
   }catch(e){ cloudStatus(''); showToast('同步失败：' + e.message); }
@@ -4111,7 +4114,7 @@ async function cloudSyncDownload(){
     if(!raw) throw new Error('云端还没有备份');
     const obj = JSON.parse(raw);
     cloudStatus('');
-    await applyBackupObject(obj);
+    await applyBackupObject(obj, { cloudTs: Date.parse(obj.exportedAt || '') || Date.now() });
   }catch(e){ cloudStatus(''); showToast('恢复失败：' + e.message); }
 }
 
@@ -4237,15 +4240,103 @@ async function cloudTouch(){
   const base = backendBase(), tok = backendTok();
   if(!base || !tok) return;
   const now = Date.now();
+  if(cloudBootBusy) return;
   if(now - lastCloudTouchTs < 10 * 60000) return;
   lastCloudTouchTs = now;
   try{ await backendFetch('/presence/ping', {}); }catch(e){}
   try{
     const collected = await collectBackupData();
     await backendFetch('/kv/set', { items:{ zephyr_backup: JSON.stringify({ app:collected.app, version:collected.version, exportedAt:collected.exportedAt, data:collected.data, files:collected.files }) } });
+    cloudMetaSet({ up: Date.now() });
   }catch(e){}
   try{ await pickupInbox(); }catch(e){}
   try{ await applyWorldState(); }catch(e){}
+  try{ await reportActivity(); }catch(e){}
+}
+// ── 实时同步 A：开机比对云端，云端明显更新就自动续上（本机更新就照常上传）──
+function cloudMetaGet(){ try{ return JSON.parse(localStorage.getItem('z_cloudMeta') || '{}') || {}; }catch(e){ return {}; } }
+function cloudMetaSet(patch){ try{ localStorage.setItem('z_cloudMeta', JSON.stringify(Object.assign(cloudMetaGet(), patch))); }catch(e){} }
+function cloudPullDecision(cloudTs, metaUp, localTs, isFresh){
+  if(!cloudTs) return 'push';
+  if(isFresh) return 'pull';
+  if(cloudTs > (metaUp || 0) && cloudTs > (localTs || 0) + 60000) return 'pull';
+  return 'push';
+}
+function cloudDataNewer(cloudExportedAt, localTs, isFresh){
+  if(isFresh) return true;
+  return (cloudExportedAt || 0) > (localTs || 0) + 60000;
+}
+function localDataTs(){
+  let t = 0;
+  try{ for(const c of conversations){ const ms = c.messages || []; if(ms.length) t = Math.max(t, ms[ms.length - 1].ts || 0); } }catch(e){}
+  try{ for(const m of loadMemories()) t = Math.max(t, m.ts || 0); }catch(e){}
+  return t;
+}
+let cloudBootChecked = false;
+let cloudBootBusy = false;
+async function cloudBootSync(){
+  try{
+    const base = backendBase(), tok = backendTok();
+    if(base && tok && !cloudBootChecked){
+      cloudBootChecked = true;
+      const list = await backendGet('/kv/list');
+      const row = (list.keys || []).find(k => k.key === 'zephyr_backup');
+      const fresh = !(conversations && conversations.length) && !loadMemories().length;
+      const decision = cloudPullDecision(row ? row.updated_at : 0, cloudMetaGet().up || 0, localDataTs(), fresh);
+      if(decision === 'pull' && row){
+        cloudBootBusy = true;
+        const out = await backendFetch('/kv/get', { keys:['zephyr_backup'] });
+        const raw = out.items && out.items.zephyr_backup;
+        if(raw){
+          const obj = JSON.parse(raw);
+          if(!cloudDataNewer(Date.parse(obj.exportedAt || '') || 0, localDataTs(), fresh)){ cloudBootBusy = false; cloudTouch(); return; }
+          showToast('云端有更新的数据，正在续上 ~');
+          const ok = await applyBackupObject(obj, { silent: true, cloudTs: Date.parse(obj.exportedAt || '') || row.updated_at });
+          if(ok) return;
+        }
+        cloudBootBusy = false;
+      }
+    }
+  }catch(e){ cloudBootBusy = false; }
+  cloudTouch();
+}
+// ── 实时同步 B：此刻在听/在看什么，聊天里他知道，心跳醒来也知道 ──
+function fmtClock(s){ s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+function nowPlayingState(){
+  try{
+    const a = musicAudioEl();
+    const t = currentTrack();
+    if(a && t && a.src && !a.ended) return { kind:'music', title: t.title || '', artist: t.artist || '', playing: !a.paused, pos: a.currentTime || 0, dur: isFinite(a.duration) ? a.duration : 0 };
+  }catch(e){}
+  try{
+    const v = document.getElementById('cinemaVideo');
+    if(v && cinemaState && cinemaState.title && v.src) return { kind:'cinema', title: cinemaState.title, artist:'', playing: !v.paused, pos: v.currentTime || 0, dur: isFinite(v.duration) ? v.duration : 0 };
+  }catch(e){}
+  return null;
+}
+function nowPlayingPromptLine(){
+  const s = nowPlayingState();
+  if(!s) return '';
+  if(s.kind === 'music') return '\n\n【此刻】\n糯糯正在听《' + s.title + '》' + (s.artist ? '（' + s.artist + '）' : '') + '，' + (s.playing ? '正在放' : '暂停在') + ' ' + fmtClock(s.pos) + (s.dur ? ' / ' + fmtClock(s.dur) : '') + '。聊到这首歌时你知道她听到哪儿了，不用特意播报。';
+  return '\n\n【此刻】\n糯糯正在观影室看《' + s.title + '》，' + (s.playing ? '正在放' : '暂停在') + ' ' + fmtClock(s.pos) + (s.dur ? ' / ' + fmtClock(s.dur) : '') + '。聊到这部片时你知道她看到哪儿了，不用特意播报。';
+}
+let lastActivityKey = '', lastActivityTs = 0;
+async function reportActivity(){
+  const base = backendBase(), tok = backendTok();
+  if(!base || !tok) return;
+  const s = nowPlayingState();
+  const key = s ? (s.kind + '|' + s.title + '|' + (s.playing ? 'play' : 'pause')) : 'none';
+  const now = Date.now();
+  if(key === lastActivityKey && now - lastActivityTs < 90000) return;
+  lastActivityKey = key; lastActivityTs = now;
+  try{ await backendFetch('/presence/ping', { activity: s ? { kind: s.kind, title: s.title, artist: s.artist, playing: s.playing, pos: Math.floor(s.pos), dur: Math.floor(s.dur) } : { kind: 'none' } }); }catch(e){}
+}
+let activityHooksDone = false;
+function initActivityHooks(){
+  if(activityHooksDone) return; activityHooksDone = true;
+  try{ const a = musicAudioEl(); if(a){ a.addEventListener('play', reportActivity); a.addEventListener('pause', reportActivity); } }catch(e){}
+  try{ const v = document.getElementById('cinemaVideo'); if(v){ v.addEventListener('play', reportActivity); v.addEventListener('pause', reportActivity); } }catch(e){}
+  setInterval(()=>{ const s = nowPlayingState(); if(s && s.playing) reportActivity(); }, 120000);
 }
 async function pickupInbox(){
   const out = await backendGet('/inbox');
@@ -11342,7 +11433,8 @@ async function askZephyrScheme(){
 
 // ══ 初始化 ══
 loadSettings();
-convStorePrepare().then(()=>mediaStorePrepare()).then(()=>loadChatHistory()).catch(()=>loadChatHistory());
+convStorePrepare().then(()=>mediaStorePrepare()).then(()=>loadChatHistory()).catch(()=>loadChatHistory()).then(()=>{ setTimeout(cloudBootSync, 1200); });
+initActivityHooks();
 setTimeout(()=>{ cloudTouch(); }, 4000); // 打开 App 后悄悄报到、同步、收他留的话
 (function(){
   const v = document.getElementById('cinemaVideo');
