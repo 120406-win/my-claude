@@ -1293,6 +1293,10 @@
           <input class="s-input" type="password" id="backendToken" placeholder="待填">
         </div>
         <div class="s-row">
+          <div class="s-row-label">字幕库 Key</div>
+          <input class="s-input" type="password" id="osubKey" placeholder="OpenSubtitles API Key" onchange="saveOsubKey(this.value)">
+        </div>
+        <div class="s-row">
           <div class="s-row-label">MCP 工具</div>
           <select class="s-input" id="mcpSel" onchange="setMcpEnabled(this.value)">
             <option value="on">开（聊天时他能用工具）</option>
@@ -5268,7 +5272,7 @@ function addVodFilm(i){
   const list = loadWatchlist();
   if(list.some(w=>w.title === it.title && w.url === it.eps[0].url)){ showToast('这部已经在清单里啦'); return; }
   const kind = /动(画|漫)/.test(it.type || '') ? '动画' : (/剧/.test(it.type || '') || it.eps.length > 1) ? '电视剧' : '电影';
-  list.unshift({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), title: String(it.title).slice(0, 120), kind, by:'lumi', note:'在线 · 全网找片（' + it.sourceName + '）', status:'want', ts:Date.now(), url: it.eps[0].url, vodEps: it.eps, vodAlt: it.alts || [], vodSource: it.sourceName });
+  list.unshift({ id:'w' + Date.now().toString(36) + Math.floor(Math.random()*999), title: String(it.title).slice(0, 120), kind, by:'lumi', note:'在线 · 全网找片（' + it.sourceName + '）', status:'want', ts:Date.now(), url: it.eps[0].url, vodEps: it.eps, vodAlt: it.alts || [], vodSource: it.sourceName, year: it.year || '' });
   if(storeWatchlist(list)){ renderWatchlist(); showToast('加进想看啦，去观影室就能看'); }
 }
 function renderWatchlist(){
@@ -10786,6 +10790,9 @@ function renderCinemaOnlineList(){
 function watchInCinemaEp(id, idx){
   const w = loadWatchlist().find(x=>x.id === id);
   if(!w || !w.vodEps || !w.vodEps[idx]){ showToast('这一集找不到了'); return; }
+  cinemaState.subQuery = w.title;
+  cinemaState.subYear = w.year || '';
+  cinemaState.subEp = idx + 1;
   navTo('cinema');
   openCinemaUrl(w.vodEps[idx].url, w.title + ' · ' + (w.vodEps[idx].name || ''), '');
 }
@@ -10826,12 +10833,17 @@ function tryAutoSwitchVodSource(){
 function watchInCinema(id){
   const w = loadWatchlist().find(x=>x.id === id);
   if(!w || !w.url){ showToast('这部没有在线链接'); return; }
+  cinemaState.subQuery = w.title;
+  cinemaState.subYear = w.year || '';
+  cinemaState.subEp = 0;
   navTo('cinema');
   openCinemaUrl(w.url, w.title, w.subUrl || '');
 }
 function openCinemaUrlInput(){
   const v = document.getElementById('cinemaUrlInput').value.trim();
   if(!/^https?:\/\//i.test(v)){ showToast('链接要以 http 开头哦'); return; }
+  cinemaState.subQuery = '';
+  cinemaState.subEp = 0;
   openCinemaUrl(v, '在线影片', '');
 }
 async function openCinemaUrl(url, title, subUrl){
@@ -10852,7 +10864,31 @@ async function openCinemaUrl(url, title, subUrl){
   document.getElementById('cinemaEmpty').style.display = 'none';
   renderCinema();
   if(subUrl) attachOnlineSub(subUrl, rec.id);
-  else showToast('开播啦，配一份字幕会更好聊');
+  else tryAttachOnlineSubtitle(rec.id);
+}
+// 在线片没有自带字幕时，去 OpenSubtitles 按片名找一份挂上（Key 在后端），让他能跟着台词陪看
+async function tryAttachOnlineSubtitle(recId){
+  const title = cinemaState.subQuery || '';
+  if(!title || !backendTok()) return;
+  try{
+    const out = await backendFetch('/vod/subtitle', { title, year: cinemaState.subYear || '', episode: cinemaState.subEp || 0 });
+    if(!out || !out.text) return;
+    const cues = parseSubtitles(out.text);
+    if(!cues.length) return;
+    if(cinemaState.recordId !== recId) return; // 已经换片了，别挂错
+    cinemaState.cues = cues;
+    const recs = loadCinemaRecords();
+    const rec = recs.find(x=>x.id === recId);
+    if(rec){ rec.subName = out.fileName || '在线字幕'; storeCinemaRecords(recs); }
+    renderCinemaInfo();
+    showToast('字幕找到了，他能跟着台词啦（共 ' + cues.length + ' 句）');
+  }catch(e){}
+}
+async function saveOsubKey(v){
+  const key = (v || '').trim();
+  if(!key) return;
+  try{ await backendFetch('/osub/config', { apiKey: key }); showToast('字幕库 Key 存好啦'); }
+  catch(e){ showToast('没存上：' + e.message); }
 }
 async function attachOnlineSub(subUrl, recId){
   try{
