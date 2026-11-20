@@ -1280,6 +1280,26 @@
       </div>
     </div>
 
+    <!-- 云端后端 -->
+    <div class="s-section">
+      <div class="s-section-title">云端后端</div>
+      <div class="s-card">
+        <div class="s-row">
+          <div class="s-row-label">后端地址</div>
+          <input class="s-input" type="text" id="backendUrl" placeholder="https://zephyr-api.xxx.workers.dev">
+        </div>
+        <div class="s-row">
+          <div class="s-row-label">访问令牌</div>
+          <input class="s-input" type="password" id="backendToken" placeholder="待填">
+        </div>
+        <div style="display:flex;gap:8px;padding:12px 16px 4px;">
+          <button onclick="cloudSyncUpload()" style="flex:1;padding:11px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">同步到云端</button>
+          <button onclick="cloudSyncDownload()" style="flex:1;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">从云端恢复</button>
+        </div>
+        <div id="cloudSyncStatus" style="font-size:11.5px;color:var(--text-pale);line-height:1.7;padding:6px 16px 12px;"></div>
+      </div>
+    </div>
+
     <!-- 导入聊天记录 -->
     <div class="s-section">
       <div class="s-section-title">导入聊天记录</div>
@@ -2441,6 +2461,8 @@ let cfg={
   ttsKey:     localStorage.getItem('z_ttsKey')||'',
   ttsVoiceId: localStorage.getItem('z_ttsVoiceId')||'',
   ttsUrl:     localStorage.getItem('z_ttsUrl')||'',
+  backendUrl: localStorage.getItem('z_backendUrl')||'https://zephyr-api.ruan060412.workers.dev',
+  backendToken: localStorage.getItem('z_backendToken')||'',
   avatarUser: localStorage.getItem('z_avatarUser')||'',   // base64 or emoji
   avatarZephyr: localStorage.getItem('z_avatarZephyr')||'🌙',
 };
@@ -2657,6 +2679,10 @@ function loadSettings(){
   document.getElementById('systemPrompt').value = cfg.system;
   document.getElementById('ttsUrl').value    = cfg.ttsUrl||'';
   document.getElementById('ttsKey').value    = cfg.ttsKey;
+  const buEl=document.getElementById('backendUrl');
+  if(buEl) buEl.value = cfg.backendUrl||'';
+  const btEl=document.getElementById('backendToken');
+  if(btEl) btEl.value = cfg.backendToken||'';
 
   const ts=document.getElementById('tempSlider');
   ts.value=cfg.temperature; document.getElementById('tempVal').textContent=cfg.temperature;
@@ -2697,10 +2723,12 @@ function saveSettings(){
   cfg.fontSize   = parseInt(document.getElementById('fontSlider').value);
   cfg.ttsKey     = document.getElementById('ttsKey').value.trim();
   cfg.ttsUrl = document.getElementById('ttsUrl').value.trim();
+  const buIn=document.getElementById('backendUrl'); if(buIn) cfg.backendUrl = buIn.value.trim();
+  const btIn=document.getElementById('backendToken'); if(btIn) cfg.backendToken = btIn.value.trim();
   Object.entries({z_apiUrl:cfg.apiUrl,z_apiKey:cfg.apiKey,z_model:cfg.model,z_system:cfg.system,
     z_temperature:cfg.temperature,z_topP:cfg.topP,z_maxTokens:cfg.maxTokens,
     z_fontSize:cfg.fontSize,z_theme:cfg.theme,z_ttsKey:cfg.ttsKey,z_ttsVoiceId:cfg.ttsVoiceId,
-    z_ttsUrl:cfg.ttsUrl
+    z_ttsUrl:cfg.ttsUrl,z_backendUrl:cfg.backendUrl,z_backendToken:cfg.backendToken
   }).forEach(([k,v])=>localStorage.setItem(k,v));
   applyFont(cfg.fontSize);
   showToast('已保存 ✓');
@@ -3921,11 +3949,11 @@ async function letterByZephyr(){
 updateLettersBadge();
 
 // ══ 数据备份：所有数据属于用户，可导出、可迁移、可恢复 ══
-async function exportData(){
+async function collectBackupData(){
   const data = {};
   for(let i = 0; i < localStorage.length; i++){
     const k = localStorage.key(i);
-    if(k && k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey' && k !== 'z_bochaKey') data[k] = localStorage.getItem(k);
+    if(k && k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey' && k !== 'z_bochaKey' && k !== 'z_backendToken') data[k] = localStorage.getItem(k);
   }
   // 对话存在 IndexedDB 大仓库里，localStorage 里没有，单独带上，备份才完整
   try{ data['z_conversations'] = JSON.stringify(conversations); }catch(e){}
@@ -3950,7 +3978,11 @@ async function exportData(){
       files.music[t.id] = { type: blob.type || 'audio/mpeg', b64: bytesToB64(new Uint8Array(await blob.arrayBuffer())) };
     }
   }catch(e){}
-  const payload = JSON.stringify({ app:'zephyr', version:2, exportedAt:new Date().toISOString(), data, files }, null, 2);
+  return { app:'zephyr', version:2, exportedAt:new Date().toISOString(), data, files, skippedFiles };
+}
+async function exportData(){
+  const collected = await collectBackupData();
+  const payload = JSON.stringify({ app:collected.app, version:collected.version, exportedAt:collected.exportedAt, data:collected.data, files:collected.files }, null, 2);
   const blob = new Blob([payload], { type:'application/json' });
   const a = document.createElement('a');
   const d = new Date();
@@ -3960,7 +3992,33 @@ async function exportData(){
   a.click();
   a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href), 4000);
-  showToast(skippedFiles ? ('备份已导出，有 ' + skippedFiles + ' 首太大的本地歌没放进去') : '备份已导出，收好它 ~');
+  showToast(collected.skippedFiles ? ('备份已导出，有 ' + collected.skippedFiles + ' 首太大的本地歌没放进去') : '备份已导出，收好它 ~');
+}
+async function applyBackupObject(obj){
+  if(!obj || obj.app !== 'zephyr' || !obj.data || typeof obj.data !== 'object') throw new Error('这不是 Zephyr 的备份');
+  if(!confirm('导入会用备份覆盖当前全部数据（对话、记忆、日记、愿望、信件、设置），确定继续吗？')) return false;
+  Object.keys(obj.data).forEach(k=>{ if(k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey' && k !== 'z_bochaKey' && k !== 'z_backendToken') localStorage.setItem(k, obj.data[k]); });
+  // 备份里带了本地书籍/歌曲文件的话，一并恢复进各自的 IndexedDB（旧备份没有这部分，跳过即可）
+  if(obj.files){
+    try{
+      const books = obj.files.books || {};
+      for(const id of Object.keys(books)) await bookPut(id, books[id]).catch(()=>{});
+    }catch(e){}
+    try{
+      const mus = obj.files.music || {};
+      for(const id of Object.keys(mus)){
+        const f = mus[id];
+        if(!f || !f.b64) continue;
+        const bin = atob(f.b64);
+        const bytes = new Uint8Array(bin.length);
+        for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        await musPutFile(id, new Blob([bytes], { type: f.type || 'audio/mpeg' })).catch(()=>{});
+      }
+    }catch(e){}
+  }
+  showToast('恢复完成，正在刷新 ~');
+  setTimeout(()=>location.reload(), 600);
+  return true;
 }
 function importDataFile(input){
   const file = input.files && input.files[0];
@@ -3970,34 +4028,58 @@ function importDataFile(input){
   reader.onload = async ()=>{
     try{
       const obj = JSON.parse(reader.result);
-      if(!obj || obj.app !== 'zephyr' || !obj.data || typeof obj.data !== 'object') throw new Error('bad file');
-      if(!confirm('导入会用备份覆盖当前全部数据（对话、记忆、日记、愿望、信件、设置），确定继续吗？')) return;
-      Object.keys(obj.data).forEach(k=>{ if(k.startsWith('z_') && k !== 'z_apiKey' && k !== 'z_searchKey' && k !== 'z_bochaKey') localStorage.setItem(k, obj.data[k]); });
-      // 备份里带了本地书籍/歌曲文件的话，一并恢复进各自的 IndexedDB（旧备份没有这部分，跳过即可）
-      if(obj.files){
-        try{
-          const books = obj.files.books || {};
-          for(const id of Object.keys(books)) await bookPut(id, books[id]).catch(()=>{});
-        }catch(e){}
-        try{
-          const mus = obj.files.music || {};
-          for(const id of Object.keys(mus)){
-            const f = mus[id];
-            if(!f || !f.b64) continue;
-            const bin = atob(f.b64);
-            const bytes = new Uint8Array(bin.length);
-            for(let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-            await musPutFile(id, new Blob([bytes], { type: f.type || 'audio/mpeg' })).catch(()=>{});
-          }
-        }catch(e){}
-      }
-      showToast('恢复完成，正在刷新 ~');
-      setTimeout(()=>location.reload(), 600);
+      await applyBackupObject(obj);
     }catch(e){
       showToast('这个文件不是 Zephyr 的备份 qwq');
     }
   };
   reader.readAsText(file);
+}
+
+// ══ 云端后端：整份备份存进糯糯自己的 Cloudflare（zephyr-api + D1），换设备登录同一后端即可恢复 ══
+function backendBase(){
+  const el = document.getElementById('backendUrl');
+  return ((el && el.value.trim()) || cfg.backendUrl || '').replace(/\/+$/, '');
+}
+function backendTok(){
+  const el = document.getElementById('backendToken');
+  return (el && el.value.trim()) || cfg.backendToken || '';
+}
+function cloudStatus(msg){
+  const el = document.getElementById('cloudSyncStatus');
+  if(el) el.textContent = msg;
+}
+async function backendFetch(path, body){
+  const base = backendBase(), tok = backendTok();
+  if(!base) throw new Error('先填后端地址');
+  if(!tok) throw new Error('先填访问令牌');
+  cfg.backendUrl = base; cfg.backendToken = tok;
+  try{ localStorage.setItem('z_backendUrl', base); localStorage.setItem('z_backendToken', tok); }catch(e){}
+  const resp = await fetch(base + path, { method:'POST', headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + tok }, body: JSON.stringify(body) });
+  const out = await resp.json().catch(()=>({}));
+  if(!resp.ok || !out.ok) throw new Error(out.error || ('HTTP ' + resp.status));
+  return out;
+}
+async function cloudSyncUpload(){
+  try{
+    cloudStatus('正在打包上传…');
+    const collected = await collectBackupData();
+    const payload = { app:collected.app, version:collected.version, exportedAt:collected.exportedAt, data:collected.data, files:collected.files };
+    await backendFetch('/kv/set', { items:{ zephyr_backup: JSON.stringify(payload) } });
+    cloudStatus('已同步到云端：' + new Date().toLocaleString());
+    showToast('已同步到云端 ✓');
+  }catch(e){ cloudStatus(''); showToast('同步失败：' + e.message); }
+}
+async function cloudSyncDownload(){
+  try{
+    cloudStatus('正在从云端取备份…');
+    const out = await backendFetch('/kv/get', { keys:['zephyr_backup'] });
+    const raw = out.items && out.items.zephyr_backup;
+    if(!raw) throw new Error('云端还没有备份');
+    const obj = JSON.parse(raw);
+    cloudStatus('');
+    await applyBackupObject(obj);
+  }catch(e){ cloudStatus(''); showToast('恢复失败：' + e.message); }
 }
 
 // ══ Calendar：Zephyr 的历史时间线。里程碑从愿望/信件/日记/重要事件里自动汇集，也可以手动补记 ══
