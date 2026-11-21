@@ -10661,6 +10661,46 @@ function findUnbackedClaim(text, did){
   return null;
 }
 
+// 把本地历史整理成能发给接口的样子：
+// ① 旧消息里的图片/文件换成占位字——附件只在「最后一条用户消息」里原样发。他当时看过、回复也都在；
+//    要是每轮把几张图和整份 PDF 的 base64 重发一遍，一条对话攒到百万字符就会被接口直接拒掉、怎么发都失败。
+// ② 字符预算兜底：摘要按条数触发，一条超大消息就能绕过它；超预算从最旧的整条丢起，并保证开头是用户消息。
+function buildApiMessages(histForApi, summaryPair){
+  let lastUserIdx = -1;
+  histForApi.forEach((m, i)=>{ if(m.role === 'user') lastUserIdx = i; });
+  const mappedHist = histForApi.map((m, i)=>{
+    let c = m.content;
+    // 历史里若混着「思考混在正文里」的旧回复，只把正文发给他，免得他学着那个格式说话
+    if(m.role === 'assistant' && typeof c === 'string'){
+      const sp = splitLeakedThinking(c);
+      if(sp) c = sp.reply;
+    }
+    if(Array.isArray(c) && i !== lastUserIdx){
+      const parts = [];
+      for(const b of c){
+        if(!b) continue;
+        if(b.type === 'text' && b.text) parts.push({ type:'text', text:b.text });
+        else if(b.type === 'image') parts.push({ type:'text', text:'（图片）' });
+        else if(b.type === 'document') parts.push({ type:'text', text:'（文件）' });
+      }
+      c = parts.length ? parts : '（附件）';
+    }
+    return { role:m.role, content:c };
+  });
+  let apiMessages = summaryPair ? summaryPair.concat(mappedHist) : mappedHist;
+  const histBudget = 180000;
+  let totalChars = JSON.stringify(apiMessages).length;
+  // 预算只管「攒下来的历史」：最后一条（刚发的消息，附件可能本身就很大）不参与计算、永不丢
+  const lastSize = apiMessages.length ? JSON.stringify(apiMessages[apiMessages.length - 1]).length : 0;
+  while(totalChars - lastSize > histBudget && apiMessages.length > 2){
+    const dropAt = summaryPair ? 2 : 0;
+    if(dropAt >= apiMessages.length - 1) break;
+    apiMessages.splice(dropAt, 1);
+    totalChars = JSON.stringify(apiMessages).length;
+  }
+  while(apiMessages.length && apiMessages[0].role !== 'user') apiMessages.shift();
+  return apiMessages;
+}
 async function callAPI(userText, extraBlocks=null, opts=null){
   if(!cfg.apiKey){ hideTyping(); showToast('请先在 Settings 里填写 API Key'); return null; }
   const regen = !!(opts && opts.regenerate);
@@ -10693,16 +10733,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
         ];
       }
     }
-    const mappedHist = histForApi.map(m=>{
-      let c = m.content;
-      // 历史里若混着「思考混在正文里」的旧回复，只把正文发给他，免得他学着那个格式说话
-      if(m.role === 'assistant' && typeof c === 'string'){
-        const sp = splitLeakedThinking(c);
-        if(sp) c = sp.reply;
-      }
-      return { role:m.role, content:c };
-    });
-    const apiMessages = summaryPair ? summaryPair.concat(mappedHist) : mappedHist;
+    const apiMessages = buildApiMessages(histForApi, summaryPair);
     const reqBody = { model:cfg.model, max_tokens:cfg.maxTokens, temperature:cfg.temperature, top_p:cfg.topP, system:buildSystemPrompt(typeof userText === 'string' ? userText : ''), messages:apiMessages, stream:true };
     const thinkOn = thinkingEnabled();
     if(thinkOn){
