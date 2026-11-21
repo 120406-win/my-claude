@@ -835,9 +835,11 @@
 
   <div id="stickerPanel" style="display:none;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 12px;max-height:196px;overflow-y:auto;background:var(--bg);border-top:1px solid var(--border);"></div>
 
+  <div id="pendingImgBar" style="display:none;gap:8px;padding:10px 12px 2px;flex-wrap:wrap;background:var(--bg);border-top:1px solid var(--border);"></div>
+
   <div class="input-bar">
     <button class="ibtn" id="imgBtn" title="发图片"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M4.5 17.5l4.8-4.8 3 3 3.2-3.2 4 4"/></svg></button>
-    <input type="file" id="fileInput" accept="image/*">
+    <input type="file" id="fileInput" accept="image/*" multiple>
     <button class="ibtn" id="docBtn" title="发文件"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
     <input type="file" id="docInput" accept=".txt,.md,.csv,.json,.pdf,.js,.py,.html,.css,.xml,.log">
     <button class="ibtn" id="stickerBtn" title="表情包" onclick="toggleStickerPanel()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/><path d="M9 9.5h.01M15 9.5h.01"/></svg></button>
@@ -9637,15 +9639,21 @@ function renderMessagesIntoChat(){
       }
     } else if(Array.isArray(m.content)){
       const hasMedia = m.content.some(b=>b.type==='image'||b.type==='document');
-      m.content.forEach(block=>{
-        if(block.type === 'image' && block.source?.data){
-          addImgMsg(`data:${block.source.media_type};base64,${block.source.data}`, isUser, false, m.mid);
-        } else if(block.type === 'document'){
-          addTextMsg('📄 文件', isUser, false, m.mid);
-        } else if(block.type === 'text' && !hasMedia){
-          addTextMsg(block.text, isUser, false, m.mid);
-        }
-      });
+      if(hasMedia){
+        const col = addRow(isUser, m.mid);
+        m.content.forEach(block=>{
+          if(block.type === 'image' && block.source?.data){
+            col.appendChild(imgWrapEl(`data:${block.source.media_type};base64,${block.source.data}`));
+          } else if(block.type === 'document'){
+            const fb = document.createElement('div'); fb.className = 'msg'; fb.textContent = '📄 文件'; col.appendChild(fb);
+          } else if(block.type === 'text' && !/^（糯糯发来了.*图片，请.*自然地回应/.test(block.text || '')){
+            const tb = document.createElement('div'); tb.className = 'msg'; tb.textContent = block.text; col.appendChild(tb);
+          }
+        });
+        chatWrap.scrollTop = chatWrap.scrollHeight;
+      } else {
+        m.content.forEach(block=>{ if(block.type === 'text') addTextMsg(block.text, isUser, false, m.mid); });
+      }
     }
   });
   // 封档线：画在被封档的那条消息下面
@@ -9981,7 +9989,8 @@ function addRow(isUser, mid){
   chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; return col;
 }
 function addTextMsg(text,isUser,skipSave,mid){ const col=addRow(isUser,mid); const b=document.createElement('div'); b.className='msg'; b.textContent=text; col.appendChild(b); chatWrap.scrollTop=chatWrap.scrollHeight; return b; }
-function addImgMsg(src,isUser,skipSave,mid){ const col=addRow(isUser,mid); const wrap=document.createElement('div'); wrap.className='msg-img-wrap'; const img=document.createElement('img'); img.className='msg-img'; img.src=src; img.onclick=()=>{ if(window.__suppressImgClick && Date.now()-window.__suppressImgClick<900) return; document.getElementById('imgPreviewEl').src=src; document.getElementById('imgPreview').classList.add('show'); }; wrap.appendChild(img); col.appendChild(wrap); chatWrap.scrollTop=chatWrap.scrollHeight; }
+function imgWrapEl(src){ const wrap=document.createElement('div'); wrap.className='msg-img-wrap'; const img=document.createElement('img'); img.className='msg-img'; img.src=src; img.onclick=()=>{ if(window.__suppressImgClick && Date.now()-window.__suppressImgClick<900) return; document.getElementById('imgPreviewEl').src=src; document.getElementById('imgPreview').classList.add('show'); }; wrap.appendChild(img); return wrap; }
+function addImgMsg(src,isUser,skipSave,mid){ const col=addRow(isUser,mid); col.appendChild(imgWrapEl(src)); chatWrap.scrollTop=chatWrap.scrollHeight; }
 async function voiceBlobToB64(blob){ const buf = new Uint8Array(await blob.arrayBuffer()); return bytesToB64(buf); }
 function addVoiceMsg(blob,dur,isUser,mid){ addVoiceBubble(URL.createObjectURL(blob), dur, isUser, mid); }
 function buildVoiceWrap(src, dur){
@@ -11812,9 +11821,24 @@ voiceToggleBtn.addEventListener('click', () => {
 
 // ══ 发消息 ══
 async function sendMessage(){
-  const text=document.getElementById('msgInput').value.trim(); if(!text) return;
+  const text=document.getElementById('msgInput').value.trim();
+  if(!text && !pendingImgs.length) return;
   document.getElementById('msgInput').value='';
   const mid = genMsgId(); pendingUserMid = mid;
+  if(pendingImgs.length){
+    const imgs = pendingImgs; pendingImgs = []; renderPendingImgs();
+    const col = addRow(true, mid);
+    imgs.forEach(pi => col.appendChild(imgWrapEl(pi.dataUrl)));
+    if(text){ const b = document.createElement('div'); b.className = 'msg'; b.textContent = text; col.appendChild(b); }
+    chatWrap.scrollTop = chatWrap.scrollHeight;
+    headerSub.textContent='正在输入…'; showTyping();
+    const blocks = imgs.map(pi => ({ type:'image', source:{ type:'base64', media_type: pi.mediaType, data: pi.dataUrl.split(',')[1] } }));
+    const prompt = text || ('（糯糯发来了' + (imgs.length > 1 ? imgs.length + '张' : '一张') + '图片，请看一下并自然地回应她）');
+    const reply = await callAPI(prompt, blocks);
+    headerSub.textContent='在线';
+    if(reply && (voiceEnabled||isCalling||isVideo)) speakText(reply);
+    return;
+  }
   addTextMsg(text,true,false,mid); headerSub.textContent='正在输入…'; showTyping();
   const reply=await callAPI(text); headerSub.textContent='在线';
   if(reply && (voiceEnabled||isCalling||isVideo)) speakText(reply);
@@ -11823,23 +11847,47 @@ document.getElementById('sendBtn').addEventListener('click',sendMessage);
 document.getElementById('sendBtn').addEventListener('click',unlockTtsAudio);
 document.getElementById('msgInput').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();} });
 
-// ══ 发图片 ══
+// ══ 发图片：先暂存（可多张、可删），写好配文点发送才和文字一起发 ══
+let pendingImgs = [];
+function renderPendingImgs(){
+  const bar = document.getElementById('pendingImgBar'); if(!bar) return;
+  if(!pendingImgs.length){ bar.style.display = 'none'; bar.innerHTML = ''; return; }
+  bar.style.display = 'flex'; bar.innerHTML = '';
+  pendingImgs.forEach((pi, i) => {
+    const cell = document.createElement('div');
+    cell.style.cssText = 'position:relative;width:56px;height:56px;flex-shrink:0;';
+    const im = document.createElement('img');
+    im.src = pi.dataUrl;
+    im.style.cssText = 'width:56px;height:56px;object-fit:cover;border-radius:10px;border:1px solid var(--border);display:block;';
+    const x = document.createElement('button');
+    x.textContent = '×';
+    x.style.cssText = 'position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:var(--accent);color:#fff;border:none;font-size:12px;line-height:1;cursor:pointer;padding:0;';
+    x.onclick = () => { pendingImgs.splice(i, 1); renderPendingImgs(); };
+    cell.appendChild(im); cell.appendChild(x); bar.appendChild(cell);
+  });
+}
+async function stageImageFiles(files){
+  const list = [...(files || [])].filter(f => f && f.type && f.type.startsWith('image/'));
+  for(const f of list){
+    if(pendingImgs.length >= 6){ showToast('一次最多发 6 张图'); break; }
+    try{
+      const raw = await new Promise((res, rej) => { const r = new FileReader(); r.onload = ev => res(ev.target.result); r.onerror = rej; r.readAsDataURL(f); });
+      const dataUrl = await compressChatImage(raw);
+      const mt = (dataUrl.match(/^data:([^;]+)/) || [])[1] || 'image/jpeg';
+      pendingImgs.push({ dataUrl, mediaType: mt });
+    }catch(e){}
+  }
+  if(list.length) renderPendingImgs();
+  const inp = document.getElementById('msgInput'); if(inp) inp.focus();
+}
 document.getElementById('imgBtn').addEventListener('click',()=>document.getElementById('fileInput').click());
-document.getElementById('fileInput').addEventListener('change',async e=>{
-  const file=e.target.files[0]; if(!file) return; e.target.value='';
-  const reader=new FileReader();
-  reader.onload=async ev=>{
-    const dataUrl = await compressChatImage(ev.target.result);
-    const mtMatch = dataUrl.match(/^data:([^;]+)/);
-    const mediaType = mtMatch ? mtMatch[1] : (file.type || 'image/jpeg');
-    const mid = genMsgId(); pendingUserMid = mid;
-    addImgMsg(dataUrl,true,false,mid); headerSub.textContent='正在识图…'; showTyping();
-    const block = {type:'image', source:{type:'base64', media_type: mediaType, data: dataUrl.split(',')[1]}};
-    const reply=await callAPI('（糯糯发来了一张图片，请描述并自然地回应她）',[block]);
-    hideTyping(); headerSub.textContent='在线';
-    // callAPI 内部已经创建气泡并流式渲染了回复，这里不要再 addTextMsg，否则回复会重复显示
-  };
-  reader.readAsDataURL(file);
+document.getElementById('fileInput').addEventListener('change',e=>{
+  stageImageFiles(e.target.files);
+  e.target.value='';
+});
+document.getElementById('msgInput').addEventListener('paste',e=>{
+  const files = (e.clipboardData && e.clipboardData.files) || [];
+  if(files && files.length){ e.preventDefault(); stageImageFiles(files); }
 });
 document.getElementById('imgPreview').addEventListener('click',()=>document.getElementById('imgPreview').classList.remove('show'));
 
