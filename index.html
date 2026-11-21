@@ -207,6 +207,17 @@
       background:inherit; transform:rotate(45deg);
       border-top:1px solid var(--border); border-right:1px solid var(--border);
     }
+    /* ══ 聊天装饰：中间水印 + 角落挂件（图片自己上传，只存本机与自己的备份）══ */
+    #app { position:relative; }
+    #chatWatermark {
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      width:min(64vw, 340px); aspect-ratio:1/1;
+      background-size:contain; background-repeat:no-repeat; background-position:center;
+      opacity:.38; pointer-events:none; z-index:0;
+    }
+    .chat-charm { position:absolute; height:56px; width:auto; max-width:30vw; object-fit:contain; pointer-events:none; z-index:11; display:none; }
+    #chatCharmTop { top:64px; right:4px; }
+    #chatCharmBottom { bottom:72px; right:4px; }
 
     html, body {
       width:100%; height:100%;
@@ -811,6 +822,10 @@
     <div class="empty-tip">✨ 和 Zephyr 说说话吧～</div>
   </div>
 
+  <div id="chatWatermark"></div>
+  <img id="chatCharmTop" class="chat-charm" alt="">
+  <img id="chatCharmBottom" class="chat-charm" alt="">
+
   <div id="stickerPanel" style="display:none;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 12px;max-height:196px;overflow-y:auto;background:var(--bg);border-top:1px solid var(--border);"></div>
 
   <div class="input-bar">
@@ -1268,6 +1283,28 @@
           </div>
           <input type="range" id="bgDimSlider" min="0" max="75" step="5" value="35" style="width:100%;">
           <button onclick="clearBgImage()" style="width:100%;padding:9px;margin-top:10px;border-radius:10px;background:none;border:1px solid var(--border);color:var(--text-dim);font-size:12px;cursor:pointer;">移除背景图</button>
+        </div>
+        <div class="s-row">
+          <div>
+            <div class="s-row-label">聊天装饰</div>
+          </div>
+        </div>
+        <div style="padding:0 16px 14px;display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <img id="decoWatermarkPreview" style="width:44px;height:44px;object-fit:contain;border:1px solid var(--border);border-radius:10px;background:var(--surface);flex-shrink:0;">
+            <div style="flex:1;font-size:13px;color:var(--text);">中间水印</div>
+            <button class="bg-mode-btn" onclick="document.getElementById('decoWatermarkInput').click()">上传</button>
+            <button class="bg-mode-btn" onclick="clearDeco('watermark')">清除</button>
+            <input type="file" id="decoWatermarkInput" accept="image/*" style="display:none">
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <img id="decoCharmPreview" style="width:44px;height:44px;object-fit:contain;border:1px solid var(--border);border-radius:10px;background:var(--surface);flex-shrink:0;display:none;">
+            <div id="decoCharmEmpty" style="width:44px;height:44px;border:1px dashed var(--border);border-radius:10px;flex-shrink:0;"></div>
+            <div style="flex:1;font-size:13px;color:var(--text);">角落挂件</div>
+            <button class="bg-mode-btn" onclick="document.getElementById('decoCharmInput').click()">上传</button>
+            <button class="bg-mode-btn" onclick="clearDeco('charm')">清除</button>
+            <input type="file" id="decoCharmInput" accept="image/*" style="display:none">
+          </div>
         </div>
       </div>
     </div>
@@ -2821,6 +2858,62 @@ function applyBackground(){
     layer.style.backgroundColor = 'transparent';
   }
   syncBgControls();
+}
+
+// ══ 聊天装饰：水印（没上传时用内置细线条小兔兜底）+ 角落挂件 ══
+const DECO_DEFAULT_WATERMARK = 'data:image/svg+xml;utf8,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><g fill="none" stroke="#c9a0b4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M42 54 C33 32 37 12 46 9 C55 6 59 27 56 50"/><path d="M78 54 C87 32 83 12 74 9 C65 6 61 27 64 50"/><circle cx="60" cy="74" r="30"/><path d="M48 72 q4 4 8 0"/><path d="M64 72 q4 4 8 0"/><path d="M57 82 q3 3 6 0"/><path d="M88 42 L99 35 L98 48 Z"/><path d="M88 42 L77 34 L76 47 Z"/><circle cx="88" cy="42" r="3"/></g></svg>');
+function applyDecorations(){
+  const wm = document.getElementById('chatWatermark');
+  const customWm = localStorage.getItem('z_decoWatermark');
+  if(wm) wm.style.backgroundImage = 'url("' + (customWm || DECO_DEFAULT_WATERMARK) + '")';
+  const charm = localStorage.getItem('z_decoCharm') || '';
+  ['chatCharmTop', 'chatCharmBottom'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el){ if(charm){ el.src = charm; el.style.display = 'block'; } else { el.style.display = 'none'; } }
+  });
+  const wp = document.getElementById('decoWatermarkPreview');
+  if(wp) wp.src = customWm || DECO_DEFAULT_WATERMARK;
+  const cp = document.getElementById('decoCharmPreview');
+  const ce = document.getElementById('decoCharmEmpty');
+  if(cp){ if(charm){ cp.src = charm; cp.style.display = 'block'; } else cp.style.display = 'none'; }
+  if(ce) ce.style.display = charm ? 'none' : 'block';
+}
+function setupDecoControls(){
+  const map = { decoWatermarkInput:'z_decoWatermark', decoCharmInput:'z_decoCharm' };
+  Object.keys(map).forEach(id=>{
+    const inp = document.getElementById(id);
+    if(!inp) return;
+    inp.addEventListener('change', e=>{
+      const file = e.target.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ev=>{
+        const img = new Image();
+        img.onload = ()=>{
+          const scale = Math.min(1, 560 / Math.max(img.width, img.height));
+          let dataUrl = ev.target.result;
+          if(scale < 1){
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+            dataUrl = canvas.toDataURL('image/png');
+          }
+          try { localStorage.setItem(map[id], dataUrl); }
+          catch(err){ showToast('这张图太大了，存不下，换张小一点的'); return; }
+          applyDecorations();
+          showToast('装饰换好啦');
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(file);
+      e.target.value = '';
+    });
+  });
+}
+function clearDeco(kind){
+  localStorage.removeItem(kind === 'watermark' ? 'z_decoWatermark' : 'z_decoCharm');
+  applyDecorations();
 }
 
 function syncBgControls(){
@@ -13031,6 +13124,8 @@ syncCallAvatars();
 // 聊天背景：注册控件并应用已保存的背景（模式/颜色/图片都和主题独立）
 setupBgControls();
 applyBackground();
+setupDecoControls();
+applyDecorations();
 initCallHeartbeatSel();
 initEnZhSel();
 initLock(); // 必须放在初始化区：锁屏状态是后段才声明的 const，提前调用会让整个脚本在启动时崩掉
