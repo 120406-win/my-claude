@@ -751,6 +751,12 @@
     html.mat-frost .sidebar, html.mat-glass .sidebar { background:color-mix(in srgb, var(--bg) 66%, transparent); backdrop-filter:blur(20px) saturate(1.3); -webkit-backdrop-filter:blur(20px) saturate(1.3); }
     html.mat-frost .s-card, html.mat-glass .s-card { background:color-mix(in srgb, var(--surface) 70%, transparent); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
     html.mat-frost .home-card, html.mat-glass .home-card, html.mat-frost .home-meet-card, html.mat-glass .home-meet-card { backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+@keyframes zBreath { 0%,100%{ transform:scale(1) translateY(0); } 50%{ transform:scale(1.014) translateY(-.5%); } }
+@keyframes zBreathSleep { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.008) translateY(-.3%); } }
+@keyframes zTapKf { 0%{ transform:translateY(0) rotate(0deg); } 30%{ transform:translateY(-2.6%) rotate(-1.6deg); } 58%{ transform:translateY(0) rotate(1.1deg); } 100%{ transform:translateY(0) rotate(0deg); } }
+.z-live { transform-origin:50% 100%; animation:zBreath 3.8s ease-in-out infinite; }
+.z-live-sleep { transform-origin:50% 100%; animation:zBreathSleep 5.2s ease-in-out infinite; }
+#placeZephyrBubble { position:absolute; top:5%; left:50%; transform:translateX(-50%); max-width:76%; background:rgba(255,255,255,.96); color:#3a3340; font-size:12.5px; line-height:1.55; padding:7px 12px; border-radius:14px; box-shadow:0 6px 18px rgba(20,10,40,.25); display:none; z-index:3; pointer-events:none; text-align:center; }
   </style>
 </head>
 <body>
@@ -2329,6 +2335,7 @@
       <div style="position:relative;border-radius:18px;overflow:hidden;aspect-ratio:16/9;background:var(--surface);">
         <img id="placeSceneImg" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
         <img id="placeZephyrImg" alt="Zephyr" onclick="placeZephyrTap()" style="position:absolute;display:none;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));">
+        <div id="placeZephyrBubble"></div>
       </div>
       <div id="placeRoomTabs" style="display:none;gap:6px;margin-top:8px;flex-wrap:wrap;"></div>
     </div>
@@ -6623,11 +6630,39 @@ const ZEPHYR_IMG_POS = {
   stand:'right:6%;bottom:0;height:88%;',
   sit:'right:1%;bottom:0;height:64%;',
   sleep:'left:1%;bottom:5%;width:74%;',
-  crouch:'right:7%;bottom:0;height:74%;',
+  crouch:'left:64%;bottom:13%;height:87%;',
 };
+let zTapState = { place:'', mode:'stand', lastIdx:-1, timer:0 };
+const Z_TAP_LINES = {
+  sleep:['……嗯？', '……别闹，再睡五分钟。', '（迷迷糊糊地往你那边靠了靠）', '……糯糯？……天亮了吗。'],
+  crouch:['它睡着了，轻点。', '呼噜声，听见了吗。', '它刚才还躲我，现在不躲了。', '（指尖轻轻顺着它的背）嘘——'],
+  sit:['嗯？', '怎么了，糯糯。', '在呢，刚想到你。', '（拍了拍身边）坐这儿。', '想说什么，我听着。'],
+  stand:['嗯？', '怎么了，糯糯。', '在呢。', '（低头看你）想我了？', '想说什么，我听着。'],
+};
+function zephyrTapLine(){
+  const pool = Z_TAP_LINES[zTapState.mode] || Z_TAP_LINES.stand;
+  let i = Math.floor(Math.random() * pool.length);
+  if(pool.length > 1 && i === zTapState.lastIdx) i = (i + 1) % pool.length;
+  zTapState.lastIdx = i;
+  return pool[i];
+}
 function placeZephyrTap(){
+  const z = document.getElementById('placeZephyrImg');
+  if(z){
+    z.style.animation = 'none';
+    void z.offsetWidth;
+    z.style.animation = 'zTapKf .52s ease-out';
+    setTimeout(() => { z.style.animation = ''; }, 560);
+  }
+  const b = document.getElementById('placeZephyrBubble');
+  if(b){
+    b.textContent = zephyrTapLine();
+    b.style.display = 'block';
+    clearTimeout(zTapState.timer);
+    zTapState.timer = setTimeout(() => { b.style.display = 'none'; }, 2600);
+  }
   const i = document.getElementById('placeChatInput');
-  if(i){ i.scrollIntoView({ block:'center', behavior:'smooth' }); setTimeout(() => { try{ i.focus(); }catch(e){} }, 350); }
+  if(i){ if(typeof i.scrollIntoView === 'function') i.scrollIntoView({ block:'center', behavior:'smooth' }); setTimeout(() => { try{ i.focus(); }catch(e){} }, 600); }
 }
 function setHomeRoom(r){ currentHomeRoom = r; renderWorldPlace(); }
 function setZephyrOutfit(id){
@@ -6667,9 +6702,11 @@ function renderPlaceScene(p, here){
   if(!scene){ wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
   if(img && img.getAttribute('src') !== scene) img.src = scene;
+  const bub = document.getElementById('placeZephyrBubble');
+  if(bub) bub.style.display = 'none';
   if(z){
-    if(look){ z.src = look.img; z.style.cssText = 'position:absolute;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));' + (ZEPHYR_IMG_POS[look.mode] || ZEPHYR_IMG_POS.stand); z.style.display = 'block'; }
-    else z.style.display = 'none';
+    if(look){ z.src = look.img; z.style.cssText = 'position:absolute;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));' + (ZEPHYR_IMG_POS[look.mode] || ZEPHYR_IMG_POS.stand); z.style.display = 'block'; z.className = look.mode === 'sleep' ? 'z-live-sleep' : 'z-live'; zTapState.place = p.id; zTapState.mode = look.mode; }
+    else { z.style.display = 'none'; z.className = ''; }
   }
 }
 function renderWorld(){
