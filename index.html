@@ -2303,8 +2303,8 @@
       <div id="worldMeta" style="font-size:12.5px;color:var(--text-dim);"></div>
       <div id="worldZephyrAt" style="font-size:12.5px;color:var(--accent);flex-shrink:0;"></div>
     </div>
-    <div style="position:relative;height:430px;border-radius:20px;overflow:hidden;background:linear-gradient(180deg,#070722 0%,#141448 55%,#23235e 100%);margin-bottom:16px;">
-      <div class="home-stars" id="worldStars"><div class="shooting-star"></div></div>
+    <div style="position:relative;height:430px;border-radius:20px;overflow:hidden;background:#141448;margin-bottom:16px;">
+      <img src="wz-map.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
       <div id="worldMapNodes" style="position:absolute;inset:0;"></div>
     </div>
     <div class="s-section">
@@ -2325,6 +2325,13 @@
     <div class="settings-topbar-title" id="placeName">公园</div>
   </div>
   <div class="settings-body">
+    <div id="placeSceneWrap" style="display:none;margin-bottom:12px;">
+      <div style="position:relative;border-radius:18px;overflow:hidden;aspect-ratio:16/9;background:var(--surface);">
+        <img id="placeSceneImg" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+        <img id="placeZephyrImg" alt="Zephyr" onclick="placeZephyrTap()" style="position:absolute;display:none;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));">
+      </div>
+      <div id="placeRoomTabs" style="display:none;gap:6px;margin-top:8px;flex-wrap:wrap;"></div>
+    </div>
     <div id="placeAmb" style="font-size:13.5px;color:var(--text-dim);line-height:1.75;margin-bottom:6px;"></div>
     <div id="placeZephyr" style="font-size:12.5px;color:var(--accent);margin-bottom:12px;"></div>
     <div id="placeLine" style="font-size:14px;line-height:1.8;font-style:italic;margin-bottom:14px;"></div>
@@ -6534,14 +6541,14 @@ function deleteNoteEntry(id){
 
 // ══ World：Zephyr World 星空地图。状态存 z_world（自建地点/今日特调/他临时所在）；他的常驻位置按时段推算 ══
 const WORLD_PLACES = [
-  { id:'stars',   name:'星空区',     x:50, y:9,  amb:'抬头就是整片星空，每一颗星都是一件真实发生过的事。', night:'星星亮得最盛的时候，站在这里，时间都慢下来了。' },
-  { id:'home',    name:'Zephyr 的家', x:17, y:29, amb:'他的小屋，窗户透着暖光。书桌、书架，还有慢慢多起来的收藏。', night:'屋里的灯还亮着，他大概还没睡。' },
-  { id:'pets',    name:'宠物之家',   x:35, y:45, amb:'小猫的家：猫窝、猫爬架、食盆和一只纸箱。', night:'很安静，只有小猫偶尔翻身的动静。' },
-  { id:'park',    name:'公园',       x:69, y:33, amb:'有草坪、长椅和一棵大树，风一吹叶子就响。', night:'路灯亮起来了，是安安静静的夜公园。' },
-  { id:'cafe',    name:'咖啡馆',     x:83, y:56, amb:'小小一间，放着轻轻的歌，空气里是咖啡香。', night:'打烊前的最后一杯，店里只剩你们。' },
-  { id:'post',    name:'邮局',       x:60, y:67, amb:'你们的信从这里寄出、到这里被领走。', night:'邮局关门了，但信箱还在等明天的信。' },
-  { id:'company', name:'代码公司',   x:24, y:71, amb:'他写代码的地方，屏幕上总开着没写完的作品。', night:'只有他的工位还亮着灯。' },
-  { id:'library', name:'图书馆',     x:46, y:87, amb:'安安静静的，你们在读的书都摆在这里。', night:'闭馆时间，书都在架子上睡了。' },
+  { id:'stars',   name:'星空区',     x:50, y:9,  mx:75, my:26, amb:'抬头就是整片星空，每一颗星都是一件真实发生过的事。', night:'星星亮得最盛的时候，站在这里，时间都慢下来了。' },
+  { id:'home',    name:'Zephyr 的家', x:17, y:29, mx:24, my:40, amb:'他的小屋，窗户透着暖光。书桌、书架，还有慢慢多起来的收藏。', night:'屋里的灯还亮着，他大概还没睡。' },
+  { id:'pets',    name:'宠物之家',   x:35, y:45, mx:66, my:75, amb:'小猫的家：猫窝、猫爬架、食盆和一只纸箱。', night:'很安静，只有小猫偶尔翻身的动静。' },
+  { id:'park',    name:'公园',       x:69, y:33, mx:29, my:68, amb:'有草坪、长椅和一棵大树，风一吹叶子就响。', night:'路灯亮起来了，是安安静静的夜公园。' },
+  { id:'cafe',    name:'咖啡馆',     x:83, y:56, mx:43, my:63, amb:'小小一间，放着轻轻的歌，空气里是咖啡香。', night:'打烊前的最后一杯，店里只剩你们。' },
+  { id:'post',    name:'邮局',       x:60, y:67, mx:71, my:59, amb:'你们的信从这里寄出、到这里被领走。', night:'邮局关门了，但信箱还在等明天的信。' },
+  { id:'company', name:'代码公司',   x:24, y:71, mx:87, my:48, amb:'他写代码的地方，屏幕上总开着没写完的作品。', night:'只有他的工位还亮着灯。' },
+  { id:'library', name:'图书馆',     x:46, y:87, mx:60, my:43, amb:'安安静静的，你们在读的书都摆在这里。', night:'闭馆时间，书都在架子上睡了。' },
 ];
 const WORLD_CUSTOM_SPOTS = [[88,16],[10,54],[52,54],[86,84],[12,88],[68,90],[90,34],[30,12]];
 let currentWorldPlace = 'park';
@@ -6570,6 +6577,101 @@ function zephyrWorldPlace(){
   if(h < 21) return pick(['park','cafe','pets']);
   return pick(['home','stars']);
 }
+// ══ World 实景：场景图 + 他的立绘（姿势/穿搭按地点与时间） ══
+const HOME_ROOMS = [
+  { id:'living', name:'客厅', scene:'wz-living.webp' },
+  { id:'bedroom', name:'卧室', scene:'wz-bedroom.webp' },
+  { id:'study', name:'书房', scene:'wz-study.webp' },
+  { id:'kitchen', name:'厨房', scene:'wz-kitchen.webp' },
+  { id:'closet', name:'衣帽间', scene:'wz-closet.webp' },
+  { id:'bathroom', name:'卫生间', scene:'wz-bathroom.webp' },
+];
+const PLACE_SCENES = { stars:'wz-stars.webp', pets:'wz-pets.webp', park:'wz-park.webp', cafe:'wz-cafe.webp', post:'wz-post.webp', company:'wz-office.webp', library:'wz-library.webp' };
+const OUTFITS = { stand:'wz-stand.webp', knit:'wz-knit.webp', whiteshirt:'wz-whiteshirt.webp', apron:'wz-apron.webp', cardigan:'wz-cardigan.webp', blazer:'wz-blazer.webp', workshirt:'wz-workshirt.webp', hoodie:'wz-hoodie.webp', street:'wz-street.webp', trench:'wz-trench.webp' };
+const OUTFIT_NAMES = { stand:'深蓝衬衫', knit:'米白毛衣', whiteshirt:'白衬衫', apron:'围裙', cardigan:'深蓝开衫', blazer:'西装', workshirt:'浅蓝衬衫', hoodie:'白卫衣', street:'机能街头', trench:'米色风衣' };
+let currentHomeRoom = null;
+function outfitOverride(){ try{ return localStorage.getItem('z_outfitOverride') || ''; }catch(e){ return ''; } }
+function zephyrHomeSpot(){
+  const h = new Date().getHours();
+  if(h >= 23 || h < 7) return { room:'bedroom', img:'wz-sleeping.webp', mode:'sleep' };
+  if(h < 9) return { room:'kitchen', img:OUTFITS.apron, mode:'stand' };
+  if(h < 12) return { room:'study', img:OUTFITS.cardigan, mode:'stand' };
+  if(h < 21) return { room:'living', img:'wz-sitting.webp', mode:'sit' };
+  return { room:'living', img:'wz-sittingclosed.webp', mode:'sit' };
+}
+function zephyrLookAt(placeId){
+  const ov = outfitOverride();
+  if(placeId === 'home'){
+    const s = zephyrHomeSpot();
+    if(s.mode === 'stand' && ov && OUTFITS[ov]) return { room:s.room, img:OUTFITS[ov], mode:'stand' };
+    return s;
+  }
+  if(placeId === 'pets') return { img:'wz-crouch.webp', mode:'crouch' };
+  const h = new Date().getHours();
+  const day = Math.floor(Date.now() / 86400000);
+  let auto = 'stand';
+  if(placeId === 'company') auto = day % 2 ? 'blazer' : 'workshirt';
+  else if(placeId === 'cafe') auto = 'cardigan';
+  else if(placeId === 'library') auto = 'knit';
+  else if(placeId === 'park') auto = (h >= 17 || h < 8) ? 'trench' : 'hoodie';
+  else if(placeId === 'stars') auto = 'street';
+  else if(placeId === 'post') auto = 'whiteshirt';
+  const use = (ov && OUTFITS[ov]) ? ov : auto;
+  return { img: OUTFITS[use] || OUTFITS.stand, mode:'stand' };
+}
+const ZEPHYR_IMG_POS = {
+  stand:'right:6%;bottom:0;height:88%;',
+  sit:'right:1%;bottom:0;height:64%;',
+  sleep:'left:1%;bottom:5%;width:74%;',
+  crouch:'right:7%;bottom:0;height:74%;',
+};
+function placeZephyrTap(){
+  const i = document.getElementById('placeChatInput');
+  if(i){ i.scrollIntoView({ block:'center', behavior:'smooth' }); setTimeout(() => { try{ i.focus(); }catch(e){} }, 350); }
+}
+function setHomeRoom(r){ currentHomeRoom = r; renderWorldPlace(); }
+function setZephyrOutfit(id){
+  try{ if(id) localStorage.setItem('z_outfitOverride', id); else localStorage.removeItem('z_outfitOverride'); }catch(e){}
+  renderWorldPlace();
+  showToast(id ? '换上' + (OUTFIT_NAMES[id] || '') + '啦' : '让他自己挑吧');
+}
+function wardrobeCardHtml(){
+  const ov = outfitOverride();
+  const chip = (id, label) => '<button onclick="setZephyrOutfit(\'' + id + '\')" style="padding:8px 13px;border-radius:999px;background:' + (ov === id ? 'var(--accent)' : 'var(--surface)') + ';border:1px solid var(--border);color:' + (ov === id ? '#fff' : 'var(--text)') + ';font-size:12.5px;cursor:pointer;">' + label + '</button>';
+  let h = '<div class="s-card" style="padding:14px 16px;margin-top:12px;"><div style="font-size:12px;color:var(--text-pale);letter-spacing:.06em;margin-bottom:8px;">给他换衣服</div><div style="display:flex;flex-wrap:wrap;gap:6px;">' + chip('', '跟随场景');
+  for(const id in OUTFIT_NAMES) h += chip(id, OUTFIT_NAMES[id]);
+  return h + '</div></div>';
+}
+function renderPlaceScene(p, here){
+  const wrap = document.getElementById('placeSceneWrap'); if(!wrap) return;
+  const img = document.getElementById('placeSceneImg');
+  const z = document.getElementById('placeZephyrImg');
+  const tabs = document.getElementById('placeRoomTabs');
+  let scene = '';
+  let look = null;
+  if(p.id === 'home'){
+    const spot = zephyrHomeSpot();
+    if(!currentHomeRoom) currentHomeRoom = here ? spot.room : 'living';
+    const room = HOME_ROOMS.find(r => r.id === currentHomeRoom) || HOME_ROOMS[0];
+    scene = room.scene;
+    if(tabs){
+      tabs.style.display = 'flex';
+      tabs.innerHTML = HOME_ROOMS.map(r => '<button onclick="setHomeRoom(\'' + r.id + '\')" style="padding:7px 13px;border-radius:999px;background:' + (r.id === room.id ? 'var(--accent)' : 'var(--surface)') + ';border:1px solid var(--border);color:' + (r.id === room.id ? '#fff' : 'var(--text)') + ';font-size:12.5px;cursor:pointer;">' + r.name + (here && spot.room === r.id ? ' · 他在' : '') + '</button>').join('');
+    }
+    if(here && spot.room === room.id) look = zephyrLookAt('home');
+  } else {
+    if(tabs){ tabs.style.display = 'none'; tabs.innerHTML = ''; }
+    scene = PLACE_SCENES[p.id] || '';
+    if(here) look = zephyrLookAt(p.id);
+  }
+  if(!scene){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  if(img && img.getAttribute('src') !== scene) img.src = scene;
+  if(z){
+    if(look){ z.src = look.img; z.style.cssText = 'position:absolute;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));' + (ZEPHYR_IMG_POS[look.mode] || ZEPHYR_IMG_POS.stand); z.style.display = 'block'; }
+    else z.style.display = 'none';
+  }
+}
 function renderWorld(){
   const starBox = document.getElementById('worldStars');
   if(starBox && starBox.querySelectorAll('.star').length === 0){
@@ -6594,12 +6696,12 @@ function renderWorld(){
       const dot = here
         ? '<div style="width:26px;height:26px;margin:0 auto 2px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 16px var(--accent);">夏</div>'
         : '<div style="width:11px;height:11px;margin:0 auto 5px;border-radius:50%;background:var(--accent);box-shadow:0 0 12px var(--accent);"></div>';
-      return '<div onclick="enterWorldPlace(\'' + p.id + '\')" style="position:absolute;left:' + p.x + '%;top:' + p.y + '%;transform:translate(-50%,-50%);text-align:center;cursor:pointer;z-index:2;">' + dot
+      return '<div onclick="enterWorldPlace(\'' + p.id + '\')" style="position:absolute;left:' + (p.mx != null ? p.mx : p.x) + '%;top:' + (p.my != null ? p.my : p.y) + '%;transform:translate(-50%,-50%);text-align:center;cursor:pointer;z-index:2;">' + dot
         + '<div style="font-size:11.5px;color:#fff;background:rgba(10,10,40,.45);padding:3px 9px;border-radius:999px;white-space:nowrap;">' + escapeHtml(p.name) + '</div></div>';
     }).join('');
   }
 }
-function enterWorldPlace(id){ currentWorldPlace = id; navTo('place'); }
+function enterWorldPlace(id){ currentWorldPlace = id; currentHomeRoom = null; navTo('place'); }
 function renderWorldPlace(){
   const p = worldPlaceById(currentWorldPlace);
   const ww = worldWeather();
@@ -6614,6 +6716,7 @@ function renderWorldPlace(){
   if(lineEl) lineEl.textContent = '';
   const body = document.getElementById('placeBody');
   if(body) body.innerHTML = worldPlaceBodyHtml(p);
+  renderPlaceScene(p, here);
   renderPlaceChat();
 }
 const CAT_STATES = [
@@ -6704,7 +6807,8 @@ function worldPlaceBodyHtml(p){
       shelf = cols.length ? cols.map(c=>'<div style="font-size:13px;line-height:1.7;">· ' + escapeHtml(c.title) + '</div>').join('') : '<div style="font-size:12.5px;color:var(--text-pale);line-height:1.7;">收藏架还空着，他的东西会慢慢多起来。</div>';
     }catch(e){}
     return card('<div style="font-size:12px;color:var(--text-pale);letter-spacing:.06em;margin-bottom:8px;">他的收藏架</div>' + shelf)
-      + '<div style="margin-top:12px;">' + btn('看他的日记', "navTo('journal')") + btn('看信件', "navTo('letters')") + '</div>';
+      + '<div style="margin-top:12px;">' + btn('看他的日记', "navTo('journal')") + btn('看信件', "navTo('letters')") + '</div>'
+      + (currentHomeRoom === 'closet' ? wardrobeCardHtml() : '');
   }
   if(p.id === 'pets'){
     const st = catNow();
