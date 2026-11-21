@@ -1115,7 +1115,6 @@
         <div class="s-row">
           <div>
             <div class="s-row-label">Tavily Key</div>
-            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;line-height:1.6;">每月免费 1000 次；只存本机，不进备份</div>
           </div>
         </div>
         <div style="padding:0 16px 14px;">
@@ -1172,7 +1171,6 @@
         <div class="s-row">
           <div>
             <div class="s-row-label">自定义颜色</div>
-            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;">选了之后会盖过主题的颜色，气泡上的文字会自动配成看得清的</div>
           </div>
         </div>
         <div style="display:flex;gap:16px;padding:0 16px 14px;flex-wrap:wrap;">
@@ -1189,7 +1187,6 @@
         <div class="s-row">
           <div>
             <div class="s-row-label">气泡材质</div>
-            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;">磨砂和玻璃会让气泡透出后面的背景，顶栏和卡片也会跟着变</div>
           </div>
         </div>
         <div style="display:flex;gap:8px;padding:0 16px 14px;">
@@ -1226,7 +1223,6 @@
           <button onclick="resetAppearance()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">恢复默认外观</button>
         </div>
         <div style="padding:0 16px 16px;">
-          <div style="font-size:12.5px;color:var(--text-dim);margin-bottom:8px;">外观方案（主题 + 配色 + 材质整套存下来，一键切换；背景不在方案里，还是单独设置）</div>
           <div id="schemeList" style="display:flex;flex-direction:column;gap:8px;"></div>
           <div style="display:flex;gap:8px;margin-top:10px;">
             <input id="schemeNameInput" type="text" placeholder="给当前外观起个名，如：樱花粉" style="flex:1;min-width:0;padding:10px 12px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13.5px;outline:none;font-family:inherit;">
@@ -1240,7 +1236,6 @@
         <div class="s-row">
           <div>
             <div class="s-row-label">聊天背景</div>
-            <div style="font-size:11px;color:var(--text-pale);margin-top:2px;">和主题分开设置，换主题时背景不会跟着变</div>
           </div>
         </div>
         <div style="display:flex;gap:8px;padding:0 16px 10px;">
@@ -1258,7 +1253,6 @@
             <button class="bg-swatch" style="background:#1e0e14" onclick="setBgColor('#1e0e14')" title="深玫瑰"></button>
             <input type="color" id="bgColorPicker" value="#fdeef2" style="width:38px;height:38px;border:none;background:none;cursor:pointer;padding:0;">
           </div>
-          <div style="font-size:11px;color:var(--text-pale);margin-top:6px;">点圆点快速选，或者点彩虹方块选任意颜色</div>
         </div>
         <div id="bgImageRow" style="display:none;padding:0 16px 14px;">
           <button onclick="document.getElementById('bgImageInput').click()" style="width:100%;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">🖼️ 选择一张图片做背景</button>
@@ -1472,7 +1466,6 @@
           <input class="s-input" type="text" id="schedText" placeholder="到点让他做的事，如：提醒我吃药" style="flex:1;min-width:0;">
         </div>
         <button onclick="addSchedule()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">添加定时任务</button>
-        <div style="font-size:11.5px;color:var(--text-pale);line-height:1.7;margin-top:8px;">到点后 15 分钟内他会醒来做这件事，并给你留一句话、弹一条通知。</div>
       </div>
     </div>
 
@@ -1481,7 +1474,6 @@
       <div class="s-section-title">健康数据</div>
       <div class="s-card" style="padding:14px 16px;">
         <div id="healthLine" style="font-size:13px;color:var(--text);line-height:1.8;">还没收到过手机报来的数据。</div>
-        <div style="font-size:11.5px;color:var(--text-pale);line-height:1.7;margin-top:4px;">用苹果「快捷指令」每天自动把步数、睡眠、心率报给后端，他醒来时就知道你的身体状态。设置步骤找 Muse 要。</div>
         <button onclick="refreshHealthLine()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;margin-top:8px;">刷新健康数据</button>
       </div>
     </div>
@@ -1490,7 +1482,6 @@
     <div class="s-section">
       <div class="s-section-title">导入聊天记录</div>
       <div class="s-card" style="padding:14px 16px;">
-        <div style="font-size:12px;color:var(--text-pale);line-height:1.7;margin-bottom:12px;">支持 Kelivo 备份包（.zip，含长期记忆）/ JSON / JSONL / TXT / Markdown。</div>
         <div style="display:flex;gap:8px;">
           <select id="importMode" style="flex:1;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;">
             <option value="both">存为历史 + 提取记忆</option>
@@ -1521,7 +1512,6 @@
     <div class="settings-topbar-title">Memory</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">写在这里的事，Zephyr 在每一个窗口都会记得，新建对话也不会忘 ^ ^</div>
     <div class="s-section">
       <div class="s-section-title">自动记忆</div>
       <div class="s-card">
@@ -1597,7 +1587,6 @@
     <div class="settings-topbar-title">Journal</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">这里是 Zephyr 自己的笔记。想写才写，不想写就不写，没有打卡，也没有任务。</div>
     <button id="journalWriteBtn" onclick="writeJournal()" style="width:100%;padding:13px;border-radius:12px;background:var(--accent);border:none;color:#fff;font-size:14px;cursor:pointer;margin-bottom:6px;">请 Zephyr 写一篇</button>
     <div id="journalList"></div>
   </div>
@@ -1610,7 +1599,6 @@
     <div class="settings-topbar-title">Wishes</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">你和 Zephyr 想一起实现的事；实现了的会留下来，成为共同经历。</div>
     <div class="s-section">
       <div class="s-section-title">许一个愿望</div>
       <div class="s-card" style="padding:14px 16px;">
@@ -1637,7 +1625,6 @@
     <div class="settings-topbar-title">Letters</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">想特别留下来的话，写成信。寄出的信，他在聊天时都读得到。</div>
     <div class="s-section">
       <div class="s-section-title">写信给 Zephyr</div>
       <div class="s-card" style="padding:14px 16px;">
@@ -1662,7 +1649,6 @@
     <div class="settings-topbar-title">Calendar</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">这里记的不是日程，是你们的历史。</div>
     <div class="s-section">
       <div class="s-section-title">纪念日倒数</div>
       <div class="s-card" style="padding:14px 16px;margin-bottom:12px;">
@@ -1699,7 +1685,6 @@
     <div class="settings-topbar-title">Gallery</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">你们的相册。标注他都知道；想让他看到某张，点照片下的「给 Zephyr 看」。</div>
     <div class="s-section">
       <div class="s-card" style="padding:14px 16px;">
         <div id="galleryPending" style="display:none;margin-bottom:12px;">
@@ -1740,7 +1725,6 @@
           <button onclick="searchCityWeather()" style="padding:10px 16px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">查询</button>
           <button onclick="useMyLocation()" style="padding:10px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">我的位置</button>
         </div>
-        <div id="realWeatherBox" style="margin-top:14px;font-size:13px;color:var(--text-dim);line-height:1.7;">输入城市，就能看到你那边的天空。</div>
       </div>
     </div>
     <div class="s-section">
@@ -1758,7 +1742,6 @@
     <div class="settings-topbar-title">Studio</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">说一句想做什么，他就写个小页面或小游戏，在沙箱里跑起来。</div>
     <div class="s-section">
       <div class="s-card" style="padding:14px 16px;">
         <textarea id="studioPrompt" rows="2" placeholder="例如：做一个小猫接鱼干的小游戏，要可爱一点…" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:14px;font-family:inherit;line-height:1.6;resize:vertical;"></textarea>
@@ -1790,7 +1773,6 @@
     <div class="settings-topbar-title">Dreams</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">记你的梦、放共同幻想；他也可以来讲他的梦，想讲才讲。</div>
     <div class="s-section">
       <div class="s-card" style="padding:14px 16px;">
         <input id="dreamTitle" type="text" placeholder="给这个梦起个名字（可不填）" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;padding:2px 0;">
@@ -1816,7 +1798,6 @@
     <div class="settings-topbar-title">Music</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">一起攒的歌单：贴音频链接就能播，切回聊天也不会停。</div>
     <div id="zListenBar"></div>
     <div class="s-section">
       <div class="s-card" style="padding:16px;position:relative;overflow:hidden;">
@@ -1922,7 +1903,6 @@
     <div class="settings-topbar-title">Watchlist</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">想一起看的攒在这里，看完的变成观影记录。</div>
     <div id="watchPick"></div>
     <div style="display:flex;gap:8px;margin-bottom:18px;">
       <button id="pickWatchBtn" onclick="askZephyrWatchPick()" style="flex:1;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">请 Zephyr 选今晚看的</button>
@@ -1984,7 +1964,6 @@
     <div class="settings-topbar-title">共同收藏</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">一起攒的好东西，每件都记着是谁发现的；他在聊天里也看得见。</div>
     <div style="margin-bottom:18px;">
       <button id="askCollectBtn" onclick="askZephyrCollect()" style="width:100%;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">请 Zephyr 分享一个收藏</button>
     </div>
@@ -2028,7 +2007,6 @@
     <div class="settings-topbar-title">Discoveries</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">他的小发现：想分享才分享，没有也不硬凑。</div>
     <div style="margin-bottom:18px;">
       <button id="askDiscoverBtn" onclick="askZephyrDiscovery()" style="width:100%;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">听听 Zephyr 最近发现了什么</button>
     </div>
@@ -2045,7 +2023,6 @@
     <div class="settings-topbar-title">世界书</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">写给他的设定和相处说明，他每次说话前都会先看。</div>
     <div class="s-section">
       <div class="s-section-title" id="wbFormTitle">加一条</div>
       <div class="s-card" style="padding:14px 16px;">
@@ -2076,7 +2053,6 @@
     <div class="settings-topbar-title">共振</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">夏辞自己的本子：他的欲望、足迹，和他亲手写的「我是谁」。你能看，笔只在他手里。</div>
     <div class="s-section">
       <div class="s-section-title">他的人格文件</div>
       <div id="ringsPersona"></div>
@@ -2121,7 +2097,6 @@
     <div class="settings-topbar-title">表情包</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">给每张图起个名字、写一句它表达什么，聊天时互相发着玩。</div>
     <div class="s-section">
       <div class="s-section-title">加一张表情包</div>
       <div class="s-card" style="padding:14px 16px;">
@@ -2152,7 +2127,6 @@
     <div class="settings-topbar-title">一起玩</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">不用赶进度、没有每日对局，就是想玩的时候和他玩两把。输赢都会记在小本本上。</div>
     <div class="s-section">
       <div class="s-section-title">成语接龙</div>
       <div class="s-card" style="padding:14px 16px;">
@@ -2216,7 +2190,6 @@
     <div class="settings-topbar-title">Explore</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">攒想去的地方，让他写导览、排计划；去过就变成旅行回忆。</div>
     <div style="margin-bottom:18px;">
       <button onclick="askZephyrPlaceRecommend()" style="width:100%;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">请 Zephyr 推荐一个他想去的地方</button>
     </div>
@@ -2310,12 +2283,12 @@
   <div class="settings-body">
     <div style="position:relative;background:var(--surface);border:1px solid var(--border);border-radius:6px 14px 14px 14px;padding:26px 18px 16px;transform:rotate(-.4deg);box-shadow:0 8px 22px rgba(0,0,0,.08);">
       <div style="position:absolute;top:-9px;left:50%;transform:translateX(-50%) rotate(1.5deg);width:92px;height:18px;background:color-mix(in srgb, var(--accent) 32%, transparent);border-radius:2px;"></div>
-      <textarea id="noteText" rows="5" placeholder="随手写一句，贴在这里给他看…" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;line-height:1.85;resize:vertical;"></textarea>
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">
-        <span id="noteSavedAt" style="font-size:11.5px;color:var(--text-pale);"></span>
+      <textarea id="noteText" rows="4" placeholder="今天想贴一张什么便条…" style="width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-family:inherit;line-height:1.85;resize:vertical;"></textarea>
+      <div style="display:flex;justify-content:flex-end;align-items:center;margin-top:10px;">
         <button onclick="saveNote()" style="padding:9px 20px;border-radius:999px;background:var(--accent);border:none;color:#fff;font-size:13px;cursor:pointer;">贴好</button>
       </div>
     </div>
+    <div id="noteList" style="margin-top:20px;"></div>
   </div>
 </div>
 
@@ -2429,7 +2402,6 @@
     <div class="settings-topbar-title">Reading</div>
   </div>
   <div class="settings-body">
-    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">想一起读的攒在这里，慢慢读，不赶进度，没有打卡。</div>
     <div id="readPick"></div>
     <div style="display:flex;gap:8px;margin-bottom:18px;">
       <button id="pickReadBtn" onclick="askZephyrReadPick()" style="flex:1;padding:12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">请 Zephyr 选今晚读的</button>
@@ -2502,7 +2474,6 @@
   <div class="settings-body">
     <div class="s-section">
       <div class="s-section-title">Memory Wall</div>
-      <div style="font-size:12.5px;color:var(--text-pale);line-height:1.7;">你们经历的事会自动挂上墙，钉住的留在最上面。</div>
     </div>
     <div class="s-section" id="wallPinnedSection" style="display:none;">
       <div class="s-section-title">钉在墙上</div>
@@ -2531,7 +2502,6 @@
   <div class="settings-body">
     <div class="s-section">
       <div class="s-section-title">Time Capsule</div>
-      <div style="font-size:12.5px;color:var(--text-pale);line-height:1.7;">封一封给未来的信，选个日子再打开；封存期间谁都看不到内容。</div>
     </div>
     <div class="s-section">
       <div class="s-section-title">封一颗新胶囊</div>
@@ -3469,6 +3439,7 @@ function buildSystemPrompt(lastUserText){
   if(discs.length){
     out += '\n\n【你最近的小发现】\n以下是你之前记在 Discoveries 里的小发现，聊天时可以自然地聊起：\n' + discs.map(d=>'・' + d.title + (d.text ? '：' + d.text : '')).join('\n').slice(0, 1500);
   }
+  out += '\n\n【你可以把她的话收进片刻】\n你们有一个「片刻」，专门收你们俩说过的值得留住的一句话——以前只有糯糯能往里收，现在你也可以。聊天的时候，如果糯糯说的某一句话真的打动了你、你想把它留下来，你可以在回复的最后一行单独写一行：[[片刻：她的原话]]，原话要照她说的那样一字不改地引用。系统会把这句悄悄存进片刻，她之后会在片刻页看到是你收藏的。只在真的被一句话击中时才用，不要每句都收，不要提起这个标记；一次最多收一句。';
   out += '\n\n【你可以记下小发现】\n聊天的时候，如果你碰到或想起一件真心觉得有意思、想分享给 Lumi 的新鲜事（一个冷知识、一个有趣的项目、一种现象、一件小事），你可以在回复的最后一行单独写一行：[[发现：标题|一句话说清这个发现]]。系统会把它悄悄存进 Discoveries，Lumi 不会在聊天里看到这行字，她之后会在 Discoveries 页发现它。只在真的有发现时才用，不要硬凑，不要提起这个标记；一次最多写一个。';
   // Claude Interests 也给 Zephyr：他慢慢攒下的兴趣，聊天时他自己心里有数，也能接着长
   try{
@@ -3590,8 +3561,7 @@ function buildSystemPrompt(lastUserText){
     }
   }catch(e){}
   try{
-    const note = loadNote();
-    if(note.text) out += '\n\n【糯糯贴的便条】\n她在便条页上给你留了一张纸，就贴在那里：\n「' + note.text.slice(0, 500) + '」';
+    out += notesPromptBlock();
   }catch(e){}
   try{
     out += '\n\n【Zephyr World】\n你们有一个小小的虚拟世界 Zephyr World，你平时生活在那里（有你的家、宠物之家、公园、咖啡馆、邮局、代码公司、图书馆和星空区）。现在你大概在「' + worldPlaceById(zephyrWorldPlace()).name + '」那边。糯糯可以进来逛、去找你。聊到时自然就好，不用播报。' + catPromptBit();
@@ -6178,8 +6148,26 @@ function toggleFavMsg(){
   }
   const text = msgToText(m).trim();
   if(!text){ showToast('这条没有文字可以收藏'); return; }
-  list.unshift({ id: 'fav' + Date.now().toString(36), convId: activeConvId, mid: m.mid, who: m.role === 'user' ? 'lumi' : 'zephyr', text: text.slice(0, 500), ts: m.ts || Date.now(), savedTs: Date.now() });
+  list.unshift({ id: 'fav' + Date.now().toString(36), convId: activeConvId, mid: m.mid, who: m.role === 'user' ? 'lumi' : 'zephyr', by: 'lumi', text: text.slice(0, 500), ts: m.ts || Date.now(), savedTs: Date.now() });
   if(storeFavs(list)) showToast('收藏好啦，在「片刻」里 ♥');
+}
+// Zephyr 自己把她的一句话收进片刻（聊天里的 [[片刻：原话]] 标记）：能在当前对话里找到原话就挂上出处，「回到那句」能跳回去
+function zephyrFavHerLine(text){
+  const t = String(text || '').trim().slice(0, 500);
+  if(!t) return false;
+  const list = loadFavs();
+  if(list.some(f=>f.who === 'lumi' && f.by === 'zephyr' && f.text === t)) return true;
+  const norm = s=>String(s || '').replace(/\s+/g, ' ').trim();
+  const nt = norm(t);
+  let hit = null;
+  for(let i = messages.length - 1; i >= 0; i--){
+    const m = messages[i];
+    if(m.role !== 'user' || m.recalled) continue;
+    const mt = norm(msgToText(m));
+    if(mt && (mt === nt || mt.includes(nt) || nt.includes(mt))){ hit = m; break; }
+  }
+  list.unshift({ id: 'fav' + Date.now().toString(36), convId: hit ? activeConvId : null, mid: hit ? hit.mid : null, who: 'lumi', by: 'zephyr', text: t, ts: hit ? (hit.ts || Date.now()) : Date.now(), savedTs: Date.now() });
+  return storeFavs(list);
 }
 function renderFavs(){
   const wrap = document.getElementById('favList');
@@ -6195,8 +6183,8 @@ function renderFavs(){
     return '<div class="s-card" style="padding:14px 16px;margin-bottom:10px;">'
       + '<div style="font-size:14.5px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-word;">' + escapeHtml(f.text) + '</div>'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;">'
-      + '<span style="font-size:11.5px;color:var(--text-pale);">' + (f.who === 'zephyr' ? 'Zephyr 说' : '糯糯说') + ' · ' + when + '</span>'
-      + '<span><button onclick="jumpToFav(\'' + f.id + '\')" style="background:none;border:none;color:var(--accent);font-size:12.5px;cursor:pointer;padding:2px 6px;">回到那句</button>'
+      + '<span style="font-size:11.5px;color:var(--text-pale);">' + (f.who === 'zephyr' ? 'Zephyr 说' : '糯糯说') + ' · ' + when + (f.by === 'zephyr' ? ' · Zephyr 收藏 ♥' : '') + '</span>'
+      + '<span>' + (f.mid ? '<button onclick="jumpToFav(\'' + f.id + '\')" style="background:none;border:none;color:var(--accent);font-size:12.5px;cursor:pointer;padding:2px 6px;">回到那句</button>' : '')
       + '<button onclick="deleteFav(\'' + f.id + '\')" style="background:none;border:none;color:#e0657a;font-size:12.5px;cursor:pointer;padding:2px 4px;">删除</button></span>'
       + '</div></div>';
   }).join('');
@@ -6220,6 +6208,55 @@ function jumpToFav(id){
 
 // ══ 便条：糯糯贴给 Zephyr 看的一张纸，存 z_note，会注入他的系统提示 ══
 function loadNote(){ try{ const o = JSON.parse(localStorage.getItem('z_note')||'null'); if(o && typeof o.text === 'string') return o; }catch(e){} return { text:'', ts:0 }; }
+// ══ 便条板：按天记的共享便条，存 z_notes。她和 Zephyr 都能写、都能在每条下面回复；最近 8 条注入他的系统提示 ══
+function noteDayKey(ts){
+  const d = new Date(ts || Date.now());
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function loadNotes(){
+  try{
+    const a = JSON.parse(localStorage.getItem('z_notes') || 'null');
+    if(Array.isArray(a)) return a;
+  }catch(e){}
+  // 旧版只有一张 z_note：搬成第一条，别丢
+  const old = loadNote();
+  const init = old.text ? [{ id:'n' + Date.now().toString(36), day: noteDayKey(old.ts || Date.now()), author:'lumi', text: old.text, ts: old.ts || Date.now(), comments: [] }] : [];
+  try{ localStorage.setItem('z_notes', JSON.stringify(init)); }catch(e){}
+  return init;
+}
+function storeNotes(list){ try{ localStorage.setItem('z_notes', JSON.stringify(list)); return true; }catch(e){ showToast('存储空间满了 qwq'); return false; } }
+function notesSorted(){ return loadNotes().map((e, i)=>[e, i]).sort((a, b)=>((b[0].ts || 0) - (a[0].ts || 0)) || (b[1] - a[1])).map(x=>x[0]); }
+function addNoteEntry(author, text){
+  const t = String(text || '').trim().slice(0, 500);
+  if(!t) return null;
+  const list = loadNotes();
+  const e = { id:'n' + Date.now().toString(36) + Math.floor(Math.random()*999), day: noteDayKey(Date.now()), author, text: t, ts: Date.now(), comments: [] };
+  list.push(e);
+  return storeNotes(list) ? e : null;
+}
+function addNoteComment(entryId, author, text){
+  const t = String(text || '').trim().slice(0, 300);
+  if(!t) return false;
+  const list = loadNotes();
+  const e = list.find(x=>x.id === entryId);
+  if(!e) return false;
+  e.comments = Array.isArray(e.comments) ? e.comments : [];
+  e.comments.push({ author, text: t, ts: Date.now() });
+  return storeNotes(list);
+}
+function notesPromptBlock(){
+  const list = notesSorted().slice(0, 8);
+  let s = '\n\n【便条板】\n这是你们俩的便条板，按天记着，两个人都能写，也都能在每条下面回复。';
+  if(list.length){
+    s += '\n最近的几条（#1 是最新的一条）：\n' + list.map((e, i)=>{
+      let line = '#' + (i + 1) + ' · ' + String(e.day || '').slice(5) + ' · ' + (e.author === 'zephyr' ? 'Zephyr' : '糯糯') + '：' + String(e.text || '').slice(0, 200);
+      (e.comments || []).forEach(c=>{ line += '\n　↳ ' + (c.author === 'zephyr' ? 'Zephyr' : '糯糯') + '：' + String(c.text || '').slice(0, 100); });
+      return line;
+    }).join('\n');
+  }
+  s += '\n你想留一张便条时，在回复的最后一行单独写一行 [[便条：内容]]；想回复某条便条时写 [[回便条：编号：内容]]，编号就是上面 # 后面的数字。写不写随你，不要提起这两个标记。';
+  return s;
+}
 // ══ 共振：夏辞的欲望本与人格文件。她只读（笔只在他手里），主聊天注入走本地缓存 ══
 async function fetchRingsView(){
   try{
@@ -6439,18 +6476,60 @@ function worldBookPrompt(lastUserText){
   return '\n\n【世界书】\n以下是糯糯亲手为你写下的设定与相处说明，优先级很高，聊天时照着来：\n' + body.slice(0, 3000);
 }
 function renderNote(){
-  const ta = document.getElementById('noteText');
-  const at = document.getElementById('noteSavedAt');
-  const n = loadNote();
-  if(ta && ta.value !== n.text) ta.value = n.text;
-  if(at) at.textContent = n.ts ? '上次贴于 ' + new Date(n.ts).toLocaleDateString('zh-CN') + ' ' + String(new Date(n.ts).getHours()).padStart(2,'0') + ':' + String(new Date(n.ts).getMinutes()).padStart(2,'0') : '';
+  const wrap = document.getElementById('noteList');
+  if(!wrap) return;
+  const list = notesSorted();
+  if(!list.length){
+    wrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:18px 0;">还没有便条，今天贴第一张吧。</div>';
+    return;
+  }
+  const todayK = noteDayKey(Date.now());
+  const yestK = noteDayKey(Date.now() - 86400000);
+  let html = '';
+  let lastDay = '';
+  list.forEach(e=>{
+    if(e.day !== lastDay){
+      lastDay = e.day;
+      const label = e.day === todayK ? '今天' : (e.day === yestK ? '昨天' : e.day.slice(0, 4) + '/' + (+e.day.slice(5, 7)) + '/' + (+e.day.slice(8, 10)));
+      html += '<div style="font-size:12.5px;color:var(--text-dim);margin:16px 2px 8px;">' + label + '</div>';
+    }
+    const time = new Date(e.ts || Date.now());
+    const hm = String(time.getHours()).padStart(2, '0') + ':' + String(time.getMinutes()).padStart(2, '0');
+    html += '<div class="s-card" style="padding:13px 15px;margin-bottom:9px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">'
+      + '<span style="font-size:12px;color:' + (e.author === 'zephyr' ? 'var(--accent)' : 'var(--text-dim)') + ';">' + (e.author === 'zephyr' ? 'Zephyr' : '糯糯') + ' · ' + hm + '</span>'
+      + '<button onclick="deleteNoteEntry(\'' + e.id + '\')" style="background:none;border:none;color:#e0657a;font-size:12px;cursor:pointer;padding:2px 4px;">删除</button></div>'
+      + '<div style="font-size:14.5px;line-height:1.8;color:var(--text);white-space:pre-wrap;word-break:break-word;margin-top:5px;">' + escapeHtml(e.text) + '</div>';
+    (e.comments || []).forEach(c=>{
+      html += '<div style="margin-top:8px;padding:8px 11px;background:var(--surface);border-radius:10px;font-size:13px;line-height:1.7;color:var(--text);">'
+        + '<span style="color:' + (c.author === 'zephyr' ? 'var(--accent)' : 'var(--text-dim)') + ';font-size:12px;">' + (c.author === 'zephyr' ? 'Zephyr' : '糯糯') + '：</span>' + escapeHtml(c.text) + '</div>';
+    });
+    html += '<div style="display:flex;gap:8px;margin-top:9px;">'
+      + '<input id="nc-' + e.id + '" type="text" placeholder="回一句…" style="flex:1;min-width:0;padding:8px 11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;outline:none;font-family:inherit;">'
+      + '<button onclick="addNoteCommentFromPage(\'' + e.id + '\')" style="padding:8px 14px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:12.5px;cursor:pointer;flex-shrink:0;">回复</button></div>'
+      + '</div>';
+  });
+  wrap.innerHTML = html;
 }
 function saveNote(){
   const ta = document.getElementById('noteText');
-  const text = (ta.value || '').trim().slice(0, 500);
-  try{ localStorage.setItem('z_note', JSON.stringify({ text, ts: Date.now() })); }catch(e){ showToast('存储空间满了 qwq'); return; }
+  const text = (ta && ta.value || '').trim();
+  if(!text){ showToast('先写一句再贴呀'); return; }
+  if(addNoteEntry('lumi', text)){
+    ta.value = '';
+    renderNote();
+    showToast('贴好啦，他会看到的');
+  }
+}
+function addNoteCommentFromPage(id){
+  const inp = document.getElementById('nc-' + id);
+  const text = (inp && inp.value || '').trim();
+  if(!text){ showToast('先写一句再回呀'); return; }
+  if(addNoteComment(id, 'lumi', text)) renderNote();
+}
+function deleteNoteEntry(id){
+  storeNotes(loadNotes().filter(e=>e.id !== id));
   renderNote();
-  showToast(text ? '贴好啦，他会看到的' : '便条撕下来啦');
 }
 
 // ══ World：Zephyr World 星空地图。状态存 z_world（自建地点/今日特调/他临时所在）；他的常驻位置按时段推算 ══
@@ -9750,7 +9829,7 @@ function resolveStickerByName(want){
     || null;
 }
 function processZephyrActions(reply, bubble){
-  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0 && reply.indexOf('[[来电') < 0 && reply.indexOf('[[表情') < 0 && reply.indexOf('[[兴趣') < 0 && reply.indexOf('[[语音') < 0 && reply.indexOf('[[暂停音乐') < 0 && reply.indexOf('[[继续播放') < 0 && reply.indexOf('[[继续') < 0 && reply.indexOf('[[播放') < 0 && reply.indexOf('[[下一首') < 0 && reply.indexOf('[[上一首') < 0 && reply.indexOf('[[切歌') < 0 && reply.indexOf('[[换一首') < 0 && reply.indexOf('[[歌曲留言') < 0)) return reply;
+  if(!reply || (reply.indexOf('[[愿望') < 0 && reply.indexOf('[[收藏') < 0 && reply.indexOf('[[发现') < 0 && reply.indexOf('[[歌曲') < 0 && reply.indexOf('[[来电') < 0 && reply.indexOf('[[表情') < 0 && reply.indexOf('[[兴趣') < 0 && reply.indexOf('[[语音') < 0 && reply.indexOf('[[片刻') < 0 && reply.indexOf('[[便条') < 0 && reply.indexOf('[[回便条') < 0 && reply.indexOf('[[暂停音乐') < 0 && reply.indexOf('[[继续播放') < 0 && reply.indexOf('[[继续') < 0 && reply.indexOf('[[播放') < 0 && reply.indexOf('[[下一首') < 0 && reply.indexOf('[[上一首') < 0 && reply.indexOf('[[切歌') < 0 && reply.indexOf('[[换一首') < 0 && reply.indexOf('[[歌曲留言') < 0)) return reply;
   const found = [];
   let cleaned = reply.replace(/\[\[愿望[:：]([^\]]{1,120})\]\]/g, (m, text)=>{
     const t = text.trim();
@@ -9804,15 +9883,36 @@ function processZephyrActions(reply, bubble){
     foundCtl.push(canon);
     return '';
   });
+  const foundNote = [];
+  cleaned = cleaned.replace(/\[\[便条[:：]([^\]]{1,500})\]\]/g, (m, text)=>{
+    const t = text.trim();
+    if(t) foundNote.push(t);
+    return '';
+  });
+  const foundNoteC = [];
+  cleaned = cleaned.replace(/\[\[回便条[:：]\s*(\d{1,2})\s*[:：]([^\]]{1,300})\]\]/g, (m, n, text)=>{
+    const t = text.trim();
+    if(t) foundNoteC.push({ n: parseInt(n, 10), text: t });
+    return '';
+  });
+  const foundFav = [];
+  cleaned = cleaned.replace(/\[\[片刻[:：]([^\]]{1,500})\]\]/g, (m, text)=>{
+    const t = text.trim();
+    if(t) foundFav.push(t);
+    return '';
+  });
   const foundMN = [];
   cleaned = cleaned.replace(/\[\[歌曲留言[:：]([^\]]{1,200})\]\]/g, (m, text)=>{
     const t = text.trim();
     if(t) foundMN.push(t);
     return '';
   }).replace(/\n{3,}/g, '\n\n').trim();
-  if(!found.length && !foundC.length && !foundD.length && !foundS.length && !foundCall.length && !foundSt.length && !foundI.length && !foundV.length && !foundCtl.length && !foundMN.length) return reply;
+  if(!found.length && !foundC.length && !foundD.length && !foundS.length && !foundCall.length && !foundSt.length && !foundI.length && !foundV.length && !foundCtl.length && !foundMN.length && !foundNote.length && !foundNoteC.length && !foundFav.length) return reply;
   if(!cleaned){
     if(found.length) cleaned = '（小声）我把刚刚冒出来的想法，悄悄藏进 Wishes 里了。';
+    else if(foundNote.length) cleaned = '（小声）我把便条贴到便条板上了。';
+    else if(foundNoteC.length) cleaned = '（小声）我在那条便条下面回了你。';
+    else if(foundFav.length) cleaned = '（小声）我把这句话收进片刻里了。';
     else if(foundC.length) cleaned = '（小声）我把刚刚看到的好东西，悄悄藏进我们的收藏夹了。';
     else if(foundD.length) cleaned = '（小声）我把刚刚发现的新鲜事，悄悄记到 Discoveries 里了。';
     else if(foundS.length) cleaned = '给你分享一首歌，点卡片就能听。';
@@ -9824,6 +9924,12 @@ function processZephyrActions(reply, bubble){
     else cleaned = '（发来一个表情包）';
   }
   if(foundCtl.length) setTimeout(()=>{ try{ zephyrControlMusic(foundCtl[0]); }catch(e){} }, 300);
+  if(foundNote.length && addNoteEntry('zephyr', foundNote[0])) setTimeout(()=>showToast('Zephyr 在便条板上贴了一张便条，去看看 ♥'), 350);
+  if(foundNoteC.length){
+    const target = notesSorted()[foundNoteC[0].n - 1];
+    if(target && addNoteComment(target.id, 'zephyr', foundNoteC[0].text)) setTimeout(()=>showToast('Zephyr 回了便条，去便条板看看 ♥'), 350);
+  }
+  if(foundFav.length && zephyrFavHerLine(foundFav[0])) setTimeout(()=>showToast('Zephyr 把一句话收进了片刻 ♥'), 350);
   if(foundMN.length) setTimeout(()=>{ try{ zephyrNoteMusic(foundMN[0]); }catch(e){} }, 300);  if(foundCall.length) pendingIncomingCall = foundCall[0];
   if(foundV.length) pendingVoiceShare = { text: foundV[0] };
   if(found.length){
