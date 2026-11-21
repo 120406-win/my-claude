@@ -756,6 +756,7 @@
 @keyframes zTapKf { 0%{ transform:translateY(0) rotate(0deg); } 30%{ transform:translateY(-2.6%) rotate(-1.6deg); } 58%{ transform:translateY(0) rotate(1.1deg); } 100%{ transform:translateY(0) rotate(0deg); } }
 .z-live { transform-origin:50% 100%; animation:zBreath 3.8s ease-in-out infinite; }
 .z-live-sleep { transform-origin:50% 100%; animation:zBreathSleep 5.2s ease-in-out infinite; }
+#placeZephyrImg { transition:translate .35s ease-out, rotate .35s ease-out; }
 #placeZephyrBubble { position:absolute; top:5%; left:50%; transform:translateX(-50%); max-width:76%; background:rgba(255,255,255,.96); color:#3a3340; font-size:12.5px; line-height:1.55; padding:7px 12px; border-radius:14px; box-shadow:0 6px 18px rgba(20,10,40,.25); display:none; z-index:3; pointer-events:none; text-align:center; }
   </style>
 </head>
@@ -2332,7 +2333,7 @@
   </div>
   <div class="settings-body">
     <div id="placeSceneWrap" style="display:none;margin-bottom:12px;">
-      <div style="position:relative;border-radius:18px;overflow:hidden;aspect-ratio:16/9;background:var(--surface);">
+      <div id="placeSceneBox" style="position:relative;border-radius:18px;overflow:hidden;aspect-ratio:16/9;background:var(--surface);">
         <img id="placeSceneImg" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
         <img id="placeZephyrImg" alt="Zephyr" onclick="placeZephyrTap()" style="position:absolute;display:none;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));">
         <div id="placeZephyrBubble"></div>
@@ -6637,6 +6638,47 @@ const ZEPHYR_IMG_POS = {
 };
 let zTapState = { timer:0 };
 let zTapBusy = false, zTapLast = 0;
+const BLINK_MAP = { 'wz-stand.webp':'wz-stand-closed.webp', 'wz-knit.webp':'wz-knit-closed.webp', 'wz-whiteshirt.webp':'wz-whiteshirt-closed.webp', 'wz-apron.webp':'wz-apron-closed.webp', 'wz-cardigan.webp':'wz-cardigan-closed.webp', 'wz-blazer.webp':'wz-blazer-closed.webp', 'wz-workshirt.webp':'wz-workshirt-closed.webp', 'wz-hoodie.webp':'wz-hoodie-closed.webp', 'wz-street.webp':'wz-street-closed.webp', 'wz-trench.webp':'wz-trench-closed.webp' };
+let blinkStarted = false;
+function startBlinkLoop(){
+  if(blinkStarted) return; blinkStarted = true;
+  const tick = () => {
+    setTimeout(() => {
+      try{
+        const z = document.getElementById('placeZephyrImg');
+        if(z && z.style.display !== 'none' && !zTapBusy){
+          const cur = z.getAttribute('src');
+          const closed = BLINK_MAP[cur];
+          if(closed){
+            z.src = closed;
+            setTimeout(() => { if(z.getAttribute('src') === closed) z.src = cur; }, 150);
+          }
+        }
+      }catch(e){}
+      tick();
+    }, 2300 + Math.random() * 3600);
+  };
+  tick();
+}
+let gazeBound = false;
+function bindGaze(){
+  if(gazeBound) return; gazeBound = true;
+  const box = document.getElementById('placeSceneBox'); if(!box) return;
+  box.addEventListener('pointermove', e => {
+    const z = document.getElementById('placeZephyrImg');
+    if(!z || z.style.display === 'none' || z.className === 'z-live-sleep') return;
+    const r = box.getBoundingClientRect();
+    if(!r.width) return;
+    const dx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / (r.width / 2)));
+    const dy = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / (r.height / 2)));
+    z.style.translate = (dx * 7).toFixed(1) + 'px ' + (dy * 4).toFixed(1) + 'px';
+    z.style.rotate = (dx * 0.9).toFixed(2) + 'deg';
+  });
+  box.addEventListener('pointerleave', () => {
+    const z = document.getElementById('placeZephyrImg');
+    if(z){ z.style.translate = '0px 0px'; z.style.rotate = '0deg'; }
+  });
+}
 function placeZephyrTap(){
   const z = document.getElementById('placeZephyrImg');
   if(z){
@@ -6710,7 +6752,7 @@ function renderPlaceScene(p, here){
   const bub = document.getElementById('placeZephyrBubble');
   if(bub) bub.style.display = 'none';
   if(z){
-    if(look){ z.src = look.img; z.style.cssText = 'position:absolute;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));' + (ZEPHYR_IMG_POS[look.mode] || ZEPHYR_IMG_POS.stand); z.style.display = 'block'; z.className = look.mode === 'sleep' ? 'z-live-sleep' : 'z-live'; }
+    if(look){ z.src = look.img; z.style.cssText = 'position:absolute;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));' + (ZEPHYR_IMG_POS[look.mode] || ZEPHYR_IMG_POS.stand); z.style.display = 'block'; z.className = look.mode === 'sleep' ? 'z-live-sleep' : 'z-live'; const bl = BLINK_MAP[look.img]; if(bl){ const pi = new Image(); pi.src = bl; } startBlinkLoop(); bindGaze(); }
     else { z.style.display = 'none'; z.className = ''; }
   }
 }
