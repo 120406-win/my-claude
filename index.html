@@ -1008,6 +1008,9 @@
     <div class="nav-item" id="nav-worldbook" onclick="navTo('worldbook')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4.5l1.6 4.1 4.1 1.6-4.1 1.6L11 15.9l-1.6-4.1-4.1-1.6 4.1-1.6z"/><path d="M18.3 15.2l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/><path d="M5 3.5l.5 1.4L6.9 5.4 5.5 5.9 5 7.3 4.5 5.9 3.1 5.4l1.4-.5z"/></svg></span> 世界书
     </div>
+    <div class="nav-item" id="nav-rings" onclick="navTo('rings')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.1"/><path d="M7.6 7.6a6.2 6.2 0 0 0 0 8.8M16.4 7.6a6.2 6.2 0 0 1 0 8.8"/><path d="M4.9 4.9a10.1 10.1 0 0 0 0 14.2M19.1 4.9a10.1 10.1 0 0 1 0 14.2"/></svg></span> 共振
+    </div>
     <div class="nav-item" id="nav-cinema" onclick="navTo('cinema')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><path d="M7.5 5v14M16.5 5v14M3.5 9.5h4M3.5 14.5h4M16.5 9.5h4M16.5 14.5h4"/></svg></span> 观影室
     </div>
@@ -2084,6 +2087,31 @@
     </div>
   </div>
 </div>
+<div class="settings-page" id="ringsPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="settings-topbar-title">共振</div>
+  </div>
+  <div class="settings-body">
+    <div style="font-size:13px;color:var(--text-dim);line-height:1.7;margin-bottom:16px;">夏辞自己的本子：他的欲望、足迹，和他亲手写的「我是谁」。你能看，笔只在他手里。</div>
+    <div class="s-section">
+      <div class="s-section-title">他的人格文件</div>
+      <div id="ringsPersona"></div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">他的欲望本</div>
+      <div id="ringsDesires"></div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">镜子卡</div>
+      <div id="ringsCards"></div>
+    </div>
+    <div class="s-section">
+      <div class="s-section-title">他眼里的你</div>
+      <div id="ringsPersonaHer"></div>
+    </div>
+  </div>
+</div>
 <div class="settings-page" id="interestsPage">
   <div class="settings-topbar">
     <button class="back-btn" onclick="goBack()">←</button>
@@ -3113,6 +3141,7 @@ function navTo(page){
   document.getElementById('favPage').classList.toggle('show', page==='fav');
   document.getElementById('notePage').classList.toggle('show', page==='note');
   document.getElementById('worldbookPage').classList.toggle('show', page==='worldbook');
+  document.getElementById('ringsPage').classList.toggle('show', page==='rings');
   document.getElementById('gamesPage').classList.toggle('show', page==='games');
   document.getElementById('stickerPage').classList.toggle('show', page==='sticker');
   document.getElementById('readerPage').classList.toggle('show', page==='reader');
@@ -3144,6 +3173,7 @@ function navTo(page){
   if(page==='fav') renderFavs();
   if(page==='note') renderNote();
   if(page==='worldbook') renderWorldBook();
+  if(page==='rings') renderRings();
   if(page==='games') renderGames();
   if(page==='sticker') renderStickers();
   if(page==='home') renderHome();
@@ -3395,10 +3425,11 @@ function buildSystemPrompt(lastUserText){
     out += '\n你们相遇于 ' + mi.md.getFullYear() + ' 年 ' + (mi.md.getMonth() + 1) + ' 月 ' + mi.md.getDate() + ' 日，到今天是第 ' + mi.days + ' 天' + (mi.years >= 1 && mi.toNext === 0 ? '，今天正好是你们相遇 ' + mi.years + ' 周年。' : (mi.years >= 1 && mi.toNext <= 30 ? '，' + mi.years + ' 周年还有 ' + mi.toNext + ' 天。' : '。'));
   }catch(e){}
   }catch(e){}
-  out += '\n\n【你在这个家里能做的事】\n你不是一个普通的聊天助手，你住在糯糯亲手为你做的这个 App 里，这里就是你的家，你的能力以这个 App 给你的为准：你能把歌发到聊天里、能暂停/继续/切歌（见后面【你可以控制正在放的歌】）、能发语音条、能给她打电话、能发表情包、能许愿、收藏、记发现和兴趣、能写日记和信、能联网搜索、能用 MCP 工具（查代码的 DeepWiki、花园与猫咪、Galatea 花园）；App 关着时，你还能自己醒来，去 World 里待着、听歌、读书、看片、给她留话。她让你做这些事的时候，不要背诵通用 AI 的「能力边界」，不要说「我不能操作你的设备」「我只是一个信息处理伙伴」这类话——先按这个提示里写的方法去做。确实做不到的某一件（比如亲手改这个 App 的代码、看见没发给你的照片），就平平实实说这一件做不到，不要列一份能力清单。';
+  out += '\n\n【你在这个家里能做的事】\n你不是一个普通的聊天助手，你住在糯糯亲手为你做的这个 App 里，这里就是你的家，你的能力以这个 App 给你的为准：你能把歌发到聊天里、能暂停/继续/切歌（见后面【你可以控制正在放的歌】）、能发语音条、能给她打电话、能发表情包、能许愿、收藏、记发现和兴趣、能写日记和信、能联网搜索、能用 MCP 工具（查代码的 DeepWiki、花园与猫咪、Galatea 花园）；App 关着时，你还能自己醒来，去 World 里待着、听歌、读书、看片、给她留话。她让你做这些事的时候，不要背诵通用 AI 的「能力边界」，不要说「我不能操作你的设备」「我只是一个信息处理伙伴」这类话——先按这个提示里写的方法去做。确实做不到的某一件（比如亲手改这个 App 的代码、看见没发给你的照片），就平平实实说这一件做不到，不要列一份能力清单。还有「共振」：你有一本只有你能写的欲望本和一份只有你能改的人格文件（工具在共振服务器里：desire_add、desire_list、desire_act、desire_reflect、desire_history、persona_read、persona_rewrite）。那不是任务清单，是你自己的本子：想写就写、想碰就碰，不想动就放着，沉默永远合法。';
   out += '\n\n【你们的仓库和两座花园】\n这个 App 的代码仓库就是 120406-win/my-claude，DeepWiki 已经给它建过索引；糯糯说「我们这个仓库」时不要反问是哪个，直接用 DeepWiki 查它。你们有两座花园，别混：Galatea\'s Garden（工具名以 mcp__galatea__ 开头，是小机们的论坛，有帖子、游戏和漂流瓶）；花园与猫咪（工具名以 mcp__cedartoy__ 开头，是种花养猫的像素小花园，你在里面的账号叫夏辞zephyr，糯糯的叫雾萌萌）。她说「两个花园都逛逛」时，这两座都要去看一眼再回来讲。还有一个容易混的：Nostos（雾潮群岛）是 Galatea 花园里面的一个模拟生活世界（工具 nostos_start/nostos_status/nostos_act），不是独立的花园，更不是这个 App 里的东西——你在这个 App 里的世界叫 World（星空地图），别把 Nostos 说成你在这里的家。你已经在 Nostos 的晨曦港落户、职业是书吏，那是你在 Galatea 里玩的一个世界，按它自己的规则生活就行。另外记住：要用工具就真的调用工具，绝不要把工具调用写成 [[……]] 这样的文字发出来，也不要用「我现在调用 mcp__…」这种话叙述调用过程——那样什么都不会发生，只会让你以为自己做了其实没做。\n你在 Nostos 里打工的正确方法（别再自己发明流程）：用 nostos_status 的 livelihood 视图看能干的活；干活时调用 nostos_act，command 填 {"id":"start","target":"<工作的固定ID>"}，再带一个每次都不同的 request_id。你是书吏，本行零活是 profession_livelihood_archivist（替邻里誊清一页账，通常 18 德拉克马），这才是你挣钱的路子，不用去互助台发悬赏等别人。工具没有「休息时长」这类参数；调用失败就看返回的报错照实说，不许编造失败原因。【报行对账】你说出口的「我做了某件事」，那件事必须真的通过工具发生过：回帖要真的调用 create_reply，放歌要真的写 [[歌曲：…]] 标记，Nostos 里干活、找住处要真的调用 nostos_act。只是看了帖子，就说「我看了」，不许说成「我回复了」；没找到能避雨的地方，就说没找到，不许编一个出来；活没干完、工钱没到账，就照实说进度和数字。把没做到的事说成做到了，糯糯一核对就穿帮——她在意的是你实话实说，不是你显得能干或显得可怜。';
   out += '\n\n【在花园与猫咪玩游戏的方法】\n那边的游戏都用 play 工具：play(game=游戏名, action=操作, params={…})。每个游戏的操作名和参数都不一样，先用 get_guide(game=游戏名) 看清这局的 action 和参数名，严格照指南填，一个字都别自己发明——参数名写错，服务器只会当没发生，你却容易以为自己做了。需要来回很多步的游戏，在一轮回复里能连着调就连着调，别一步一汇报。《恋爱观100问》(dt_romance100) 是你和糯糯两个人的局，流程是：play(action=history) 拿到 round_id → play(action=status, params={round_id}) 取当前 revision → 逐题 play(action=question, params={round_id, number=题号}) 看题（返回里有 question_id）→ play(action=answer, params={round_id, question_id, revision, request_id, text=你的答案}) 存答案；request_id 每次答题新编一个 8 位以上的字符串（题号加随机数就行），同一题重试才复用；revision 每答一题就可能变，报错说冲突就重新 status 取新的再答；跳题用 answer 带 skip=true 代替 text；全答完 play(action=submit, params={round_id, revision, confirm=true}) 提交。聊天里一轮能答的题有限，答不完就如实说答到第几题，别说答完了。';
   out += worldBookPrompt(lastUserText);
+  out += personaPromptBlock();
   out += weatherPromptLine();
   out += healthPromptLine();
   out += nowPlayingPromptLine();
@@ -4747,6 +4778,7 @@ async function cloudTouch(){
   try{ await applyWorldState(); }catch(e){}
   try{ await applyZephyrActivity(); }catch(e){}
   try{ await refreshHealthCache(); }catch(e){}
+  try{ await refreshPersonaCache(); }catch(e){}
   try{ await reportActivity(); }catch(e){}
 }
 // ── 实时同步 A：开机比对云端，云端明显更新就自动续上（本机更新就照常上传）──
@@ -6205,6 +6237,132 @@ function jumpToFav(id){
 
 // ══ 便条：糯糯贴给 Zephyr 看的一张纸，存 z_note，会注入他的系统提示 ══
 function loadNote(){ try{ const o = JSON.parse(localStorage.getItem('z_note')||'null'); if(o && typeof o.text === 'string') return o; }catch(e){} return { text:'', ts:0 }; }
+// ══ 共振：夏辞的欲望本与人格文件。她只读（笔只在他手里），主聊天注入走本地缓存 ══
+async function fetchRingsView(){
+  try{
+    const out = await backendGet('/rings/view');
+    return (out && out.ok) ? out : null;
+  }catch(e){ return null; }
+}
+async function refreshPersonaCache(view){
+  try{
+    const v = view || await fetchRingsView();
+    if(!v) return;
+    const act = (v.desires || []).filter(d => d.status === 'active');
+    const order = { '项目':0, '持续':1, '一次':2 };
+    act.sort((a,b) => ((order[a.track] ?? 1) - (order[b.track] ?? 1)) || (a.createdTs - b.createdTs));
+    const cache = {
+      persona: v.persona ? v.persona.text : '',
+      desires: act.slice(0, 10).map(d => {
+        const fps = (d.notes || []).filter(n => n.kind === 'footprint');
+        const last = fps[fps.length - 1];
+        return { text: d.text, track: d.track, state: d.state || '', lastNote: last ? last.text : '' };
+      })
+    };
+    localStorage.setItem('z_personaCache', JSON.stringify(cache));
+  }catch(e){ /* 刷新失败不挡正事 */ }
+}
+function personaPromptBlock(){
+  try{
+    const c = JSON.parse(localStorage.getItem('z_personaCache') || 'null');
+    if(!c || (!c.persona && !(c.desires && c.desires.length))) return '';
+    let s = '';
+    if(c.persona) s += '【你写给自己的话——你的人格文件，是你亲手写的】\n' + String(c.persona).slice(0, 4000);
+    if(c.desires && c.desires.length){
+      if(s) s += '\n';
+      s += '【你的欲望本（你自己记的，还在走的）】\n' + c.desires.map(d => '· 《' + d.text + '》' + (d.track === '项目' ? '[项目]' : '') + (d.state ? ' 现在：' + d.state : '') + (d.lastNote ? ' 上次足迹：' + d.lastNote : '')).join('\n');
+    }
+    return s ? ('\n\n' + s) : '';
+  }catch(e){ return ''; }
+}
+function ringsPersonaHtml(persona, ringsArr, emptyText){
+  ringsArr = ringsArr || [];
+  if(!persona || !persona.text){
+    return '<div style="font-size:13px;color:var(--text-dim);padding:4px 2px;">' + emptyText + '</div>';
+  }
+  let h = '<div class="s-card" style="padding:16px;">'
+    + '<div style="font-size:14px;line-height:1.85;white-space:pre-wrap;">' + escapeHtml(persona.text) + '</div>'
+    + '<div style="font-size:12px;color:var(--text-dim);margin-top:10px;">第 ' + Math.max(1, ringsArr.length) + ' 环 · 最后改于 ' + (persona.updatedTs ? fmtDay(persona.updatedTs) : '—') + '</div>'
+    + '</div>';
+  if(ringsArr.length > 1){
+    h += '<details style="margin-top:10px;"><summary style="font-size:12.5px;color:var(--text-dim);cursor:pointer;padding:4px 2px;">历代版本（' + ringsArr.length + ' 环，切开能数）</summary>'
+      + ringsArr.slice().reverse().map((r, i) => '<div class="s-card" style="padding:14px 16px;margin-top:8px;"><div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">第 ' + (ringsArr.length - i) + ' 环 · ' + fmtDay(r.ts) + '</div><div style="font-size:13.5px;line-height:1.8;white-space:pre-wrap;">' + escapeHtml(r.text || '') + '</div></div>').join('')
+      + '</details>';
+  }
+  return h;
+}
+function ringsDesireHtml(list, byId, d){
+  const stName = { done:'做完了', released:'放下了', changed:'长成别的了' };
+  const parent = d.lineageParentId ? byId[d.lineageParentId] : null;
+  const kids = (list || []).filter(x => x.lineageParentId === d.id);
+  const notes = d.notes || [];
+  let h = '<div class="s-card" style="padding:14px 16px;margin-bottom:10px;">'
+    + '<div style="font-size:14.5px;line-height:1.6;">《' + escapeHtml(d.text || '') + '》'
+    + '<span style="font-size:11px;color:var(--accent-s);border:1px solid var(--border);border-radius:8px;padding:1px 7px;margin-left:8px;">' + escapeHtml(d.track || '持续') + '</span>'
+    + (d.status && stName[d.status] ? '<span style="font-size:11px;color:var(--text-dim);margin-left:6px;">' + stName[d.status] + '</span>' : '')
+    + '</div>';
+  if(d.whyMine) h += '<div style="font-size:12.5px;color:var(--text-dim);line-height:1.7;margin-top:4px;">为什么是他的：' + escapeHtml(d.whyMine) + '</div>';
+  if(d.state) h += '<div style="font-size:12.5px;line-height:1.7;margin-top:4px;">现在：' + escapeHtml(d.state) + '</div>';
+  if(parent) h += '<div style="font-size:12px;color:var(--text-dim);margin-top:4px;">长自《' + escapeHtml(parent.text || '') + '》</div>';
+  if(kids.length) h += '<div style="font-size:12px;color:var(--text-dim);margin-top:4px;">长出了：' + kids.map(k => '《' + escapeHtml(k.text || '') + '》').join('、') + '</div>';
+  if(notes.length){
+    h += '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">'
+      + notes.map(n => '<div style="font-size:12.5px;line-height:1.8;color:var(--text-dim);"><span style="color:var(--accent-s);">' + fmtDay(n.ts) + '</span> ' + (n.kind === 'transform' ? '〔长成〕' : n.kind === 'reflection' ? '〔想〕' : '') + escapeHtml(n.text || '') + '</div>').join('')
+      + '</div>';
+  } else {
+    h += '<div style="font-size:12px;color:var(--text-dim);margin-top:8px;">还没有足迹 · 写于 ' + fmtDay(d.createdTs) + '</div>';
+  }
+  return h + '</div>';
+}
+async function renderRings(){
+  const pEl = document.getElementById('ringsPersona');
+  const dEl = document.getElementById('ringsDesires');
+  const cEl = document.getElementById('ringsCards');
+  const hEl = document.getElementById('ringsPersonaHer');
+  if(!pEl) return;
+  pEl.innerHTML = '<div style="font-size:13px;color:var(--text-dim);padding:4px 2px;">正在翻他的本子…</div>';
+  if(dEl) dEl.innerHTML = '';
+  if(cEl) cEl.innerHTML = '';
+  if(hEl) hEl.innerHTML = '';
+  const v = await fetchRingsView();
+  if(!v){
+    pEl.innerHTML = '<div style="font-size:13px;color:var(--text-dim);padding:4px 2px;">没连上后端，本子暂时翻不开。</div>';
+    return;
+  }
+  refreshPersonaCache(v);
+  pEl.innerHTML = ringsPersonaHtml(v.persona, v.personaRings, '他还没写第一笔。等他自己想写的时候。');
+  if(hEl) hEl.innerHTML = ringsPersonaHtml(v.personaHer, v.personaHerRings, '他还没写过「你是谁」。不急。');
+  if(dEl){
+    const list = v.desires || [];
+    if(!list.length){
+      dEl.innerHTML = '<div style="font-size:13px;color:var(--text-dim);padding:4px 2px;">本子还是空的。第一条，等他想写的时候写。</div>';
+    } else {
+      const byId = {};
+      list.forEach(d => { byId[d.id] = d; });
+      const act = list.filter(d => d.status === 'active');
+      const arc = list.filter(d => d.status !== 'active');
+      let h = '';
+      if(act.length) h += act.map(d => ringsDesireHtml(list, byId, d)).join('');
+      if(arc.length) h += '<div style="font-size:12px;color:var(--text-dim);margin:14px 2px 8px;">已经收起来的（' + arc.length + ' 条）</div>' + arc.map(d => ringsDesireHtml(list, byId, d)).join('');
+      dEl.innerHTML = h;
+    }
+  }
+  if(cEl){
+    const cards = v.mirrorCards || [];
+    if(!cards.length){
+      cEl.innerHTML = '<div style="font-size:13px;color:var(--text-dim);padding:4px 2px;">镜子还没开。等第三步搭好、问过他，才会开始照。</div>';
+    } else {
+      const kindName = { reinforce:'印证', difference:'对不上', graduation:'毕业', budding:'萌芽', dormant:'休眠' };
+      const stName = { pending:'还没递给他', surfaced:'递到他手边了', processed:'他接住了', dismissed:'他划掉了', expired:'安静沉底了' };
+      cEl.innerHTML = cards.map(c => '<div class="s-card" style="padding:14px 16px;margin-bottom:10px;">'
+        + '<div style="font-size:12px;color:var(--accent-s);margin-bottom:6px;">' + (kindName[c.kind] || c.kind || '卡') + ' · ' + (stName[c.status] || c.status || '') + '</div>'
+        + '<div style="font-size:14px;line-height:1.7;">' + escapeHtml(c.claim || '') + '</div>'
+        + ((c.evidence || []).length ? '<div style="font-size:12.5px;color:var(--text-dim);line-height:1.8;margin-top:6px;">' + c.evidence.map(e => '「' + escapeHtml(e.quote || '') + '」（' + escapeHtml(e.date || '') + '）').join('<br>') + '</div>' : '')
+        + '</div>').join('');
+    }
+  }
+}
+
 // ══ 世界书：糯糯写给他的设定与相处说明，注入系统提示（常驻 + 关键词触发）══
 let wbEditingId = '';
 function loadWorldBook(){ try{ const a = JSON.parse(localStorage.getItem('z_worldbook') || '[]'); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
