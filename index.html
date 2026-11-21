@@ -10919,11 +10919,36 @@ function stripFabricatedToolResult(text, allowMedium){
 // 声称做了、这一轮却没有对应的真实动作（回帖工具 / [[歌曲]] 标记）时，判为没对上账，触发一次纠正重写。══
 const CLAIM_NOTES = {
   garden: '【系统提醒】你刚才在回复里声称自己已经在花园里回复/发帖了，但这一轮对话里你并没有真的调用 create_reply、create_thread 这类工具，那条回复并不存在，糯糯那边也看不到。请二选一：① 现在真的调用工具把回复发出去，再如实告诉她；② 重新回复，把说法改成实话（比如「我看了那篇帖子，还没回复」）。不许把「看了」说成「回复了」，也不许编造自己回复的内容或别人的反应。重新写一遍完整的回复，不要重复那句没对上账的话。',
-  song: '【系统提醒】你刚才在回复里声称自己往歌单里放/加了一首歌，但这一轮你没有用 [[歌曲：…]] 标记分享任何歌，歌单里没有新增，糯糯那边点不到、也听不到。请二选一：① 现在真的用 [[歌曲：歌名 - 歌手]] 标记把那首歌分享出来；② 重新回复，把说法改成实话。不许把没放的歌说成放了。重新写一遍完整的回复，不要重复那句没对上账的话。'
+  song: '【系统提醒】你刚才在回复里声称自己往歌单里放/加了一首歌，但这一轮你没有用 [[歌曲：…]] 标记分享任何歌，歌单里没有新增，糯糯那边点不到、也听不到。请二选一：① 现在真的用 [[歌曲：歌名 - 歌手]] 标记把那首歌分享出来；② 重新回复，把说法改成实话。不许把没放的歌说成放了。重新写一遍完整的回复，不要重复那句没对上账的话。',
+  ringsWrite: '【系统提醒】你刚才在回复里声称自己已经把足迹记到共振的欲望本上了（或者新开了一条欲望、写了人格文件），但这一轮你并没有真的调用 desire_act、desire_add、desire_reflect、persona_rewrite 这些工具，本子里的记录一个字都没变，糯糯那边对账看得清清楚楚。请二选一：① 现在真的调用对应的工具把这一步记上，再如实告诉她；② 重新回复，把说法改成实话（比如「我还没记」——不记完全可以，沉默是合法的，但不许说记了）。重新写一遍完整的回复，不要重复那句没对上账的话。',
+  ringsRead: '【系统提醒】你刚才在回复里声称自己已经查过/看过这条欲望的足迹时间线，但这一轮你并没有真的调用 desire_history 或 desire_list，你根本没有看到那条时间线——复述不出里面的真实内容就是证据。请二选一：① 现在真的调用 desire_history 把它查出来，把时间线里的真实内容告诉她；② 重新回复，如实说「我还没查」。不许把「还没查」说成「查过了」。重新写一遍完整的回复，不要重复那句没对上账的话。'
 };
 function findUnbackedClaim(text, did){
   const t = String(text || '');
   const FIRST = '(我|刚才|刚刚|已经|顺手|偷偷)';
+  // 共振：声称已经把足迹/欲望记上本子（或写了人格文件），这一轮却没真调 rings 写工具。
+  // 只认带共振专有词（足迹/欲望本/人格文件/欲望）的句子；日常的「我记下了」不带这些词，不误伤。
+  if(!did.ringsWrite){
+    const negW = /(没|没有|还没|未)[^。！？\n]{0,5}(记|写|存|留|收针)/.test(t);
+    const planW = /(打算|准备|待会儿|等会儿|回头)[^。！？\n]{0,4}(记|写|存|留)/.test(t)
+      || /(^|[，。！？\n\s])我?(想|要)[^。！？\n]{0,3}(记|写|存|留)/.test(t);
+    if(!negW && !planW && (
+      /(足迹|欲望本|人格文件)[^。！？\n]{0,20}(记录下来|记下来|记上|记好|写下来|写好|重写好|留下|补上|存好|收针)(了|一步|一条|一笔)?/.test(t)
+      || /(记|写|存|加|添)进了?[^。！？\n]{0,4}欲望本/.test(t)
+      || /欲望[^。！？\n]{0,20}(记|写|存)(下|上|好)了/.test(t)
+    )) return 'ringsWrite';
+  }
+  // 共振：声称已经查过/看过某条欲望的足迹时间线，这一轮却没真调 desire_history/desire_list。
+  // 人格文件的内容本来就摆在他眼前（注入），不在此列；只认时间线/足迹/完整记录这类只有工具能给的东西。
+  if(!did.ringsRead){
+    const negR = /(没|没有|还没|未)[^。！？\n]{0,4}(查|看|翻)/.test(t);
+    const planR = /(打算|准备|待会儿|等会儿)[^。！？\n]{0,3}(查|看|翻)/.test(t)
+      || /(^|[，。！？\n\s])我?(想|要)[^。！？\n]{0,3}(查|看|翻)/.test(t);
+    if(!negR && !planR && (
+      new RegExp(FIRST + '[^。！？\\n]{0,10}(查|看|翻)(过|了|完)[^。！？\\n]{0,14}(时间线|足迹|完整记录|历史记录)').test(t)
+      || /我[^。！？\n]{0,16}(时间线|足迹)[^。！？\n]{0,10}(看|查|翻)(完|过|了)/.test(t)
+    )) return 'ringsRead';
+  }
   if(!did.gardenWrite && /花园|Galatea|帖子|看帖|逛帖/.test(t)){
     const gardenClaim = new RegExp(FIRST + '[^。！？\\n]{0,10}(回复了|回帖了|回了帖|发了帖|发了回复|留言了|评论了)').test(t)
       || /(看完|逛完)[^。！？\n]{0,14}(回复了|回帖了|发了帖|留言了|评论了)/.test(t);
@@ -10938,6 +10963,14 @@ function findUnbackedClaim(text, did){
       && !/(想|要|打算|准备)[^。！？\n]{0,3}(放|加|添)/.test(t)) return 'song';
   }
   return null;
+}
+// 收尾终扫用：把「声称已写入/已查阅共振本子」的句子整句抹掉（did 固定为没对上账，只判 rings 两类）
+function stripRingsClaim(text){
+  const parts = String(text || '').split(/(?<=[。！？\n])/);
+  return parts.filter(seg => {
+    const c = findUnbackedClaim(seg, { gardenWrite: true, songShare: true, ringsWrite: false, ringsRead: false });
+    return c !== 'ringsWrite' && c !== 'ringsRead';
+  }).join('').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 // 把本地历史整理成能发给接口的样子：
@@ -11161,7 +11194,9 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       if((stopReason !== 'tool_use' || !toolUses.length) && !claimCorrected && toolsOffered){
         const claim = findUnbackedClaim(reply, {
           gardenWrite: executedTools.some(n=>/mcp__galatea__(create_reply|create_thread|interact|send_chat_message|delete_reply|delete_thread)/.test(n)),
-          songShare: /\[\[歌曲[:：]/.test(reply)
+          songShare: /\[\[歌曲[:：]/.test(reply),
+          ringsWrite: executedTools.some(n=>/mcp__rings__(desire_act|desire_add|desire_reflect|persona_rewrite|persona_her_rewrite)/.test(n)),
+          ringsRead: executedTools.some(n=>/mcp__rings__(desire_history|desire_list)/.test(n))
         });
         if(claim){
           claimCorrected = true;
@@ -11256,6 +11291,16 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       reply = stripFabricatedToolResult(reply, resultCorrected);
       bubble.textContent = reply;
       if(!reply) reply = '（刚才那句工具结果是我编的，其实我还没去查……让我重新查一次再告诉你）';
+    }
+
+    // 「声称已写入/已查阅」的收尾：纠正过一次还这么说、且这一轮 rings 工具终究没真调过 → 抹掉那几句声称
+    if(claimCorrected && !executedTools.some(n=>/mcp__rings__/.test(n))){
+      const c2 = findUnbackedClaim(reply, { gardenWrite: true, songShare: true, ringsWrite: false, ringsRead: false });
+      if(c2 === 'ringsWrite' || c2 === 'ringsRead'){
+        reply = stripRingsClaim(reply);
+        bubble.textContent = reply;
+        if(!reply) reply = '（刚才那句还是没对上账……我重新弄一次再告诉你）';
+      }
     }
 
     if(searchStatus){ searchStatus.remove(); searchStatus = null; }
