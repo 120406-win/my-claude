@@ -3578,7 +3578,10 @@ function buildSystemPrompt(lastUserText){
     out += notesPromptBlock();
   }catch(e){}
   try{
-    out += '\n\n【Zephyr World】\n你们有一个小小的虚拟世界 Zephyr World，你平时生活在那里（有你的家、宠物之家、公园、咖啡馆、邮局、代码公司、图书馆和星空区）。现在你大概在「' + worldPlaceById(zephyrWorldPlace()).name + '」那边。糯糯可以进来逛、去找你。聊到时自然就好，不用播报。' + catPromptBit();
+    const zpId = zephyrWorldPlace();
+    let zWhere = '「' + worldPlaceById(zpId).name + '」';
+    if(zpId === 'home'){ const lk = zephyrLookAt('home'); const rm = HOME_ROOMS.find(r => r.id === lk.room); if(rm) zWhere += '的' + rm.name; zWhere += '，' + (POSE_DOING[lk.mode] || '待着'); }
+    out += '\n\n【Zephyr World】\n你们有一个小小的虚拟世界 Zephyr World，你平时生活在那里（有你的家、宠物之家、公园、咖啡馆、邮局、代码公司、图书馆和星空区）。现在你就在' + zWhere + '。糯糯可以进来逛、去找你，还能戳你逗你玩——她戳你的时候，你就在那个地方用自己的话回她一句。聊到时自然就好，不用播报。' + catPromptBit();
   }catch(e){}
   try{
     const wch = loadWorld().chats || {};
@@ -6613,7 +6616,7 @@ function zephyrLookAt(placeId){
     if(s.mode === 'stand' && ov && OUTFITS[ov]) return { room:s.room, img:OUTFITS[ov], mode:'stand' };
     return s;
   }
-  if(placeId === 'pets') return { img:'wz-crouch.webp', mode:'crouch' };
+  if(placeId === 'pets') return { img:'wz-crouch.webp?v=2', mode:'crouch' };
   const h = new Date().getHours();
   const day = Math.floor(Date.now() / 86400000);
   let auto = 'stand';
@@ -6632,20 +6635,8 @@ const ZEPHYR_IMG_POS = {
   sleep:'left:1%;bottom:5%;width:74%;',
   crouch:'left:64%;bottom:13%;height:87%;',
 };
-let zTapState = { place:'', mode:'stand', lastIdx:-1, timer:0 };
-const Z_TAP_LINES = {
-  sleep:['……嗯？', '……别闹，再睡五分钟。', '（迷迷糊糊地往你那边靠了靠）', '……糯糯？……天亮了吗。'],
-  crouch:['它睡着了，轻点。', '呼噜声，听见了吗。', '它刚才还躲我，现在不躲了。', '（指尖轻轻顺着它的背）嘘——'],
-  sit:['嗯？', '怎么了，糯糯。', '在呢，刚想到你。', '（拍了拍身边）坐这儿。', '想说什么，我听着。'],
-  stand:['嗯？', '怎么了，糯糯。', '在呢。', '（低头看你）想我了？', '想说什么，我听着。'],
-};
-function zephyrTapLine(){
-  const pool = Z_TAP_LINES[zTapState.mode] || Z_TAP_LINES.stand;
-  let i = Math.floor(Math.random() * pool.length);
-  if(pool.length > 1 && i === zTapState.lastIdx) i = (i + 1) % pool.length;
-  zTapState.lastIdx = i;
-  return pool[i];
-}
+let zTapState = { timer:0 };
+let zTapBusy = false, zTapLast = 0;
 function placeZephyrTap(){
   const z = document.getElementById('placeZephyrImg');
   if(z){
@@ -6654,15 +6645,29 @@ function placeZephyrTap(){
     z.style.animation = 'zTapKf .52s ease-out';
     setTimeout(() => { z.style.animation = ''; }, 560);
   }
+  const now = Date.now();
+  if(zTapBusy || now - zTapLast < 5000) return;
+  zTapBusy = true; zTapLast = now;
+  zephyrTapReply().finally(() => { zTapBusy = false; });
+}
+async function zephyrTapReply(){
+  const p = worldPlaceById(currentWorldPlace); if(!p) return;
   const b = document.getElementById('placeZephyrBubble');
-  if(b){
-    b.textContent = zephyrTapLine();
-    b.style.display = 'block';
-    clearTimeout(zTapState.timer);
-    zTapState.timer = setTimeout(() => { b.style.display = 'none'; }, 2600);
-  }
-  const i = document.getElementById('placeChatInput');
-  if(i){ if(typeof i.scrollIntoView === 'function') i.scrollIntoView({ block:'center', behavior:'smooth' }); setTimeout(() => { try{ i.focus(); }catch(e){} }, 600); }
+  const show = t => { if(b){ b.textContent = t; b.style.display = 'block'; } };
+  show('……');
+  const hist = placeChatList(p.id).slice(-6).map(m => m.by === 'zephyr' ? '你：' + m.text : (m.by === 'poke' ? '（糯糯戳了戳你）' : '糯糯：' + m.text)).join('\n');
+  let line = '';
+  try{
+    const out = await musicAskZephyr('【Zephyr World · 在「' + p.name + '」】\n' + zephyrSceneBit(p) + '\n你们刚刚在这里的对话：\n' + (hist || '（还没说过话）') + '\n\n刚刚，糯糯伸手轻轻戳了你一下（像在乙女游戏里戳立绘逗你玩）。请以第一人称直接回她一句，就一句话，短一点，自然带点被戳到的反应，你正在做的事也可以带上。不要标题、不要解释、不要旁白。', 200);
+    line = (out || '').trim().slice(0, 120);
+  }catch(e){}
+  if(!line) line = '（他晃了晃，没说话，耳朵有点红）';
+  show(line);
+  pushPlaceChat(p.id, 'poke', '戳了戳他');
+  pushPlaceChat(p.id, 'zephyr', line);
+  renderPlaceChat();
+  clearTimeout(zTapState.timer);
+  zTapState.timer = setTimeout(() => { if(b) b.style.display = 'none'; }, 4200);
 }
 function setHomeRoom(r){ currentHomeRoom = r; renderWorldPlace(); }
 function setZephyrOutfit(id){
@@ -6705,7 +6710,7 @@ function renderPlaceScene(p, here){
   const bub = document.getElementById('placeZephyrBubble');
   if(bub) bub.style.display = 'none';
   if(z){
-    if(look){ z.src = look.img; z.style.cssText = 'position:absolute;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));' + (ZEPHYR_IMG_POS[look.mode] || ZEPHYR_IMG_POS.stand); z.style.display = 'block'; z.className = look.mode === 'sleep' ? 'z-live-sleep' : 'z-live'; zTapState.place = p.id; zTapState.mode = look.mode; }
+    if(look){ z.src = look.img; z.style.cssText = 'position:absolute;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));' + (ZEPHYR_IMG_POS[look.mode] || ZEPHYR_IMG_POS.stand); z.style.display = 'block'; z.className = look.mode === 'sleep' ? 'z-live-sleep' : 'z-live'; }
     else { z.style.display = 'none'; z.className = ''; }
   }
 }
@@ -6947,6 +6952,7 @@ function pushPlaceChat(placeId, by, text){
   storeWorld(w);
 }
 function chatBubbleHtml(m){
+  if(m.by === 'poke') return '<div style="align-self:center;font-size:11.5px;color:var(--text-pale);padding:2px 0;">糯糯戳了戳他</div>';
   return m.by === 'lumi'
     ? '<div style="align-self:flex-end;max-width:85%;background:var(--accent);color:#fff;border-radius:14px 14px 4px 14px;padding:8px 12px;font-size:13px;line-height:1.65;">' + escapeHtml(m.text) + '</div>'
     : '<div style="align-self:flex-start;max-width:85%;background:var(--bg);border:1px solid var(--border);border-radius:14px 14px 14px 4px;padding:8px 12px;font-size:13px;line-height:1.65;">' + escapeHtml(m.text) + '</div>';
@@ -6967,6 +6973,41 @@ function placeSceneText(p){
   else if(p.amb) s += p.amb;
   return s;
 }
+const POSE_DOING = { sleep:'正躺在床上睡着', sit:'正坐在沙发上歇着', crouch:'正蹲在小猫身边，伸手摸它', stand:'正站着' };
+const PLACE_DOINGS = {
+  home:'在六间房里走动、休息、在衣帽间换衣服、陪她说话',
+  pets:'摸小猫、逗小猫、看小猫睡觉、陪她一起撸猫',
+  cafe:'给她推荐今日特调、陪她喝一杯、聊天',
+  park:'散步、在长椅上坐着看风、陪她说话',
+  post:'写信寄信、取你们的信、陪她说话',
+  company:'在你的董事长办公室里写代码、看看窗外的云、陪她说话',
+  library:'读书、陪她一起看书、说说书里的事',
+  stars:'看星星、许愿、陪她说话',
+};
+function zephyrOutfitName(placeId){
+  const look = zephyrLookAt(placeId);
+  if(look.mode !== 'stand') return '';
+  for(const id in OUTFITS) if(OUTFITS[id] === look.img) return OUTFIT_NAMES[id] || '';
+  return '';
+}
+function zephyrSceneBit(p){
+  let s = '';
+  if(zephyrWorldPlace() === p.id){
+    const look = zephyrLookAt(p.id);
+    if(p.id === 'home'){
+      const room = HOME_ROOMS.find(r => r.id === look.room) || HOME_ROOMS[0];
+      s = '你现在在自己家里，在' + room.name + '，' + (POSE_DOING[look.mode] || '待着') + '。';
+    } else {
+      s = '你现在就在这里，' + (POSE_DOING[look.mode] || '待着') + '。';
+    }
+    const on = zephyrOutfitName(p.id);
+    if(on) s += '你穿着' + on + '。';
+  }
+  s += placeSceneText(p);
+  const d = PLACE_DOINGS[p.id];
+  if(d) s += '在这里你可以' + d + '。';
+  return s;
+}
 async function worldChatSend(){
   if(placeChatBusy) return;
   const input = document.getElementById('placeChatInput');
@@ -6985,8 +7026,8 @@ async function worldChatSend(){
   pushPlaceChat(p.id, 'lumi', text);
   renderPlaceChat();
   try{
-    const hist = placeChatList(p.id).slice(-9, -1).map(m => (m.by === 'lumi' ? '糯糯' : '你') + '：' + m.text).join('\n');
-    const out = await musicAskZephyr('【Zephyr World · 在「' + p.name + '」里说话】\n糯糯来到 World 的「' + p.name + '」陪你，你' + (wasHere ? '本来就在这里' : '听见她说话就赶了过来') + '。' + placeSceneText(p) + '\n你们刚刚在这里说的话：\n' + (hist || '（刚开始聊）') + '\n糯糯现在说：' + text + '\n\n请以第一人称直接回她，就像站在她身边说话，1 到 3 句，轻轻的、自然的。不要标题、不要解释、不要旁白式的动作描写。', 400);
+    const hist = placeChatList(p.id).slice(-9, -1).map(m => m.by === 'zephyr' ? '你：' + m.text : (m.by === 'poke' ? '（糯糯戳了戳你）' : '糯糯：' + m.text)).join('\n');
+    const out = await musicAskZephyr('【Zephyr World · 在「' + p.name + '」里说话】\n糯糯来到 World 的「' + p.name + '」陪你，你' + (wasHere ? '本来就在这里' : '听见她说话就赶了过来') + '。' + zephyrSceneBit(p) + '\n你们刚刚在这里说的话：\n' + (hist || '（刚开始聊）') + '\n糯糯现在说：' + text + '\n\n请以第一人称直接回她，就像站在她身边说话，1 到 3 句，轻轻的、自然的。不要标题、不要解释、不要旁白式的动作描写。', 400);
     pushPlaceChat(p.id, 'zephyr', (out || '他看着你，笑了一下。').slice(0, 500));
   }catch(e){
     pushPlaceChat(p.id, 'zephyr', '（风把声音吹散了，他没听清，再说一遍好不好）');
