@@ -10794,6 +10794,39 @@ function stripNarratedToolCall(text){
 function stripFakeToolCall(text){
   return String(text || '').replace(/\n?[ \t]*\[\[\s*mcp__[\s\S]*?\]\][ \t]*\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
 }
+// 「编造工具结果」：叙述体假调用的变种——调用过程不编了，改编结果：这一轮明明没调工具，
+// 却报告「工具返回了错误」「系统里找不到这条记录」，甚至引一段 {"error":…} 出来，编完自己当真。
+// 只认工具语境很强的说法；「我看了眼本子」这类不带工具的日常叙述不在此列，别误伤。
+// allowMedium=false 时只认强特征（引 JSON 报错 / 明说工具返回或调用工具），收尾终扫用它防误抹。
+function findFabricatedToolResult(text, allowMedium){
+  const t = String(text || '');
+  const strong = [
+    /\{\s*"error"\s*:/,
+    /工具(返回|报错|说|显示|回了)/,
+    /(调用|用)工具(查|看|翻|调|执行|确认)/,
+    /我(已经|刚|刚才)?调用了?工具/,
+  ];
+  for(const p of strong){
+    const m = p.exec(t);
+    if(m) return m.index;
+  }
+  if(allowMedium === false) return -1;
+  const medium = [
+    /(系统|账本|本子)里?找不到(这条|那条|这个|该)?(记录|欲望|条目|东西)?/,
+    /报错了[^。！？\n]{0,16}(找不到|不存在|没有这条)/,
+    /(工具|调用)[^。！？\n]{0,10}失败了/,
+  ];
+  let best = -1;
+  for(const p of medium){
+    const m = p.exec(t);
+    if(m && (best < 0 || m.index < best)) best = m.index;
+  }
+  return best;
+}
+function stripFabricatedToolResult(text, allowMedium){
+  const parts = String(text || '').split(/(?<=[。！？\n])/);
+  return parts.filter(seg => findFabricatedToolResult(seg, allowMedium) < 0).join('').replace(/\n{3,}/g, '\n\n').trim();
+}
 // ══ 防「把看说成做」：他真去逛了花园/歌单，却在话里把「看了帖子」说成「回复了」、把没放的歌说成「放了一首」。
 // 声称做了、这一轮却没有对应的真实动作（回帖工具 / [[歌曲]] 标记）时，判为没对上账，触发一次纠正重写。══
 const CLAIM_NOTES = {
@@ -10944,6 +10977,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     const toolsOffered = !!reqBody.tools;
     let fakeCorrected = false;
     let claimCorrected = false;
+    let resultCorrected = false;
     const executedTools = [];
     let roundLimit = 4;
     for(let round = 0; round < roundLimit; round++){
@@ -11025,6 +11059,19 @@ async function callAPI(userText, extraBlocks=null, opts=null){
         reply = stripNarratedToolCall(stripFakeToolCall(reply));
         bubble.textContent = reply;
         showToast('他刚把工具调用写成了文字，我让他真的重做一次');
+        continue;
+      }
+      // 防「编造工具结果」纠正：这一整轮一个真工具都没调过，他却报告了工具的返回（甚至编了个报错）→ 顶他一句，让他真调一次或改口
+      if((stopReason !== 'tool_use' || !toolUses.length) && !resultCorrected && !executedTools.length && toolsOffered && findFabricatedToolResult(reply) >= 0){
+        resultCorrected = true;
+        roundLimit = round + 4;
+        const ac = [];
+        blocks.forEach(b=>{ if(b && b.type === 'text' && b.text) ac.push({ type:'text', text:b.text }); });
+        if(ac.length) workMsgs.push({ role:'assistant', content:ac });
+        workMsgs.push({ role:'user', content:'【系统提醒】你刚才报告的那个工具结果并不存在——这一轮你并没有真的调用任何工具，所以没有任何工具向你返回过东西，更没有向你报错。你写出来的那段「错误信息」是你自己补出来的，账本里的记录好好的。请二选一：① 现在真的调用对应的工具去查（比如 desire_history、desire_list），拿到真实返回再回复糯糯；② 如果你其实还没去查，就如实说「我还没查」，不要编造任何工具的返回或报错。工具真的报错时，App 会把原文给你，你照原样转述即可，永远不要自己编一段报错出来。' });
+        reply = stripFabricatedToolResult(reply);
+        bubble.textContent = reply;
+        showToast('他报的工具结果是编的，我让他真的查一次');
         continue;
       }
       // 防「把看说成做」纠正：声称回了帖/放了歌、这一轮却没有真实动作 → 顶他一句，让他真做一次或改口说实话
@@ -11118,6 +11165,14 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       reply = stripNarratedToolCall(stripFakeToolCall(reply));
       bubble.textContent = reply;
       if(!reply) reply = fakeCorrected ? '（刚才那件事我没做成……你再让我试一次好不好）' : '（刚才走神了，再跟我说一次好吗）';
+    }
+
+    // 编造工具结果的收尾：这一整轮没真调过工具，正文里还留着编出来的工具返回/报错 → 抹掉那几句
+    // （强特征直接抹；「系统里找不到」这类中等特征只在已经纠正过一次、他还再犯时才抹，防误伤日常话）
+    if(!executedTools.length && findFabricatedToolResult(reply, resultCorrected) >= 0){
+      reply = stripFabricatedToolResult(reply, resultCorrected);
+      bubble.textContent = reply;
+      if(!reply) reply = '（刚才那句工具结果是我编的，其实我还没去查……让我重新查一次再告诉你）';
     }
 
     if(searchStatus){ searchStatus.remove(); searchStatus = null; }
