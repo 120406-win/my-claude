@@ -157,6 +157,56 @@
       --sidebar-bg:  #180c12;
       --font-size:   15px;
     }
+    /* 粉点点（QQ 主题那种：白气泡细粉边、波点底、花边） */
+    [data-theme="melody"] {
+      --bg:        #fff6f9;
+      --bg2:       #ffeef4;
+      --bg3:       #ffdfea;
+      --surface:   rgba(240,120,170,0.07);
+      --border:    rgba(240,130,175,0.28);
+      --text:      #6b4353;
+      --text-dim:  #b08397;
+      --text-pale: #cfa9ba;
+      --accent:    #f28bb4;
+      --accent-s:  #e56ba0;
+      --bubble-user: #ffffff;
+      --bubble-ai:   #ffffff;
+      --bubble-user-text: #6b4353;
+      --bubble-ai-text:   #6b4353;
+      --header-bg:   rgba(255,224,238,0.92);
+      --input-bg:    rgba(255,240,246,0.97);
+      --sidebar-bg:  #ffecf3;
+      --font-size:   15px;
+    }
+    html[data-theme="melody"] body {
+      background-color:#fff6f9;
+      background-image:radial-gradient(rgba(240,130,175,0.20) 1.6px, transparent 1.9px);
+      background-size:26px 26px;
+    }
+    html[data-theme="melody"] .msg-row.user .msg, html[data-theme="melody"] .msg-row.user .voice-bubble { border:1px solid rgba(240,130,175,0.45); }
+    html[data-theme="melody"] .msg-row.ai .msg, html[data-theme="melody"] .msg-row.ai .voice-bubble { border-color:rgba(240,130,175,0.45); }
+    html[data-theme="melody"] .header::after {
+      content:''; position:absolute; left:0; right:0; bottom:-8px; height:9px; pointer-events:none;
+      background-image:radial-gradient(circle at 8px 0, var(--header-bg) 5px, transparent 6.5px);
+      background-size:16px 9px; background-repeat:repeat-x;
+    }
+    html[data-theme="melody"] .input-bar::before {
+      content:''; position:absolute; left:0; right:0; top:-8px; height:9px; pointer-events:none;
+      background-image:radial-gradient(circle at 8px 9px, var(--input-bg) 5px, transparent 6.5px);
+      background-size:16px 9px; background-repeat:repeat-x;
+    }
+    /* ══ 气泡小尾巴（外观开关 html.tail-on，颜色跟气泡走）══ */
+    html.tail-on .msg, html.tail-on .voice-bubble { position:relative; }
+    html.tail-on .msg-row.ai .msg::before, html.tail-on .msg-row.ai .voice-bubble::before {
+      content:''; position:absolute; top:12px; left:-4.5px; width:9px; height:9px;
+      background:inherit; transform:rotate(45deg);
+      border-left:1px solid var(--border); border-bottom:1px solid var(--border);
+    }
+    html.tail-on .msg-row.user .msg::before, html.tail-on .msg-row.user .voice-bubble::before {
+      content:''; position:absolute; top:12px; right:-4.5px; width:9px; height:9px;
+      background:inherit; transform:rotate(45deg);
+      border-top:1px solid var(--border); border-right:1px solid var(--border);
+    }
 
     html, body {
       width:100%; height:100%;
@@ -177,7 +227,7 @@
       font-size: var(--fs,14px);
       user-select:none;
     }
-    [data-theme="light"] .p, [data-theme="bunny"] .p, [data-theme="kitty"] .p { opacity: calc(var(--op,0.12) * 0.5); }
+    [data-theme="light"] .p, [data-theme="bunny"] .p, [data-theme="kitty"] .p, [data-theme="melody"] .p { opacity: calc(var(--op,0.12) * 0.5); }
 
     /* ══ 自定义背景层（和主题解耦，单独控制）══ */
     .bg-layer {
@@ -447,11 +497,11 @@
     .voice-icon { font-size:18px; flex-shrink:0; }
     .voice-waves { display:flex; align-items:center; gap:2px; flex:1; }
     .voice-bar   { width:3px; border-radius:2px; background:rgba(255,255,255,0.6); }
-    [data-theme="light"] .voice-bar, [data-theme="bunny"] .voice-bar, [data-theme="kitty"] .voice-bar { background:rgba(0,0,0,0.35); }
+    [data-theme="light"] .voice-bar, [data-theme="bunny"] .voice-bar, [data-theme="kitty"] .voice-bar, [data-theme="melody"] .voice-bar { background:rgba(0,0,0,0.35); }
     .voice-bubble.playing .voice-bar { animation:wavebar var(--s,.5s) ease-in-out infinite alternate; }
     @keyframes wavebar{ from{transform:scaleY(0.4);} to{transform:scaleY(1);} }
     .voice-dur { font-size:12px; color:rgba(255,255,255,0.7); flex-shrink:0; }
-    [data-theme="light"] .voice-dur, [data-theme="bunny"] .voice-dur, [data-theme="kitty"] .voice-dur { color:rgba(0,0,0,0.5); }
+    [data-theme="light"] .voice-dur, [data-theme="bunny"] .voice-dur, [data-theme="kitty"] .voice-dur, [data-theme="melody"] .voice-dur { color:rgba(0,0,0,0.5); }
 
     /* 打字动画 */
     .typing-dots span {
@@ -1116,6 +1166,7 @@
           <button id="themeRose"   onclick="setTheme('rose')"   class="theme-btn" style="background:#1e0e14;color:#f0a0b8;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🌹 玫瑰暮光</button>
           <button id="themeBunny"  onclick="setTheme('bunny')"  class="theme-btn" style="background:#fdeef4;color:#e5639c;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🐰 奶糖小兔</button>
           <button id="themeKitty"  onclick="setTheme('kitty')"  class="theme-btn" style="background:#fdf3e0;color:#e07f2e;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🐱 布丁小猫</button>
+          <button id="themeMelody" onclick="setTheme('melody')" class="theme-btn" style="background:#fff0f5;color:#e56ba0;border:2px solid transparent;border-radius:10px;padding:10px;font-size:13px;cursor:pointer;">🎀 粉点点</button>
         </div>
         <div class="s-row">
           <div>
@@ -1163,6 +1214,12 @@
             <div class="slider-val" id="radiusVal">18</div>
           </div>
           <input type="range" id="radiusSlider" min="4" max="28" step="1" value="18" oninput="setBubbleRadius(this.value)">
+        </div>
+        <div class="s-row">
+          <div>
+            <div class="s-row-label">气泡小尾巴</div>
+          </div>
+          <button id="bubbleTailBtn" class="bg-mode-btn" onclick="toggleBubbleTail()" style="min-width:60px;">关</button>
         </div>
         <div style="padding:0 16px 14px;">
           <button onclick="resetAppearance()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">恢复默认外观</button>
@@ -2577,6 +2634,7 @@ const PARTICLE_SETS = {
   rose:   ['✨','🌹','🌙','✨','✨','🌹','☁️'],
   bunny:  ['🌸','🐰','🌸','✨','🥕','🌸','🐰'],
   kitty:  ['🐾','🐱','🐾','✨','🧶','🐾','🐱'],
+  melody: ['🎀','🤍','🎀','✨','🫧','🎀','🤍'],
 };
 function buildParticles(theme){
   const layer=document.getElementById('particleLayer');
@@ -2645,7 +2703,7 @@ let localStream=null;
 // ══ 主题 ══
 function applyTheme(t){
   // 主题名和按钮 id 不一致，用映射表对齐：dark→Night, light→Day
-  const btnIds = { dark:'themeNight', light:'themeDay', purple:'themePurple', forest:'themeForest', rose:'themeRose', bunny:'themeBunny', kitty:'themeKitty' };
+  const btnIds = { dark:'themeNight', light:'themeDay', purple:'themePurple', forest:'themeForest', rose:'themeRose', bunny:'themeBunny', kitty:'themeKitty', melody:'themeMelody' };
   document.documentElement.removeAttribute('data-theme');
   if(t !== 'dark') document.documentElement.setAttribute('data-theme', t);
   Object.entries(btnIds).forEach(([name, id]) => {
@@ -2689,6 +2747,9 @@ function applyAppearance(){
   const mat = bubbleMaterial();
   root.classList.toggle('mat-frost', mat === 'frost');
   root.classList.toggle('mat-glass', mat === 'glass');
+  root.classList.toggle('tail-on', bubbleTail());
+  const tb = document.getElementById('bubbleTailBtn');
+  if(tb){ tb.textContent = bubbleTail() ? '开' : '关'; tb.style.borderColor = bubbleTail() ? 'var(--accent)' : 'transparent'; }
   const opStored = parseFloat(localStorage.getItem('z_bubbleOpacity') || '');
   const op = isNaN(opStored) ? (mat === 'glass' ? 0.55 : 0.7) : opStored;
   root.style.setProperty('--bubble-alpha', String(op));
@@ -2728,8 +2789,15 @@ function setBubbleRadius(v){
   localStorage.setItem('z_bubbleRadius', String(parseInt(v, 10)));
   applyAppearance();
 }
+function bubbleTail(){
+  return localStorage.getItem('z_bubbleTail') === 'true';
+}
+function toggleBubbleTail(){
+  localStorage.setItem('z_bubbleTail', bubbleTail() ? 'false' : 'true');
+  applyAppearance();
+}
 function resetAppearance(){
-  ['z_accentCustom','z_bubbleUser','z_bubbleAi','z_glass','z_bubbleMaterial','z_bubbleOpacity','z_bubbleRadius'].forEach(k=>localStorage.removeItem(k));
+  ['z_accentCustom','z_bubbleUser','z_bubbleAi','z_glass','z_bubbleMaterial','z_bubbleOpacity','z_bubbleRadius','z_bubbleTail'].forEach(k=>localStorage.removeItem(k));
   const root = document.documentElement;
   ['--accent','--accent-s','--bubble-user','--bubble-user-text','--bubble-ai','--bubble-ai-text','--bubble-alpha','--bubble-radius'].forEach(v=>root.style.removeProperty(v));
   applyAppearance();
@@ -12741,7 +12809,8 @@ function currentAppearanceData(){
     bubbleAi: localStorage.getItem('z_bubbleAi') || '',
     material: bubbleMaterial(),
     opacity: localStorage.getItem('z_bubbleOpacity') || '',
-    radius: localStorage.getItem('z_bubbleRadius') || ''
+    radius: localStorage.getItem('z_bubbleRadius') || '',
+    tail: bubbleTail() ? 'true' : ''
   };
 }
 function applySchemeData(d){
@@ -12752,6 +12821,7 @@ function applySchemeData(d){
   set('z_bubbleAi', d.bubbleAi);
   set('z_bubbleOpacity', d.opacity);
   set('z_bubbleRadius', d.radius);
+  set('z_bubbleTail', d.tail);
   localStorage.setItem('z_bubbleMaterial', ['solid', 'frost', 'glass'].includes(d.material) ? d.material : 'solid');
   if(d.theme) setTheme(d.theme);
   applyAppearance();
