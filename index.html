@@ -4582,7 +4582,7 @@ async function setHeartbeatMax(v){
 async function setHeartbeatGap(v){
   try{
     await backendFetch('/heartbeat/settings', { minGapH: parseFloat(v) || 2 });
-    showToast('两次醒来至少间隔 ' + (parseFloat(v) === 0.5 ? '半小时' : v + ' 小时'));
+    showToast('两次醒来至少间隔 ' + (parseFloat(v) === 0.25 ? '15 分钟' : parseFloat(v) === 0.5 ? '半小时' : v + ' 小时'));
   }catch(e){ showToast('没改成：' + e.message); }
   refreshHeartbeatStatus();
 }
@@ -7830,7 +7830,9 @@ function renderMusic(){
     list.appendChild(row);
   });
 }
+let playSeq = 0; // 连点两首歌时，先点的那首取链慢也不能在后面盖掉新点的
 async function playTrack(id, keepPos){
+  const mySeq = ++playSeq;
   const d = loadMusic();
   const t = d.tracks.find(x=>x.id===id);
   if(!t) return;
@@ -7839,6 +7841,7 @@ async function playTrack(id, keepPos){
   bindMusicAudio();
   const pos = (keepPos && d.lastId === id) ? (a.currentTime || 0) : 0;
   const src = await resolveTrackSrc(t);
+  if(mySeq !== playSeq) return; // 取链期间又点了别的歌，这次作废
   if(!src){ showToast(t.local ? '这个文件找不到了，可能被浏览器清理了 qwq' : '这首歌的链接取不到 qwq 换个来源试试'); return; }
   if(t.local || t.gdSource || d.lastId !== id || !a.src){
     a.src = src;
@@ -7847,8 +7850,9 @@ async function playTrack(id, keepPos){
       if(a.readyState >= 1) sk(); else a.addEventListener('loadedmetadata', sk, { once:true });
     }
   }
-  d.lastId = id;
-  storeMusic(d);
+  const d2 = loadMusic(); // 等待期间歌单可能被改过，写 lastId 前重读，别用旧快照覆盖
+  d2.lastId = id;
+  storeMusic(d2);
   a.play().catch(()=>showToast('这首歌放不出来 qwq 换个来源试试'));
   renderMusic();
   if(!t.synced && !t.plain && t.title && !(t.url && t.url.indexOf('somafm.com') >= 0)) fetchLyrics(false);
@@ -9484,7 +9488,7 @@ async function regenerateLastReply(){
   for(let i = aiIdx - 1; i >= 0; i--){ if(!messages[i].recalled && messages[i].role === 'user'){ hasUser = true; break; } }
   if(!hasUser){ showToast('没有可以重新生成的回复'); return; }
   regenBusy = true;
-  messages.splice(aiIdx, 1);
+  const removedMsg = messages.splice(aiIdx, 1)[0];
   saveChatHistory();
   renderMessagesIntoChat();
   headerSub.textContent = '正在重新生成…';
@@ -9493,7 +9497,13 @@ async function regenerateLastReply(){
   hideTyping();
   headerSub.textContent = '在线';
   regenBusy = false;
-  if(!reply) showToast('重新生成失败了，再试一次 qwq');
+  if(!reply){
+    // 生成失败就把刚删掉的旧回复原样放回去，不能让他上一句话凭空消失
+    messages.splice(aiIdx, 0, removedMsg);
+    saveChatHistory();
+    renderMessagesIntoChat();
+    showToast('重新生成失败了，再试一次 qwq');
+  }
 }
 function regenFromMenu(){ closeMsgMenu(); regenerateLastReply(); }
 // 双击（手机上连点两下）气泡打开菜单，不用再长按等了
@@ -9549,7 +9559,7 @@ function addVoiceBubble(src,dur,isUser,mid){
   chatWrap.scrollTop=chatWrap.scrollHeight;
   return col;
 }
-function showTyping(){ chatWrap.querySelector('.empty-tip')?.remove(); const row=document.createElement('div'); row.className='msg-row ai'; row.id='typing-row'; const av=getAvatarEl(false); const col=document.createElement('div'); col.className='msg-col'; const b=document.createElement('div'); b.className='msg'; b.innerHTML='<div class="typing-dots"><span></span><span></span><span></span></div>'; col.appendChild(b); row.appendChild(av); row.appendChild(col); chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; }
+function showTyping(){ document.getElementById('typing-row')?.remove(); chatWrap.querySelector('.empty-tip')?.remove(); const row=document.createElement('div'); row.className='msg-row ai'; row.id='typing-row'; const av=getAvatarEl(false); const col=document.createElement('div'); col.className='msg-col'; const b=document.createElement('div'); b.className='msg'; b.innerHTML='<div class="typing-dots"><span></span><span></span><span></span></div>'; col.appendChild(b); row.appendChild(av); row.appendChild(col); chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; }
 function hideTyping(){ document.getElementById('typing-row')?.remove(); }
 
 const headerSub=document.getElementById('headerSub');
@@ -10652,11 +10662,13 @@ function findUnbackedClaim(text, did){
 }
 
 async function callAPI(userText, extraBlocks=null, opts=null){
-  if(!cfg.apiKey){ showToast('请先在 Settings 里填写 API Key'); return null; }
+  if(!cfg.apiKey){ hideTyping(); showToast('请先在 Settings 里填写 API Key'); return null; }
   const regen = !!(opts && opts.regenerate);
+  let sentUserMid = null;
   if(!regen){
     let content = extraBlocks ? [...extraBlocks, {type:'text', text:userText||'请看一下这个'}] : userText;
     const userMid = pendingUserMid || genMsgId();
+    sentUserMid = userMid;
     pendingUserMid = null;
     messages.push({role:'user',content,mid:userMid});
     document.getElementById('regen-row')?.remove(); // 新消息发出后，旧回复的重新生成按钮先撤下
@@ -10848,11 +10860,13 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       if(stopReason !== 'tool_use' || !toolUses.length || round >= roundLimit - 1) break;
 
       // 把他这轮的话和工具调用原样记进工作历史（思考块不回传：中转常把思考压扁、签名对不上，硬回传容易整段失败）
+      // 工具调用只回传真正执行过的那几个：名单外的 tool_use 没有对应的 tool_result，带回去接口会直接 400
+      const executedIds = new Set(toolUses.map(tu=>tu.id));
       const assistantContent = [];
       blocks.forEach(b=>{
         if(!b) return;
         if(b.type === 'text' && b.text) assistantContent.push({ type:'text', text:b.text });
-        else if(b.type === 'tool_use'){
+        else if(b.type === 'tool_use' && executedIds.has(b.id)){
           let input = {};
           try{ input = JSON.parse(b.json || '{}'); }catch(e){}
           assistantContent.push({ type:'tool_use', id:b.id, name:b.name, input });
@@ -10953,7 +10967,12 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     cloudTouch(); // 后端三件小事：报到、自动同步、收他留的话（节流 10 分钟，静默）
     updateRegenButton();
     return reply;
-  } catch(e){ if(!regen) messages.pop(); showToast('发送失败：'+e.message + (thinkingEnabled() ? '（开着思考模式时若反复失败，可能是模型或接口不支持，去设置里关掉它）' : '')); return null; }
+  } catch(e){
+    hideTyping();
+    // 失败回滚要按 mid 精确删自己这条：等待期间心跳留言可能已经追加到末尾，pop() 会误删他的话
+    if(!regen && sentUserMid){ const ix = messages.findIndex(m=>m.mid === sentUserMid); if(ix >= 0) messages.splice(ix, 1); }
+    showToast('发送失败：'+e.message + (thinkingEnabled() ? '（开着思考模式时若反复失败，可能是模型或接口不支持，去设置里关掉它）' : '')); return null;
+  }
 }
 
 // ══ TTS 播放器：全局共用一个 Audio 元素。iOS 只放行被用户手势「解锁」过的
@@ -11853,8 +11872,11 @@ document.getElementById('callBtn').addEventListener('click',async()=>{
   callSeconds=0; callInterval=setInterval(()=>{callSeconds++;const m=String(Math.floor(callSeconds/60)).padStart(2,'0'),s=String(callSeconds%60).padStart(2,'0');document.getElementById('callTimer').textContent=`${m}:${s}`;document.getElementById('callMiniTimer').textContent=`${m}:${s}`;},1000);
   callBusy = true;
   showTyping(); const reply=await callAPI('（糯糯拨打了语音通话，温柔打个招呼，简短一点）'); hideTyping();
-  callBusy = false; callLastActivity = Date.now(); armCallHeartbeat();
+  callBusy = false; callLastActivity = Date.now();
+  if(!isCalling) return; // 等接通时她已经挂断了：别再出声、别把通话状态写回去
+  armCallHeartbeat();
   if(reply){ await speakText(reply); }
+  if(!isCalling) return; // 问候语播到一半她挂断了：别再开麦
   // 等他问候说完再开输入门（识别和播放同时开会互相打死）；
   // 录音识别就绪就用它，没就绪才回退浏览器识别
   callMicActive = true;
@@ -12199,12 +12221,12 @@ async function attachOnlineSub(subUrl, recId){
     const text = await readTextFileSmart(await r.blob());
     const cues = parseSubtitles(text);
     if(!cues.length) throw new Error('sub empty');
-    cinemaState.cues = cues;
+    const stillSame = cinemaState.recordId === recId; // 取字幕期间换了片，旧字幕不能挂到新片上（记录本身照常存）
+    if(stillSame) cinemaState.cues = cues;
     const recs = loadCinemaRecords();
     const rec = recs.find(x=>x.id === recId);
     if(rec){ rec.subName = decodeURIComponent(subUrl.split('/').pop() || ''); storeCinemaRecords(recs); }
-    renderCinemaInfo();
-    showToast('字幕自动挂上啦，共 ' + cues.length + ' 句');
+    if(stillSame){ renderCinemaInfo(); showToast('字幕自动挂上啦，共 ' + cues.length + ' 句'); }
   }catch(e){ showToast('字幕没自动取到（源站限制），想配字幕可以手动选文件'); }
 }
 async function onCinemaSubChosen(input){
