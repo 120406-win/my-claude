@@ -710,6 +710,8 @@
 
     /* Toast */
     .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%); background:var(--accent); background:color-mix(in srgb, var(--accent) 92%, transparent); color:white; padding:8px 20px; border-radius:20px; font-size:14px; z-index:500; pointer-events:none; white-space:nowrap; box-shadow:0 8px 24px color-mix(in srgb, var(--accent) 35%, transparent); }
+    /* 报错专用 toast：能点开看全文，所以要能点、能换行 */
+    .toast-err { pointer-events:auto; cursor:pointer; white-space:normal; max-width:92vw; text-align:center; line-height:1.45; }
     /* ══ Home 首页：星空 App 首页，配色全部跟随主题（星星是主题色的小星尘） ══ */
     #homePage { background:linear-gradient(180deg, color-mix(in srgb, var(--bg) 84%, var(--accent) 16%) 0%, var(--bg) 55%, color-mix(in srgb, var(--bg) 90%, var(--accent) 10%) 100%); color:var(--text); }
     .home-stars { position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:0; opacity:.5; }
@@ -2688,6 +2690,17 @@
 <!-- 图片预览 -->
 <div class="img-preview" id="imgPreview">
   <img id="imgPreviewEl" src="" alt="">
+</div>
+
+<!-- 错误详情：报错 toast 点开后看全文，可滚动、可长按复制 -->
+<div class="settings-page" id="errDetailPage" style="z-index:600;">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="closeErrorDetail()">←</button>
+    <div class="settings-topbar-title">错误详情</div>
+  </div>
+  <div class="settings-body">
+    <div id="errDetailText" style="font-size:13.5px;line-height:1.75;white-space:pre-wrap;word-break:break-word;-webkit-user-select:text;user-select:text;"></div>
+  </div>
 </div>
 
 <!-- ══ 锁屏 ══ -->
@@ -9470,6 +9483,22 @@ function showToast(msg){
   document.body.appendChild(t); setTimeout(()=>t.remove(),2200);
 }
 
+// 报错专用：toast 停留久一点且可点击，点开「错误详情」页看全文（普通 toast 不受影响）
+let lastErrorFull = '';
+function showErrorToast(msg, full){
+  document.querySelectorAll('.toast').forEach(t=>t.remove());
+  lastErrorFull = full || msg;
+  const t=document.createElement('div'); t.className='toast toast-err'; t.textContent=msg;
+  t.addEventListener('click', ()=>{ t.remove(); openErrorDetail(); });
+  document.body.appendChild(t); setTimeout(()=>t.remove(),6000);
+}
+function openErrorDetail(){
+  const el = document.getElementById('errDetailText');
+  if(el) el.textContent = lastErrorFull || '';
+  document.getElementById('errDetailPage')?.classList.add('show');
+}
+function closeErrorDetail(){ document.getElementById('errDetailPage')?.classList.remove('show'); }
+
 function nowTime(){ const d=new Date(); return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`; }
 
 // ══ 多窗口 / 多对话系统 ══
@@ -11551,6 +11580,21 @@ function buildApiMessages(histForApi, summaryPair){
   while(apiMessages.length && apiMessages[0].role !== 'user') apiMessages.shift();
   return apiMessages;
 }
+// 有些中转不收「带 thinking 的请求」与工具的组合，报错会点名 thinking 并给出路：
+// 形如 “…mode=between_tools; omit thinking or use one of those modes”。命中这种形态才降级重试，普通错误不碰。
+function isThinkingReject(msg){
+  const m = String(msg || '').toLowerCase();
+  if(!m.includes('thinking')) return false;
+  // mode 要按词匹配：普通报错里的 "model" 也含 mode 子串，不能误伤
+  return m.includes('omit') || m.includes('between_tools') || m.includes('interleav') || m.includes('unsupported') || m.includes('not supported') || /(^|[^a-z])modes?([^a-z]|$)/.test(m);
+}
+async function apiErrFromRes(res){
+  const e = await res.json().catch(()=>({}));
+  const err = new Error(e?.error?.message || `HTTP ${res.status}`);
+  err.status = res.status;
+  return err;
+}
+
 async function callAPI(userText, extraBlocks=null, opts=null){
   if(!cfg.apiKey){ hideTyping(); showToast('请先在 Settings 里填写 API Key'); return null; }
   const regen = !!(opts && opts.regenerate);
@@ -11609,13 +11653,24 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     const workMsgs = apiMessages.slice();
     reqBody.messages = workMsgs;
     let res = await sendReq();
+    if(!res.ok && reqBody.thinking){
+      // 接口点名拒绝 thinking（如 thinking 与工具的模式限制）：去掉 thinking、其余一字不变重试一次。
+      // 这里还没开始读流式响应、正文一个字都没出（气泡都还没建），重试不会拼出两份回复；
+      // 流式中途的错误不在这里发生，也不会走到这个重试。
+      const peekRes = (typeof res.clone === 'function') ? res.clone() : res;
+      const peek = await peekRes.json().catch(()=>({}));
+      if(isThinkingReject(peek?.error?.message || '')){
+        delete reqBody.thinking;
+        res = await sendReq();
+      }
+    }
     if(!res.ok && reqBody.tools){
       // 接口连普通工具都不收时，去掉工具重试一次，别让整段聊天直接失败
       delete reqBody.tools;
       res = await sendReq();
       if(res.ok) showToast('这个接口暂时用不了联网搜索，先陪你把话聊完 qwq');
     }
-    if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`HTTP ${res.status}`);}
+    if(!res.ok) throw await apiErrFromRes(res);
 
     let reply = '';
     let bubble = null;
@@ -11647,7 +11702,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
         compactWorkToolResults(workMsgs); // 回放投影：早先几轮的工具结果只留摘录，最新一轮留全文
         reqBody.messages = workMsgs;
         res = await sendReq();
-        if(!res.ok){const e=await res.json().catch(()=>({}));throw new Error(e?.error?.message||`HTTP ${res.status}`);}
+        if(!res.ok) throw await apiErrFromRes(res);
       }
       const blocks = [];
       let stopReason = '';
@@ -11913,7 +11968,9 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     hideTyping();
     // 失败回滚要按 mid 精确删自己这条：等待期间心跳留言可能已经追加到末尾，pop() 会误删他的话
     if(!regen && sentUserMid){ const ix = messages.findIndex(m=>m.mid === sentUserMid); if(ix >= 0) messages.splice(ix, 1); }
-    showToast('发送失败：'+e.message + (thinkingEnabled() ? '（开着思考模式时若反复失败，可能是模型或接口不支持，去设置里关掉它）' : '')); return null;
+    const failHint = thinkingEnabled() ? '（开着思考模式时若反复失败，可能是模型或接口不支持，去设置里关掉它）' : '';
+    const failFull = '发送失败：' + e.message + (e.status ? '\nHTTP 状态：' + e.status : '') + (failHint ? '\n' + failHint : '');
+    showErrorToast('发送失败：' + e.message + '（点开看全文）', failFull); return null;
   }
 }
 
