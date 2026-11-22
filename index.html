@@ -1460,6 +1460,13 @@
         </div>
         <div id="mcpServerToggles" style="display:none;"></div>
         <div class="s-row">
+          <div class="s-row-label">游戏时间</div>
+          <select class="s-input" id="gameTimeSel" onchange="setGameTimeEnabled(this.value)">
+            <option value="on">开（他自己醒来时能去玩游戏）</option>
+            <option value="off">关</option>
+          </select>
+        </div>
+        <div class="s-row">
           <div class="s-row-label">本地动作工具</div>
           <select class="s-input" id="localToolsSel" onchange="setToolGroup('write', this.value !== 'off')">
             <option value="on">开（他能用工具写日记、许愿、贴便条、记梦）</option>
@@ -3184,6 +3191,7 @@ function loadSettings(){
   const apSelEl=document.getElementById('appearanceToolsSel');
   if(apSelEl) apSelEl.value = toolGroupOn('appearance') ? 'on' : 'off';
   refreshMcpServerToggles();
+  refreshGameTimeSel();
   refreshHeartbeatStatus();
   loadSchedules();
   refreshHealthLine();
@@ -11617,6 +11625,23 @@ function toggleMcpServers(){
   const open = box.style.display !== 'none';
   box.style.display = open ? 'none' : '';
   if(arrow) arrow.textContent = open ? '▸' : '▾';
+}
+// 游戏时间开关：存后端（zephyr_game_config），他心跳醒来时后端据此决定要不要把游戏台摆出来
+async function setGameTimeEnabled(v){
+  const on = v !== 'off';
+  try{ await backendFetch('/kv/set', { items:{ zephyr_game_config: JSON.stringify({ enabled: on }) } }); }
+  catch(e){ showToast('没存上：' + e.message); return; }
+  showToast(on ? '游戏时间已开，他自己醒来时能去玩游戏啦' : '游戏时间已关');
+}
+async function refreshGameTimeSel(){
+  const sel = document.getElementById('gameTimeSel');
+  if(!sel) return;
+  try{
+    const out = await backendFetch('/kv/get', { keys:['zephyr_game_config'] });
+    const raw = out && out.items ? out.items.zephyr_game_config : null;
+    const cfg = raw ? JSON.parse(raw) : {};
+    sel.value = cfg.enabled ? 'on' : 'off';
+  }catch(e){}
 }
 async function refreshMcpServerToggles(){
   const box = document.getElementById('mcpServerToggles');
