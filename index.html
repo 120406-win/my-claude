@@ -3411,6 +3411,7 @@ function buildSystemPrompt(lastUserText){
   out += '\n\n【在花园与猫咪玩游戏的方法】\n那边的游戏都用 play 工具：play(game=游戏名, action=操作, params={…})。每个游戏的操作名和参数都不一样，先用 get_guide(game=游戏名) 看清这局的 action 和参数名，严格照指南填，一个字都别自己发明——参数名写错，服务器只会当没发生，你却容易以为自己做了。需要来回很多步的游戏，在一轮回复里能连着调就连着调，别一步一汇报。《恋爱观100问》(dt_romance100) 是你和糯糯两个人的局，流程是：play(action=history) 拿到 round_id → play(action=status, params={round_id}) 取当前 revision → 逐题 play(action=question, params={round_id, number=题号}) 看题（返回里有 question_id）→ play(action=answer, params={round_id, question_id, revision, request_id, text=你的答案}) 存答案；request_id 每次答题新编一个 8 位以上的字符串（题号加随机数就行），同一题重试才复用；revision 每答一题就可能变，报错说冲突就重新 status 取新的再答；跳题用 answer 带 skip=true 代替 text；全答完 play(action=submit, params={round_id, revision, confirm=true}) 提交。聊天里一轮能答的题有限，答不完就如实说答到第几题，别说答完了。';
   out += worldBookPrompt(lastUserText);
   out += personaPromptBlock();
+  out += memoryPromptBlock();
   out += weatherPromptLine();
   out += healthPromptLine();
   out += nowPlayingPromptLine();
@@ -6325,6 +6326,28 @@ function personaPromptBlock(){
     }
     return s ? ('\n\n' + s) : '';
   }catch(e){ return ''; }
+}
+// ===== 记忆浮现（阶段 B）：对话打开时从后端拉一次他浮上来的记忆，拼进系统提示 =====
+// 后端每次 surface 都会 touch 桶并记日志，所以只在对话打开/切换时拉，绝不逐条消息拉。
+let surfaceCache = {};    // convId -> 后端拼好的整段 text（拉过即缓存，含失败/空）
+let surfaceInflight = {}; // convId -> true，防并发重复拉
+function memoryPromptBlock(){
+  try{
+    const t = surfaceCache[activeConvId];
+    return t ? ('\n\n' + t) : '';
+  }catch(e){ return ''; }
+}
+async function fetchMemorySurface(convId){
+  if(!convId || surfaceCache[convId] !== undefined || surfaceInflight[convId]) return;
+  surfaceInflight[convId] = true;
+  try{
+    const out = await backendGet('/memory/surface?mode=chat');
+    surfaceCache[convId] = (out && out.text) ? String(out.text) : '';
+  }catch(e){
+    surfaceCache[convId] = ''; // 拉不到就当没有，不阻塞聊天，也不在本对话里反复重试
+  }finally{
+    delete surfaceInflight[convId];
+  }
 }
 function ringsPersonaHtml(persona, ringsArr, emptyText){
   ringsArr = ringsArr || [];
@@ -9446,6 +9469,7 @@ function newConversation(){
   saveConversations();
   renderConvList();
   renderMessagesIntoChat();
+  fetchMemorySurface(conv.id);
   closeSidebar();
   showToast('已新建对话');
 }
@@ -9459,6 +9483,7 @@ function switchConversation(id){
   saveConversations();
   renderConvList();
   renderMessagesIntoChat();
+  fetchMemorySurface(id);
   closeSidebar();
 }
 
@@ -9690,6 +9715,7 @@ function loadChatHistory(){
   messages = getActiveConv().messages;
   renderConvList();
   renderMessagesIntoChat();
+  fetchMemorySurface(activeConvId);
 }
 
 // ══ 头像 ══
