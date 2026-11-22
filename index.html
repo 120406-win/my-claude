@@ -3577,6 +3577,7 @@ function buildSystemPrompt(lastUserText){
   out += personaPromptBlock();
   out += worksPromptBlock();
   out += memoryPromptBlock();
+  out += pulsePromptBlock();
   out += weatherPromptLine();
   out += healthPromptLine();
   out += nowPlayingPromptLine();
@@ -6525,6 +6526,28 @@ async function fetchMemorySurface(convId){
     surfaceCache[convId] = ''; // 拉不到就当没有，不阻塞聊天，也不在本对话里反复重试
   }finally{
     delete surfaceInflight[convId];
+  }
+}
+// ===== 脉·身体行：对话打开时从后端拉一次他此刻的身体状态行，拼进系统提示（记忆段后） =====
+// 与记忆浮现同规矩：只在对话打开/切换时拉一次，拉不到静默、不重试、不阻塞聊天。
+let pulseCache = {};    // convId -> 后端算好的身体行 text（拉过即缓存，含失败/空）
+let pulseInflight = {}; // convId -> true，防并发重复拉
+function pulsePromptBlock(){
+  try{
+    const t = pulseCache[activeConvId];
+    return t ? ('\n\n' + t) : '';
+  }catch(e){ return ''; }
+}
+async function fetchPulseLine(convId){
+  if(!convId || pulseCache[convId] !== undefined || pulseInflight[convId]) return;
+  pulseInflight[convId] = true;
+  try{
+    const out = await backendGet('/pulse/line');
+    pulseCache[convId] = (out && out.text) ? String(out.text) : '';
+  }catch(e){
+    pulseCache[convId] = ''; // 拉不到就当没有，不阻塞聊天，也不在本对话里反复重试
+  }finally{
+    delete pulseInflight[convId];
   }
 }
 function ringsPersonaHtml(persona, ringsArr, emptyText){
@@ -9793,6 +9816,7 @@ function newConversation(){
   renderConvList();
   renderMessagesIntoChat();
   fetchMemorySurface(conv.id);
+  fetchPulseLine(conv.id);
   closeSidebar();
   showToast('已新建对话');
 }
@@ -9807,6 +9831,7 @@ function switchConversation(id){
   renderConvList();
   renderMessagesIntoChat();
   fetchMemorySurface(id);
+  fetchPulseLine(id);
   closeSidebar();
 }
 
@@ -10044,6 +10069,7 @@ function loadChatHistory(){
   renderConvList();
   renderMessagesIntoChat();
   fetchMemorySurface(activeConvId);
+  fetchPulseLine(activeConvId);
 }
 
 // ══ 头像 ══
