@@ -1069,6 +1069,13 @@
           <div class="s-row-label">模型</div>
           <input class="s-input" type="text" id="modelName" placeholder="claude-sonnet-4-6">
         </div>
+        <div class="s-row" id="modelPickRow" style="display:none">
+          <div class="s-row-label">选择模型</div>
+          <select class="s-input" id="modelPickSel" onchange="pickModel(this.value)"></select>
+        </div>
+        <div style="padding:12px 16px 14px;">
+          <button id="fetchModelsBtn" onclick="fetchModelList()" style="width:100%;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">获取模型列表</button>
+        </div>
       </div>
     </div>
 
@@ -3124,6 +3131,83 @@ function saveSettings(){
   }).forEach(([k,v])=>localStorage.setItem(k,v));
   applyFont(cfg.fontSize);
   showToast('已保存 ✓');
+}
+
+// ══ 模型列表：用设置页输入框里的地址+Key 去中转拉清单，选中即填 ══
+let fetchingModels = false;
+function parseModelList(json){
+  if(!json) return [];
+  const arr = Array.isArray(json) ? json : (Array.isArray(json.data) ? json.data : (Array.isArray(json.models) ? json.models : []));
+  const out = [];
+  arr.forEach(m=>{
+    const id = typeof m === 'string' ? m : (m && (m.id || m.name || m.model));
+    if(id && out.indexOf(id) === -1) out.push(id);
+  });
+  return out;
+}
+async function fetchModelList(){
+  if(fetchingModels) return;
+  const base = (document.getElementById('apiUrl').value.trim() || 'https://api.anthropic.com/v1').replace(/\/+$/, '');
+  const key = document.getElementById('apiKey').value.trim();
+  if(!key){ showToast('先填 API Key 再获取模型列表'); return; }
+  const btn = document.getElementById('fetchModelsBtn');
+  fetchingModels = true;
+  if(btn){ btn.disabled = true; btn.textContent = '获取中…'; btn.style.opacity = '0.5'; }
+  // 端点推导：先试与聊天同前缀的 /models（聊天是 {base}/messages），base 不带 /v1 时再补 /v1/models；每处先 Anthropic 头、再 Bearer 头
+  const urls = [base + '/models'];
+  if(!/\/v1$/.test(base)) urls.push(base + '/v1/models');
+  const headerSets = [
+    { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+    { 'Authorization': 'Bearer ' + key }
+  ];
+  let got = null, lastStatus = 0, netErr = false;
+  try{
+    outer:
+    for(const u of urls){
+      for(const h of headerSets){
+        let res;
+        try{ res = await fetch(u, { method: 'GET', headers: h }); }
+        catch(e){ netErr = true; continue; }
+        if(!res.ok){ lastStatus = res.status; continue; }
+        let json = null;
+        try{ json = await res.json(); }catch(e){ continue; }
+        const list = parseModelList(json);
+        if(list.length){ got = list; break outer; }
+        lastStatus = res.status;
+      }
+    }
+  }finally{
+    fetchingModels = false;
+    if(btn){ btn.disabled = false; btn.textContent = '获取模型列表'; btn.style.opacity = ''; }
+  }
+  if(got){ fillModelPick(got); showToast('拉到 ' + got.length + ' 个模型，选一个吧'); }
+  else if(lastStatus === 401 || lastStatus === 403) showToast('没拉到：密钥可能不对（' + lastStatus + '）');
+  else if(lastStatus === 404) showToast('没拉到：这个中转不支持模型列表接口（404），还是手填吧');
+  else if(lastStatus) showToast('没拉到：服务器返回 ' + lastStatus + '，还是手填吧');
+  else if(netErr) showToast('没拉到：连不上这个地址，检查下地址和网络');
+  else showToast('没拉到：列表是空的，还是手填吧');
+}
+function fillModelPick(list){
+  const row = document.getElementById('modelPickRow');
+  const sel = document.getElementById('modelPickSel');
+  if(!row || !sel) return;
+  sel.innerHTML = '';
+  const ph = document.createElement('option');
+  ph.value = ''; ph.textContent = '点这里选模型（' + list.length + ' 个）';
+  sel.appendChild(ph);
+  list.forEach(id=>{
+    const o = document.createElement('option');
+    o.value = id; o.textContent = id;
+    sel.appendChild(o);
+  });
+  const cur = document.getElementById('modelName').value.trim();
+  sel.value = list.indexOf(cur) >= 0 ? cur : '';
+  row.style.display = '';
+}
+function pickModel(v){
+  if(!v) return;
+  document.getElementById('modelName').value = v;
+  saveSettings();
 }
 
 // ══ 导航 ══
