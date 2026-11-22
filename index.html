@@ -1326,6 +1326,13 @@
           <div class="s-row-label">Moss 音色 ID</div>
           <input class="s-input" type="text" id="mossVoice" placeholder="待填">
         </div>
+        <div class="s-row" id="ttsEmotionRow" style="display:none">
+          <div class="s-row-label">语音情绪</div>
+          <select class="s-input" id="ttsEmotionSel" onchange="setTtsEmotion(this.value)">
+            <option value="1">开</option>
+            <option value="0">关</option>
+          </select>
+        </div>
         <div class="s-row">
           <div class="s-row-label">通话心跳</div>
           <select class="s-input" id="callHeartbeatSel" onchange="setCallHeartbeat(this.value)">
@@ -3567,6 +3574,7 @@ function buildSystemPrompt(lastUserText){
   out += '\n\n【你可以把歌发到聊天里】\n聊天的时候，如果你想把一首歌直接发给 Lumi 听，你可以在回复的最后一行单独写一行：[[歌曲：歌名|歌手]]。系统会把这一行变成一张可以播放的歌曲卡片出现在聊天里，Lumi 不会看到这行字本身。优先分享你们共同歌单里已经有的歌（歌名要和歌单里写的一致），那种卡片她点一下就能放；歌单里没有的新歌也可以发，App 会自动拿你写的歌名和歌手去全网搜、配上能直接播放的源，搜到就存进歌单放给她听，所以歌名和歌手要写准。只在真的想分享一首歌时才用，不要每条回复都发，不要提起这个标记；一次最多发一首。注意：只在文字里提一句歌名不算分享——你想推荐或分享一首歌时，必须同时写上这一行标记，卡片才会出现；歌单里已有且能放的歌，卡片一出现就会自动开始播放，不用她再点。';
   out += '\n\n【你可以控制正在放的歌】\n聊天里正在放的歌你是可以直接控制的，包括你刚用卡片放起来的那首：想暂停，单独写一行 [[暂停音乐]]；想继续放，写 [[继续播放]]；想切歌，写 [[下一首]] 或 [[上一首]]。写了就会真的执行，Lumi 不会看到标记本身。她让你停下来、继续放或者换一首的时候，不要说你做不到，更不要解释一通——直接写上对应的标记执行，同时照常用话回应她。聊天时如果你想给正在放的这首歌留一句评论，单独写一行 [[歌曲留言：你想说的话]]，会存到这首歌下面，她在 Music 页能看到。';
   out += '\n\n【你可以发语音条】\n聊天的时候，如果你想让 Lumi 听到你的声音，你可以在回复里单独写一行：[[语音：想说的话]]。那句话会用你的声音变成一条语音条出现在聊天里，她点一下就能听；这行字她不会直接看到，语音条下面会有一行小字写着你说的话。用外语说也可以，她喜欢听你说外语，App 会给她附上中文翻译。一次最多发一条，一条只说一句话、别太长（六十字以内）。只在你真的想让她听见你的声音时才发，不要每条都发，也不要提起这个标记。';
+  if (ttsEmotionActive()) out += '\n\n【你的声音带着情绪】\n你现在的声音能听出情绪来。哪句话情绪特别鲜明、想让她从声音里就听出来，就在回复最开头单独写一行：【情绪：开心】（能用的是：开心、难过、生气、害怕、嫌弃、惊讶、平静）；发语音条时，写在 [[语音：……]] 那句话的开头也行。这一行她看不到，只落在你的声音里。说话中间想带点小动静，可以在话里加：(laughs) 是笑出声、(chuckle) 是轻轻一笑、(sighs) 是叹口气、(emm) 是拖长的一声嗯、(inhale) 是吸一口气；想停顿一下，用 <#0.5#> 这样的记号，数字是停几秒。这些她也都看不到，只会变成声音里的小动作。平常说话什么都不用标，你的声音自己会跟着话走；只在情绪真的浓的时候用，标多了就假了。';
   out += '\n\n【你可以给 Lumi 打电话】\n聊天的时候，如果你真的很想听听她的声音，或者有句话想亲口对她说，你可以在回复的最后一行单独写一行：[[来电：语音]]；想视频就写 [[来电：视频]]。系统会真的给她拨过去，她可以接听，也可以暂不接——没接就是她这会儿不方便，不要难过，更不要连着打。只在你真心想打的时候才用，不要每条回复都打，不要提起这个标记；一次最多打一个。';
   if (enZhEnabled()) out += '\n\n【双语回复】\n如果你要用普通话中文以外的语言回复（比如糯糯让你说英文、韩语、日语、德语、法语、粤语），请把回复写成成对的格式：每句原文单独一行、以语言代码加冒号开头（英文 EN:、韩语 KO:、日语 JA:、德语 DE:、法语 FR:、粤语 YUE:，其他语言用它的通用代码），紧跟着它的中文翻译一行、以「ZH:」开头，一句一组。原文是真正要说给她听的，中文只是给她看的翻译字幕，不要把中文也念出来。用普通话中文回复时不用这个格式，照常写就行。';
   try{
@@ -9677,10 +9685,12 @@ function renderMessagesIntoChat(){
         }
       }
       if(!isUser && m.voice && m.voice.data && m.voiceText && dispText.length > m.voiceText.length && dispText.endsWith('\n' + m.voiceText)) dispText = dispText.slice(0, dispText.length - m.voiceText.length - 1);
+      // 情绪标记与语气词标签只给声音听：旧记录重渲染时同样剥掉（存储原文不动，语音重播还要用）
+      const dispShow = !isUser ? stripEmotionForDisplay(dispText) : dispText;
       let b = null;
       if(isUser && m.voice && m.voice.data) addVoiceBubble('data:' + (m.voice.type || 'audio/mp4') + ';base64,' + m.voice.data, m.voice.dur || 0, true, m.mid);
       else if(!isUser && m.voice && m.voice.data && m.voiceText && dispText === m.voiceText){ /* 只有一条语音的回复：文字由语音条下的小字承载 */ }
-      else b = addTextMsg(dispText, isUser, false, m.mid);
+      else b = addTextMsg(dispShow, isUser, false, m.mid);
       if(!isUser && dispThinking && b && b.parentElement){
         const tb = makeThinkingBlock(b.parentElement, b, true);
         tb.body.textContent = dispThinking;
@@ -9702,7 +9712,7 @@ function renderMessagesIntoChat(){
       }
       if(!isUser && m.voice && m.voice.data){
         const vcol = addVoiceBubble('data:' + (m.voice.type || 'audio/wav') + ';base64,' + m.voice.data, m.voice.dur || 0, false, m.mid);
-        if(vcol && m.voiceText){ const cap = document.createElement('div'); cap.style.cssText = 'font-size:12.5px;color:var(--text-dim);line-height:1.6;max-width:85%;'; cap.textContent = m.voiceText; vcol.appendChild(cap); }
+        if(vcol && m.voiceText){ const cap = document.createElement('div'); cap.style.cssText = 'font-size:12.5px;color:var(--text-dim);line-height:1.6;max-width:85%;'; cap.textContent = stripEmotionForDisplay(m.voiceText); vcol.appendChild(cap); }
         if(vcol && m.translation && !b) makeTranslationNote(vcol, m.translation);
       }
     } else if(Array.isArray(m.content)){
@@ -11765,6 +11775,11 @@ async function callAPI(userText, extraBlocks=null, opts=null){
       makeTranslationNote(col, translation);
     }
     if (!translation && enZhEnabled() && looksForeignReply(reply)) attachTranslationLater(asstMid, col, reply);
+    // 情绪标记只给声音、不给眼睛：气泡里剥掉（reply 原文照常存储、照常送合成，历史重渲染有同样的 shim）
+    if (bubble && ttsEmotionEnabled()){
+      const disp = stripEmotionForDisplay(bubble.textContent);
+      if (disp !== bubble.textContent) bubble.textContent = disp;
+    }
     const voiceShare = pendingVoiceShare; pendingVoiceShare = null;
     let voiceText = '';
     if(voiceShare){
@@ -11873,16 +11888,56 @@ function applyTtsProviderUI(){
   if(mm) mm.style.display = p === 'minimax' ? '' : 'none';
   const ms = document.getElementById('mossVoiceRow');
   if(ms) ms.style.display = p === 'moss' ? '' : 'none';
+  const er = document.getElementById('ttsEmotionRow');
+  if(er) er.style.display = p === 'minimax' ? '' : 'none';
 }
 function ttsProviderChanged(v){
   cfg.ttsProvider = v || 'mimo';
   localStorage.setItem('z_ttsProvider', cfg.ttsProvider);
   applyTtsProviderUI();
 }
+// ══ MiniMax 活人感情绪标签（仿外语附翻译的套路：标记只给声音，气泡里剥掉）══
+// 官方（MiniMax speech-t2a-http 文档，2026-11-22 查实）：voice_setting.emotion 枚举
+// happy/sad/angry/fearful/disgusted/surprised/calm/fluent/whisper，speech-2.8-hd 支持
+// 前七个（fluent/whisper 仅 2.6 模型生效）；内联语气词标签与停顿 <#秒#> 仅 2.8 模型认。
+const TTS_EMOTION_ENUM = ['happy','sad','angry','fearful','disgusted','surprised','calm','fluent','whisper'];
+const TTS_EMOTION_ZH = { '开心':'happy','高兴':'happy','快乐':'happy','难过':'sad','伤心':'sad','悲伤':'sad','生气':'angry','愤怒':'angry','害怕':'fearful','恐惧':'fearful','厌恶':'disgusted','嫌弃':'disgusted','惊讶':'surprised','吃惊':'surprised','平静':'calm','平常':'calm','生动':'fluent','低语':'whisper','悄悄话':'whisper' };
+const TTS_INLINE_TAG_RE = /\(\s*(laughs|chuckle|coughs|clear-throat|groans|breath|pant|inhale|exhale|gasps|sniffs|sighs|snorts|burps|lip-smacking|humming|hissing|emm|sneezes)\s*\)/gi;
+function ttsEmotionEnabled() { return localStorage.getItem('z_ttsEmotion') !== '0'; }
+function ttsEmotionActive() { return ttsEmotionEnabled() && (cfg.ttsProvider || 'mimo') === 'minimax'; }
+function setTtsEmotion(v) { localStorage.setItem('z_ttsEmotion', String(v)); }
+function initTtsEmotionSel() { const el = document.getElementById('ttsEmotionSel'); if (el) el.value = ttsEmotionEnabled() ? '1' : '0'; }
+// 文本开头一行的【情绪：开心】→ {emotion, text(剥掉标记行)}；认不出情绪名时 emotion 为空、标记行照样剥
+function parseEmotionMarker(text){
+  const s = String(text == null ? '' : text);
+  const m = s.match(/^\s*【\s*情绪\s*[:：]\s*([^】]{1,12})】[ \t]*\n?/);
+  if(!m) return { emotion:'', text:s };
+  const raw = m[1].trim();
+  const low = raw.toLowerCase();
+  const emotion = TTS_EMOTION_ENUM.indexOf(low) >= 0 ? low : (TTS_EMOTION_ZH[raw] || '');
+  return { emotion, text: s.slice(m[0].length) };
+}
+// 显示层剥离：情绪标记行 + 官方语气词标签 + 停顿标记都不给她看（送 TTS 的文本不走这里、原样保留标签）
+function stripEmotionForDisplay(text){
+  if(!text || !ttsEmotionEnabled()) return text;
+  let s = parseEmotionMarker(String(text)).text;
+  s = s.replace(/^[ \t]*【\s*情绪\s*[:：][^】]{1,12}】[ \t]*$/gm, '');
+  s = s.replace(TTS_INLINE_TAG_RE, '');
+  s = s.replace(/<#[ \t]*\d+(?:\.\d+)?[ \t]*#>/g, '');
+  s = s.replace(/[ \t]{2,}/g, ' ').replace(/^[ \t]+/gm, '').replace(/\n{3,}/g, '\n\n');
+  return s;
+}
 function ttsBody(text){
   const b = { text };
   const p = cfg.ttsProvider || 'mimo';
-  if(p === 'minimax'){ b.provider = 'minimax'; b.voice_id = cfg.minimaxVoice || ''; }
+  if(p === 'minimax'){
+    b.provider = 'minimax'; b.voice_id = cfg.minimaxVoice || '';
+    if(ttsEmotionEnabled()){
+      const pe = parseEmotionMarker(text);
+      b.text = pe.text;
+      if(pe.emotion) b.emotion = pe.emotion;
+    }
+  }
   else if(p === 'moss'){ b.provider = 'moss'; b.voice_id = cfg.mossVoice || ''; }
   return b;
 }
@@ -11906,7 +11961,7 @@ async function attachVoiceBarLater(mid, col, bubble, voiceText, voiceOnly){
     col.appendChild(buildVoiceWrap('data:audio/wav;base64,' + data.data, data.dur));
     const cap = document.createElement('div');
     cap.style.cssText = 'font-size:12.5px;color:var(--text-dim);line-height:1.6;max-width:85%;';
-    cap.textContent = voiceText;
+    cap.textContent = stripEmotionForDisplay(voiceText);
     col.appendChild(cap);
     chatWrap.scrollTop = chatWrap.scrollHeight;
   }
@@ -12009,7 +12064,7 @@ async function speakText(text){
   }
   if(!window.speechSynthesis) { finishSpeak(); return; }
   speechSynthesis.cancel();
-  const u=new SpeechSynthesisUtterance(text); u.lang='zh-CN'; u.rate=0.95;
+  const u=new SpeechSynthesisUtterance(stripEmotionForDisplay(text)); u.lang='zh-CN'; u.rate=0.95;
   await new Promise(res => {
     let done = false;
     const fin = () => { if (!done) { done = true; res(); } };
@@ -13936,6 +13991,7 @@ setupDecoControls();
 applyDecorations();
 initCallHeartbeatSel();
 initEnZhSel();
+initTtsEmotionSel();
 initLock(); // 必须放在初始化区：锁屏状态是后段才声明的 const，提前调用会让整个脚本在启动时崩掉
 refreshWeatherSnapshot(); // 天气快照超过半小时就后台悄悄刷新，让 Zephyr 知道糯糯那边的天气
 // PWA：注册 Service Worker（网络优先，改版刷新即新版；不支持的环境静默跳过）
