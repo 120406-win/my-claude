@@ -1311,6 +1311,22 @@
           <input class="s-input" type="password" id="ttsKey" placeholder="待填">
         </div>
         <div class="s-row">
+          <div class="s-row-label">语音通道</div>
+          <select class="s-input" id="ttsProviderSel" onchange="ttsProviderChanged(this.value)">
+            <option value="mimo">MiMo</option>
+            <option value="minimax">MiniMax</option>
+            <option value="moss">Mossland</option>
+          </select>
+        </div>
+        <div class="s-row" id="minimaxVoiceRow" style="display:none">
+          <div class="s-row-label">MiniMax 音色 ID</div>
+          <input class="s-input" type="text" id="minimaxVoice" placeholder="待填">
+        </div>
+        <div class="s-row" id="mossVoiceRow" style="display:none">
+          <div class="s-row-label">Moss 音色 ID</div>
+          <input class="s-input" type="text" id="mossVoice" placeholder="待填">
+        </div>
+        <div class="s-row">
           <div class="s-row-label">通话心跳</div>
           <select class="s-input" id="callHeartbeatSel" onchange="setCallHeartbeat(this.value)">
             <option value="0">关</option>
@@ -2733,6 +2749,9 @@ let cfg={
   ttsKey:     localStorage.getItem('z_ttsKey')||'',
   ttsVoiceId: localStorage.getItem('z_ttsVoiceId')||'',
   ttsUrl:     localStorage.getItem('z_ttsUrl')||'',
+  ttsProvider: localStorage.getItem('z_ttsProvider')||'mimo',
+  minimaxVoice: localStorage.getItem('z_minimaxVoice')||'',
+  mossVoice: localStorage.getItem('z_mossVoice')||'',
   backendUrl: localStorage.getItem('z_backendUrl')||'https://zephyr-api.ruan060412.workers.dev',
   backendToken: localStorage.getItem('z_backendToken')||'',
   avatarUser: localStorage.getItem('z_avatarUser')||'',   // base64 or emoji
@@ -3017,6 +3036,13 @@ function loadSettings(){
   document.getElementById('systemPrompt').value = cfg.system;
   document.getElementById('ttsUrl').value    = cfg.ttsUrl||'';
   document.getElementById('ttsKey').value    = cfg.ttsKey;
+  const tpSel=document.getElementById('ttsProviderSel');
+  if(tpSel) tpSel.value = cfg.ttsProvider||'mimo';
+  const mmvEl=document.getElementById('minimaxVoice');
+  if(mmvEl) mmvEl.value = cfg.minimaxVoice||'';
+  const msvEl=document.getElementById('mossVoice');
+  if(msvEl) msvEl.value = cfg.mossVoice||'';
+  applyTtsProviderUI();
   const buEl=document.getElementById('backendUrl');
   if(buEl) buEl.value = cfg.backendUrl||'';
   const btEl=document.getElementById('backendToken');
@@ -3069,12 +3095,15 @@ function saveSettings(){
   cfg.fontSize   = parseInt(document.getElementById('fontSlider').value);
   cfg.ttsKey     = document.getElementById('ttsKey').value.trim();
   cfg.ttsUrl = document.getElementById('ttsUrl').value.trim();
+  const tpSel2=document.getElementById('ttsProviderSel'); if(tpSel2) cfg.ttsProvider = tpSel2.value;
+  const mmvIn=document.getElementById('minimaxVoice'); if(mmvIn) cfg.minimaxVoice = mmvIn.value.trim();
+  const msvIn=document.getElementById('mossVoice'); if(msvIn) cfg.mossVoice = msvIn.value.trim();
   const buIn=document.getElementById('backendUrl'); if(buIn) cfg.backendUrl = buIn.value.trim();
   const btIn=document.getElementById('backendToken'); if(btIn) cfg.backendToken = btIn.value.trim();
   Object.entries({z_apiUrl:cfg.apiUrl,z_apiKey:cfg.apiKey,z_model:cfg.model,z_system:cfg.system,
     z_temperature:cfg.temperature,z_topP:cfg.topP,z_maxTokens:cfg.maxTokens,
     z_fontSize:cfg.fontSize,z_theme:cfg.theme,z_ttsKey:cfg.ttsKey,z_ttsVoiceId:cfg.ttsVoiceId,
-    z_ttsUrl:cfg.ttsUrl,z_backendUrl:cfg.backendUrl,z_backendToken:cfg.backendToken
+    z_ttsUrl:cfg.ttsUrl,z_ttsProvider:cfg.ttsProvider,z_minimaxVoice:cfg.minimaxVoice,z_mossVoice:cfg.mossVoice,z_backendUrl:cfg.backendUrl,z_backendToken:cfg.backendToken
   }).forEach(([k,v])=>localStorage.setItem(k,v));
   applyFont(cfg.fontSize);
   showToast('已保存 ✓');
@@ -11837,9 +11866,29 @@ function wavDurationSecs(bytes){
     return Math.max(1, Math.round((bytes.length - 44) / (rate * chans * (bits / 8))));
   }catch(e){ return 0; }
 }
+// ══ TTS 通道：mimo（默认，请求体与旧版一字不差）/ minimax / moss ══
+function applyTtsProviderUI(){
+  const p = cfg.ttsProvider || 'mimo';
+  const mm = document.getElementById('minimaxVoiceRow');
+  if(mm) mm.style.display = p === 'minimax' ? '' : 'none';
+  const ms = document.getElementById('mossVoiceRow');
+  if(ms) ms.style.display = p === 'moss' ? '' : 'none';
+}
+function ttsProviderChanged(v){
+  cfg.ttsProvider = v || 'mimo';
+  localStorage.setItem('z_ttsProvider', cfg.ttsProvider);
+  applyTtsProviderUI();
+}
+function ttsBody(text){
+  const b = { text };
+  const p = cfg.ttsProvider || 'mimo';
+  if(p === 'minimax'){ b.provider = 'minimax'; b.voice_id = cfg.minimaxVoice || ''; }
+  else if(p === 'moss'){ b.provider = 'moss'; b.voice_id = cfg.mossVoice || ''; }
+  return b;
+}
 async function synthVoiceBar(text){
   try{
-    const resp = await fetch((cfg.ttsUrl || '') + '/tts', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ text }) });
+    const resp = await fetch((cfg.ttsUrl || '') + '/tts', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(ttsBody(text)) });
     const data = await resp.json();
     if(!data || !data.audio) return null;
     if(data.audio.length > 3600000) return null;
@@ -11866,7 +11915,7 @@ async function fetchTtsUrl(sentence, ttsUrl){
   const resp = await fetch(ttsUrl + '/tts', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({ text: sentence })
+    body: JSON.stringify(ttsBody(sentence))
   });
   const data = await resp.json();
   if(!data || !data.audio) return null;
@@ -11942,7 +11991,7 @@ async function speakText(text){
       const resp = await fetch(ttsUrl + '/tts', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({text})
+        body: JSON.stringify(ttsBody(text))
       });
       const data = await resp.json();
       if(data.audio) {
