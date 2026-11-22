@@ -1454,7 +1454,11 @@
             <option value="off">关</option>
           </select>
         </div>
-        <div id="mcpServerToggles"></div>
+        <div class="s-row" onclick="toggleMcpServers()" style="cursor:pointer;">
+          <div class="s-row-label">各台服务器的开关</div>
+          <span id="mcpServersArrow" style="color:var(--text-pale);font-size:13px;flex-shrink:0;">▸</span>
+        </div>
+        <div id="mcpServerToggles" style="display:none;"></div>
         <div class="s-row">
           <div class="s-row-label">本地动作工具</div>
           <select class="s-input" id="localToolsSel" onchange="setToolGroup('write', this.value !== 'off')">
@@ -10168,7 +10172,8 @@ function renderMessagesIntoChat(){
         makeSourcesNote(b.parentElement, m.sources);
       }
       if(!isUser && m.tools && m.tools.length && b && b.parentElement){
-        m.tools.forEach(ev => addToolCard(b.parentElement, b, ev));
+        const tg = makeToolGroup(b.parentElement, b, true);
+        m.tools.forEach(ev => tg.add(ev));
       }
       if(!isUser && m.translation && b && b.parentElement){
         makeTranslationNote(b.parentElement, m.translation);
@@ -11604,6 +11609,15 @@ function setMcpServerEnabled(id, v){
   try{ localStorage.setItem('z_mcpServersOff', JSON.stringify(arr)); }catch(e){}
   showToast(v === 'off' ? '这台服务器的工具已关' : '这台服务器的工具已开');
 }
+// 设置里那一长串服务器开关默认收着，点一下才展开（跟聊天里工具卡一个思路，省得设置页拉得老长）
+function toggleMcpServers(){
+  const box = document.getElementById('mcpServerToggles');
+  const arrow = document.getElementById('mcpServersArrow');
+  if(!box) return;
+  const open = box.style.display !== 'none';
+  box.style.display = open ? 'none' : '';
+  if(arrow) arrow.textContent = open ? '▸' : '▾';
+}
 async function refreshMcpServerToggles(){
   const box = document.getElementById('mcpServerToggles');
   if(!box) return;
@@ -11673,21 +11687,47 @@ function makeSearchStatus(col, beforeEl){
   col.insertBefore(el, beforeEl);
   return el;
 }
-// 工具证据卡：他真调过的工具在这里留痕，点开能看回执全文；卡片会存进消息，重进对话还在
-function addToolCard(col, beforeEl, ev){
-  const el = document.createElement('div');
-  el.className = 'tool-card';
-  el.style.cssText = 'margin:2px 0 6px;font-size:12px;color:var(--text-pale);' + (ev.detail ? 'cursor:pointer;' : '');
-  el.textContent = (ev.ok ? '✓ ' : '✗ ') + ev.label + ' · ' + ev.summary;
-  if(ev.detail && ev.detail !== ev.summary){
-    const det = document.createElement('div');
-    det.style.cssText = 'display:none;margin-top:3px;font-size:11.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;';
-    det.textContent = String(ev.detail).slice(0, 1200);
-    el.appendChild(det);
-    el.onclick = () => { det.style.display = det.style.display === 'none' ? 'block' : 'none'; };
+// 工具证据卡：他真调过的工具在这里留痕。一轮的卡收进一个可折叠的组（跟思考过程一样）：
+// 收起时只留一行「工具调用 · N」，点开看每条，点某条看回执全文；卡片会存进消息，重进对话还在
+function makeToolGroup(col, beforeEl, startCollapsed){
+  const wrap = document.createElement('div');
+  wrap.className = 'tool-group';
+  wrap.style.cssText = 'margin:2px 0 6px;max-width:100%;';
+  const head = document.createElement('div');
+  head.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-pale);cursor:pointer;padding:2px 0;user-select:none;';
+  const label = document.createElement('span');
+  label.textContent = '工具调用';
+  const arrow = document.createElement('span');
+  head.appendChild(label);
+  head.appendChild(arrow);
+  const body = document.createElement('div');
+  let collapsed = !!startCollapsed;
+  let count = 0;
+  function setCollapsed(c){ collapsed = c; body.style.display = c ? 'none' : ''; arrow.textContent = c ? '▸' : '▾'; }
+  head.addEventListener('click', ()=>setCollapsed(!collapsed));
+  wrap.appendChild(head);
+  wrap.appendChild(body);
+  if(beforeEl && beforeEl.parentElement === col) col.insertBefore(wrap, beforeEl);
+  else col.appendChild(wrap);
+  setCollapsed(collapsed);
+  function add(ev){
+    count++;
+    label.textContent = '工具调用 · ' + count;
+    const el = document.createElement('div');
+    el.className = 'tool-card';
+    el.style.cssText = 'margin:2px 0 4px;font-size:12px;color:var(--text-pale);' + (ev.detail ? 'cursor:pointer;' : '');
+    el.textContent = (ev.ok ? '✓ ' : '✗ ') + ev.label + ' · ' + ev.summary;
+    if(ev.detail && ev.detail !== ev.summary){
+      const det = document.createElement('div');
+      det.style.cssText = 'display:none;margin-top:3px;font-size:11.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;';
+      det.textContent = String(ev.detail).slice(0, 1200);
+      el.appendChild(det);
+      el.onclick = () => { det.style.display = det.style.display === 'none' ? 'block' : 'none'; };
+    }
+    body.appendChild(el);
+    return el;
   }
-  col.insertBefore(el, beforeEl);
-  return el;
+  return { wrap, body, setCollapsed, add };
 }
 // 回放投影：同一轮里早先几轮的工具结果回喂时只留摘录（最新一轮留全文），免得长工具链把上下文撑爆
 function compactWorkToolResults(msgs){
@@ -12137,6 +12177,12 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     let resultCorrected = false;
     const executedTools = [];
     const toolEvidence = [];
+    let toolGroup = null; // 本轮的工具卡折叠组：干活时展开着，他收尾时自动收起
+    function pushToolEvidence(ev){
+      toolEvidence.push(ev);
+      if(!toolGroup) toolGroup = makeToolGroup(col, bubble, false);
+      toolGroup.add(ev);
+    }
     let roundLimit = 10;
     let wrapUpPending = false; // 已到硬顶、工具也执行回喂了：下一轮摘掉工具，只让他文字收尾
     let noMoreTools = false;   // 收尾轮已开始：此后不再执行任何工具
@@ -12289,32 +12335,32 @@ async function callAPI(userText, extraBlocks=null, opts=null){
           out.items.forEach(it=>{ if(it.url && !sources.some(s=>s.url === it.url)) sources.push({ title:String(it.title || '').slice(0, 80), url:it.url }); });
           resultBlocks.push({ type:'tool_result', tool_use_id:tu.id, content: out.error ? ('搜索没成功（' + out.error + '）。请根据你已有的知识回答糯糯，并坦白这次没搜到。') : JSON.stringify({ items: out.items }) });
           const ev = { name:tu.name, label:'联网搜索', ok:!out.error, summary: out.error ? '没搜成功' : ('搜到 ' + out.items.length + ' 条结果'), detail: out.error ? String(out.error) : out.items.map(it=>String(it.title || '')).filter(Boolean).join('；').slice(0, 600), ts:Date.now() };
-          toolEvidence.push(ev); addToolCard(col, bubble, ev);
+          pushToolEvidence(ev);
         } else if(lt){
           if(!toolGroupOn(lt.group)){
             resultBlocks.push({ type:'tool_result', tool_use_id:tu.id, content:'这个工具（' + lt.label + '）已被糯糯在设置里关掉了，这次没有执行。请如实告诉她，不要假装做过。' });
             const ev = { name:tu.name, label:lt.label, ok:false, summary:'已被关掉，没执行', detail:'', ts:Date.now() };
-            toolEvidence.push(ev); addToolCard(col, bubble, ev);
+            pushToolEvidence(ev);
           } else {
             if(searchStatus) searchStatus.textContent = '正在用工具：' + lt.label;
             let outText = '';
             try{ outText = String(lt.run(input) || ''); }catch(e){ outText = '执行失败：' + e.message; }
             resultBlocks.push({ type:'tool_result', tool_use_id:tu.id, content: outText });
             const ev = { name:tu.name, label:lt.label, ok:!/^(没写成|没记成|没贴成|执行失败)/.test(outText), summary: outText.slice(0, 60), detail: outText, ts:Date.now() };
-            toolEvidence.push(ev); addToolCard(col, bubble, ev);
+            pushToolEvidence(ev);
           }
         } else {
           const entry = mcpToolsCache && mcpToolsCache.map[tu.name];
           if(entry && mcpServerOff(entry.server)){
             resultBlocks.push({ type:'tool_result', tool_use_id:tu.id, content:'这台 MCP 服务器（' + entry.server + '）已被糯糯在设置里关掉了，这个工具这次没有执行。请如实告诉她，不要编造结果。' });
             const ev = { name:tu.name, label: entry.server + ' · ' + entry.name, ok:false, summary:'服务器已被关掉，没执行', detail:'', ts:Date.now() };
-            toolEvidence.push(ev); addToolCard(col, bubble, ev);
+            pushToolEvidence(ev);
           } else {
             if(searchStatus) searchStatus.textContent = '正在用工具：' + tu.name.replace(/^mcp__/, '').replace('__', ' · ');
             const text = await executeMcpTool(tu.name, input);
             resultBlocks.push({ type:'tool_result', tool_use_id:tu.id, content: text });
             const ev = { name:tu.name, label: tu.name.replace(/^mcp__/, '').replace('__', ' · '), ok:!/^(工具调用失败|工具返回了错误|工具不存在)/.test(text), summary: text.replace(/\s+/g, ' ').slice(0, 60), detail: text.slice(0, 4000), ts:Date.now() };
-            toolEvidence.push(ev); addToolCard(col, bubble, ev);
+            pushToolEvidence(ev);
           }
         }
       }
@@ -12415,6 +12461,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     if(stickerShare && bubble && bubble.parentElement) makeStickerImg(bubble.parentElement, stickerShare);
     const incomingCall = pendingIncomingCall; pendingIncomingCall = null;
     if(incomingCall) setTimeout(()=>showIncomingCall(incomingCall), 700);
+    if(toolGroup) toolGroup.setCollapsed(true); // 这一轮干完了，工具卡收起，只留一行
     messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(toolEvidence.length ? {tools: toolEvidence.map(ev => ({ ...ev, detail:(ev.detail || '').slice(0, 1200) }))} : {}), ...(songShare ? {song: songShare} : {}), ...(workShare ? {work: workShare} : {}), ...(stickerShare ? {sticker: stickerShare} : {}), ...(translation ? {translation} : {}), ...(voiceText ? {voiceText} : {})});
     saveChatHistory();
     maybeAutoSummarize(); // 聊满设定的条数就自动总结记忆，后台进行，不打断聊天
