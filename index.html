@@ -1557,9 +1557,19 @@
       <div class="s-card">
         <div class="s-row">
           <div class="s-row-label">聊天时自动记下重要的事
-            <div class="s-row-sub">每聊 10 条自动总结一次</div>
+            <div class="s-row-sub" id="autoMemEverySub">每聊 10 条自动总结一次</div>
           </div>
           <input type="checkbox" id="autoMemToggle" onchange="toggleAutoMem(this.checked)" style="width:20px;height:20px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;">
+        </div>
+        <div class="s-row" id="autoMemEveryRow">
+          <div class="s-row-label">总结间隔</div>
+          <select class="s-input" id="autoMemEverySel" onchange="setAutoMemEvery(this.value)">
+            <option value="5">5 条</option>
+            <option value="10">10 条</option>
+            <option value="20">20 条</option>
+            <option value="30">30 条</option>
+            <option value="50">50 条</option>
+          </select>
         </div>
         <div style="padding:12px 16px 14px;">
           <button onclick="summarizeNow()" style="width:100%;padding:11px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">立即总结当前对话</button>
@@ -3682,6 +3692,7 @@ function memEmoLabel(m){
 function renderMemories(){
   const tg = document.getElementById('autoMemToggle');
   if(tg) tg.checked = autoMemEnabled();
+  applyAutoMemUI();
   const stg = document.getElementById('summaryToggle');
   if(stg) stg.checked = summaryEnabled();
   const spv = document.getElementById('summaryPreview');
@@ -3870,12 +3881,23 @@ function clearConvSummary(){
   showToast('当前对话的摘要已清除');
 }
 
-// ══ 自动记忆：每聊满 10 条，自动把这段对话总结成长期记忆 ══
-const AUTO_MEM_EVERY = 10;
+// ══ 自动记忆：每聊满设定的条数（5/10/20/30/50 可选，默认 10），自动把这段对话总结成长期记忆 ══
+const AUTO_MEM_EVERY_CHOICES = [5, 10, 20, 30, 50];
+function autoMemEvery(){ const n = parseInt(localStorage.getItem('z_autoMemEvery') || '10', 10); return AUTO_MEM_EVERY_CHOICES.includes(n) ? n : 10; }
+function setAutoMemEvery(v){ const n = parseInt(v, 10); localStorage.setItem('z_autoMemEvery', String(AUTO_MEM_EVERY_CHOICES.includes(n) ? n : 10)); applyAutoMemUI(); }
+function applyAutoMemUI(){
+  const on = autoMemEnabled();
+  const sel = document.getElementById('autoMemEverySel');
+  if(sel){ sel.value = String(autoMemEvery()); sel.disabled = !on; }
+  const row = document.getElementById('autoMemEveryRow');
+  if(row) row.style.opacity = on ? '' : '0.45';
+  const sub = document.getElementById('autoMemEverySub');
+  if(sub) sub.textContent = '每聊 ' + autoMemEvery() + ' 条自动总结一次';
+}
 const AUTO_MEM_PROMPT = '你是一个记忆整理助手。下面是 Lumi（用户）和 Zephyr（AI 伙伴）的一段对话。请提炼值得长期记住的重要信息：Lumi 的身份与近况、重要人物、偏好习惯、重要事件、两人的共同经历、项目进展与决定。只输出一个 JSON 数组，每个元素是 {"cat":"分类","text":"记忆内容","v":情绪,"a":分量}。分类只能是：身份、重要人物、偏好、重要事件、共同经历、项目。v 是这件事的情绪：1 暖/积极，0 中性，-1 沉重/消极；a 是分量：0 平静，1 有感觉，2 很有分量、刻骨。text 用简洁的第三人称陈述，主语用 Lumi 或 Zephyr，一条只记一件事。不要记录寒暄、玩笑和一次性的小事。如果没有值得长期记住的内容，输出 []。不要输出 JSON 以外的任何文字。';
 let autoMemRunning = false;
 function autoMemEnabled(){ return localStorage.getItem('z_autoMem') !== '0'; }
-function toggleAutoMem(on){ localStorage.setItem('z_autoMem', on ? '1' : '0'); showToast(on ? '自动记忆已开启' : '自动记忆已关闭'); }
+function toggleAutoMem(on){ localStorage.setItem('z_autoMem', on ? '1' : '0'); applyAutoMemUI(); showToast(on ? '自动记忆已开启' : '自动记忆已关闭'); }
 function getAutoMemState(){ try{ return JSON.parse(localStorage.getItem('z_autoMemState')||'{}'); }catch(e){ return {}; } }
 function setAutoMemState(s){ try{ localStorage.setItem('z_autoMemState', JSON.stringify(s)); }catch(e){} }
 function msgToText(m){
@@ -3887,7 +3909,7 @@ function maybeAutoSummarize(){
   if(!autoMemEnabled() || autoMemRunning || !activeConvId) return;
   const userCount = messages.filter(m=>m.role==='user').length;
   const last = getAutoMemState()[activeConvId] || 0;
-  if(userCount - last >= AUTO_MEM_EVERY) runAutoSummarize(false);
+  if(userCount - last >= autoMemEvery()) runAutoSummarize(false);
 }
 async function summarizeNow(){
   if(autoMemRunning){ showToast('正在总结中，稍等一下 ~'); return; }
@@ -11798,7 +11820,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     if(incomingCall) setTimeout(()=>showIncomingCall(incomingCall), 700);
     messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(toolEvidence.length ? {tools: toolEvidence.map(ev => ({ ...ev, detail:(ev.detail || '').slice(0, 1200) }))} : {}), ...(songShare ? {song: songShare} : {}), ...(stickerShare ? {sticker: stickerShare} : {}), ...(translation ? {translation} : {}), ...(voiceText ? {voiceText} : {})});
     saveChatHistory();
-    maybeAutoSummarize(); // 聊满 10 条就自动总结记忆，后台进行，不打断聊天
+    maybeAutoSummarize(); // 聊满设定的条数就自动总结记忆，后台进行，不打断聊天
     maybeUpdateSummary(); // 聊得太长时把旧消息压成摘要，后台进行，不打断聊天
     cloudTouch(); // 后端三件小事：报到、自动同步、收他留的话（节流 10 分钟，静默）
     updateRegenButton();
