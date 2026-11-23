@@ -602,6 +602,17 @@
     .flip-wrap.flipped .flip-inner { transform: rotateY(180deg); }
     .flip-face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
     .flip-back { transform: rotateY(180deg); }
+    /* ══ 记忆仓：文件夹浮动 + 通量线 ══ */
+    .mem-vault { position:relative; height:104px; border-radius:16px; border:1px solid var(--border); background:color-mix(in srgb, var(--surface) 55%, transparent); overflow:hidden; transition:height .65s cubic-bezier(.34,1.25,.5,1); }
+    .mem-vault.open { height:368px; }
+    #fluxCanvas { position:absolute; inset:0; width:100%; height:100%; }
+    .mem-vault-folder { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:3; display:flex; align-items:center; gap:8px; padding:11px 18px; border-radius:14px; background:var(--surface); border:1px solid var(--border); color:var(--text); font-size:13.5px; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.10); white-space:nowrap; }
+    .mem-chip { position:absolute; z-index:2; width:42%; transform:translate(-50%,-50%) scale(.25); opacity:0; pointer-events:none; transition:transform .7s cubic-bezier(.34,1.45,.5,1), opacity .45s ease; }
+    .mem-vault.open .mem-chip { transform:translate(-50%,-50%) scale(1); opacity:1; pointer-events:auto; }
+    .mem-chip-in { background:color-mix(in srgb, var(--surface) 90%, transparent); border:1px solid var(--border); border-radius:12px; padding:8px 11px; box-shadow:0 4px 14px rgba(0,0,0,.08); cursor:pointer; animation:chipFloat 5s ease-in-out infinite; }
+    .mem-chip-cat { display:block; font-size:10.5px; color:var(--accent-s); margin-bottom:2px; }
+    .mem-chip-txt { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; font-size:12px; line-height:1.55; color:var(--text); }
+    @keyframes chipFloat { 0%,100% { transform:translateY(-3px) rotate(-.6deg); } 50% { transform:translateY(4px) rotate(.6deg); } }
     /* Studio 预览全屏玩：同一个 iframe 只改尺寸、不重载，游戏进度不丢 */
     #studioPreviewWrap.studio-fs { position:fixed; inset:0; z-index:210; background:var(--bg); padding:10px; display:flex; flex-direction:column; margin:0; }
     #studioPreviewWrap.studio-fs #studioFrame { flex:1; height:auto; }
@@ -1647,6 +1658,18 @@
     <div class="settings-topbar-title">Memory</div>
   </div>
   <div class="settings-body">
+    <div class="s-section">
+      <div class="s-section-title">记忆仓</div>
+      <div class="mem-vault" id="memVault">
+        <canvas id="fluxCanvas"></canvas>
+        <div class="mem-vault-cloud" id="memVaultCloud"></div>
+        <button class="mem-vault-folder" id="memVaultFolder" onclick="toggleMemVault()">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          <span>记忆仓 · <span id="memVaultCount">0</span> 条</span>
+          <span style="font-size:12px;color:var(--text-pale);" id="memVaultHint">点开看看</span>
+        </button>
+      </div>
+    </div>
     <div class="s-section">
       <div class="s-section-title">自动记忆</div>
       <div class="s-card">
@@ -4085,6 +4108,7 @@ function renderMemories(){
   const list = loadMemories();
   const countEl = document.getElementById('memCount');
   if(countEl) countEl.textContent = list.length;
+  refreshMemVault(list);
   const wrap = document.getElementById('memList');
   if(!wrap) return;
   wrap.innerHTML = '';
@@ -4141,6 +4165,94 @@ function renderMemories(){
   if(q && !shown){
     wrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:24px 0;">没有找到包含「' + q.replace(/</g,'') + '」的记忆</div>';
   }
+}
+// ══ 记忆仓：点开文件夹，记忆纸片弹簧散开成浮云，背后通量线随手指弯曲 ══
+let memVaultOpen = false, memVaultPicks = [], memVaultSig = '', fluxCtx = null, fluxRunning = false, fluxT = 0;
+const fluxPtr = { x: -9999, y: -9999 };
+const MEM_VAULT_SLOTS = [[15,18],[37,13],[60,16],[84,20],[25,40],[50,34],[75,42],[13,62],[35,58],[58,60],[83,63],[68,80]];
+const FLUX_COLORS = ['167,139,250', '249,168,212', '147,197,253', '255,255,255'];
+function refreshMemVault(listArg){
+  const list = Array.isArray(listArg) ? listArg : loadMemories();
+  const cnt = document.getElementById('memVaultCount');
+  if(cnt) cnt.textContent = list.length;
+  const cloud = document.getElementById('memVaultCloud');
+  if(!cloud) return;
+  const picks = list.filter(m => m && m.text).slice().sort((a, b) => ((b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)) || ((b.ts || 0) - (a.ts || 0))).slice(0, 12);
+  const sig = picks.map(m => m.id || m.text).join('|');
+  if(sig === memVaultSig) return;
+  memVaultSig = sig;
+  memVaultPicks = picks;
+  cloud.innerHTML = picks.map((m, i) => {
+    const s = MEM_VAULT_SLOTS[i % MEM_VAULT_SLOTS.length];
+    return '<div class="mem-chip" style="left:' + s[0] + '%;top:' + s[1] + '%;transition-delay:' + (i * 45) + 'ms;" onclick="memVaultJump(' + i + ')">'
+      + '<div class="mem-chip-in" style="animation-duration:' + (4.2 + (i % 5) * .7).toFixed(1) + 's;animation-delay:' + (i * .3).toFixed(1) + 's;">'
+      + '<span class="mem-chip-cat">' + escapeHtml(m.cat || '记忆') + (m.pinned ? ' · 置顶' : '') + '</span>'
+      + '<span class="mem-chip-txt">' + escapeHtml(m.text) + '</span>'
+      + '</div></div>';
+  }).join('');
+}
+function memVaultJump(i){
+  const m = memVaultPicks[i];
+  if(!m) return;
+  const q = (m.text || '').slice(0, 10);
+  const inp = document.getElementById('memSearch');
+  memSearchText = q;
+  if(inp) inp.value = q;
+  renderMemories();
+  const list = document.getElementById('memList');
+  if(list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function toggleMemVault(){
+  memVaultOpen = !memVaultOpen;
+  const v = document.getElementById('memVault');
+  if(v) v.classList.toggle('open', memVaultOpen);
+  const hint = document.getElementById('memVaultHint');
+  if(hint) hint.textContent = memVaultOpen ? '收起来' : '点开看看';
+  if(memVaultOpen){ refreshMemVault(); startFlux(); }
+}
+function startFlux(){
+  const cv = document.getElementById('fluxCanvas');
+  const vault = document.getElementById('memVault');
+  if(!cv || !vault) return;
+  const W = vault.clientWidth, H = vault.clientHeight;
+  if(!W || !H) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = W * dpr; cv.height = H * dpr;
+  fluxCtx = cv.getContext('2d');
+  if(!fluxCtx) return;
+  fluxCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if(!cv.dataset.bound){
+    cv.dataset.bound = '1';
+    const move = e => { const r = cv.getBoundingClientRect(); const t = (e.touches && e.touches[0]) || e; if(t && typeof t.clientX === 'number'){ fluxPtr.x = t.clientX - r.left; fluxPtr.y = t.clientY - r.top; } };
+    vault.addEventListener('pointermove', move, { passive: true });
+    vault.addEventListener('touchmove', move, { passive: true });
+  }
+  if(fluxRunning) return;
+  fluxRunning = true;
+  const lines = [];
+  for(let i = 0; i < 6; i++) lines.push({ base: (i + .5) / 6, ph: i * 1.7, sp: .010 + i * .002, amp: 10 + (i % 3) * 6, c: FLUX_COLORS[i % FLUX_COLORS.length] });
+  (function tick(){
+    const page = document.getElementById('memoryPage');
+    if(!memVaultOpen || !page || !page.classList.contains('show') || document.hidden){ fluxRunning = false; return; }
+    fluxT += 1;
+    fluxCtx.clearRect(0, 0, W, H);
+    for(const L of lines){
+      const passes = [[5, .07], [1.6, .5]];
+      for(const ps of passes){
+        fluxCtx.beginPath();
+        for(let x = 0; x <= W; x += 12){
+          let y = L.base * H + Math.sin(x * .012 + fluxT * L.sp + L.ph) * L.amp + Math.sin(x * .004 - fluxT * L.sp * .6 + L.ph) * L.amp * .6;
+          const dx = x - fluxPtr.x, dy = y - fluxPtr.y, d2 = dx * dx + dy * dy;
+          if(d2 < 12100){ const d = Math.sqrt(d2) || 1; y += (fluxPtr.y - y) * (1 - d / 110) * .45; }
+          if(x === 0) fluxCtx.moveTo(x, y); else fluxCtx.lineTo(x, y);
+        }
+        fluxCtx.strokeStyle = 'rgba(' + L.c + ',' + ps[1] + ')';
+        fluxCtx.lineWidth = ps[0];
+        fluxCtx.stroke();
+      }
+    }
+    requestAnimationFrame(tick);
+  })();
 }
 function saveMemoryEdit(){
   const input = document.getElementById('memInput');
