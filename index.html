@@ -604,7 +604,6 @@
     .flip-back { transform: rotateY(180deg); }
     /* ══ 记忆仓：线串纸片，牵引浮动 ══ */
     .mem-vault { position:relative; flex:1; overflow:hidden; }
-    #fluxCanvas { position:absolute; inset:0; width:100%; height:100%; z-index:3; pointer-events:none; }
     .mem-vault-folder { position:absolute; left:50%; bottom:20px; transform:translateX(-50%); z-index:4; display:flex; align-items:center; gap:8px; padding:10px 18px; border-radius:14px; background:var(--surface); border:1px solid var(--border); color:var(--text); font-size:13.5px; box-shadow:0 6px 18px rgba(0,0,0,.10); white-space:nowrap; pointer-events:none; }
     .mem-chip { position:absolute; left:0; top:0; z-index:2; width:36%; opacity:0; will-change:transform; touch-action:none; }
     .mem-chip-in { background:color-mix(in srgb, var(--surface) 92%, transparent); border:1px solid var(--border); border-radius:12px; padding:7px 10px; box-shadow:0 4px 14px rgba(0,0,0,.10); cursor:grab; }
@@ -2249,7 +2248,6 @@
     <div class="settings-topbar-title">记忆仓</div>
   </div>
   <div class="mem-vault" id="memVault">
-    <canvas id="fluxCanvas"></canvas>
     <div class="mem-vault-cloud" id="memVaultCloud"></div>
     <div class="mem-vault-folder" id="memVaultFolder">
       <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
@@ -4173,10 +4171,9 @@ function renderMemories(){
     wrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:24px 0;">没有找到包含「' + q.replace(/</g,'') + '」的记忆</div>';
   }
 }
-// ══ 记忆仓：纸片被发光的线串着，线能牵引纸片；拖一张，邻居会被扯动 ══
+// ══ 记忆仓：点开文件夹，记忆纸片弹簧散开、在全屏里轻轻浮（可拖，松手弹回）══
 let memVaultOpen = false, memVaultPicks = [], memVaultSig = '', memVaultNodes = [], vaultRunning = false, vaultT = 0, vaultDrag = null;
 const MEM_VAULT_SLOTS = [[19,15],[41,10],[64,11],[81,16],[24,36],[52,32],[76,38]];
-const FLUX_COLORS = ['167,139,250', '249,168,212', '147,197,253', '251,191,36'];
 function refreshMemVault(listArg){
   const list = Array.isArray(listArg) ? listArg : loadMemories();
   const cnt = document.getElementById('memVaultCount');
@@ -4244,21 +4241,13 @@ function closeMemVault(){
   memVaultOpen = false;
   const o = document.getElementById('memVaultOverlay');
   if(o) o.style.display = 'none';
-  const cv = document.getElementById('fluxCanvas');
-  if(cv){ const c = cv.getContext('2d'); if(c) c.clearRect(0, 0, cv.width, cv.height); }
 }
 function startVault(){
-  const cv = document.getElementById('fluxCanvas');
   const vault = document.getElementById('memVault');
-  if(!cv || !vault) return;
+  if(!vault) return;
   const W = vault.clientWidth, H = vault.clientHeight;
   if(!W || !H) return;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  cv.width = W * dpr; cv.height = H * dpr;
-  const ctx = cv.getContext('2d');
-  if(!ctx) return;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // 节点出生在文件夹口，弹簧会把它们送到各自的家
+  // 节点出生在文件夹口，弹簧把它们送到各自的家，之后就在家里附近轻轻浮
   const fx = W / 2, fy = H - 58;
   const els = vault.querySelectorAll('.mem-chip');
   memVaultNodes = memVaultPicks.map((m, i) => {
@@ -4266,70 +4255,25 @@ function startVault(){
     const el = els[i];
     return { hx: s[0] / 100 * W, hy: s[1] / 100 * H, x: fx, y: fy, vx: 0, vy: 0, ph: i * 1.3, born: vaultT + i * 6, w: el ? el.offsetWidth : 120, h: el ? el.offsetHeight : 54, el };
   });
-  // 链的静止长度 = 相邻家位距离
-  for(let i = 0; i < memVaultNodes.length - 1; i++){
-    const a = memVaultNodes[i], b = memVaultNodes[i + 1];
-    a.rest = Math.hypot(b.hx - a.hx, b.hy - a.hy);
-  }
   if(vaultRunning) return;
   vaultRunning = true;
   (function tick(){
     if(!memVaultOpen || document.hidden){ vaultRunning = false; return; }
     vaultT += 1;
-    const nodes = memVaultNodes;
-    // 物理：弹簧回家 + 轻微浮动 + 相邻牵引
-    for(let i = 0; i < nodes.length; i++){
-      const n = nodes[i];
+    for(let i = 0; i < memVaultNodes.length; i++){
+      const n = memVaultNodes[i];
       if(vaultT < n.born){ n.x = fx; n.y = fy; continue; }
       if(n.el && n.el.style.opacity !== '1') n.el.style.opacity = '1';
-      if(vaultDrag && vaultDrag.i === i) continue;
-      const tx = n.hx + Math.sin(vaultT * .012 + n.ph) * 5;
-      const ty = n.hy + Math.cos(vaultT * .010 + n.ph * 1.7) * 4;
-      n.vx += (tx - n.x) * .045; n.vy += (ty - n.y) * .045;
-      n.vx *= .86; n.vy *= .86;
-      n.x += n.vx; n.y += n.vy;
-    }
-    for(let pass = 0; pass < 2; pass++){
-      for(let i = 0; i < nodes.length - 1; i++){
-        const a = nodes[i], b = nodes[i + 1];
-        if(!a.rest) continue;
-        const dx = b.x - a.x, dy = b.y - a.y;
-        const d = Math.hypot(dx, dy) || 1;
-        const diff = (d - a.rest) / d * .5;
-        const aDrag = vaultDrag && vaultDrag.i === i, bDrag = vaultDrag && vaultDrag.i === i + 1;
-        if(!aDrag){ a.x += dx * diff * (bDrag ? 2 : 1); a.y += dy * diff * (bDrag ? 2 : 1); }
-        if(!bDrag){ b.x -= dx * diff * (aDrag ? 2 : 1); b.y -= dy * diff * (aDrag ? 2 : 1); }
+      if(!(vaultDrag && vaultDrag.i === i)){
+        const tx = n.hx + Math.sin(vaultT * .012 + n.ph) * 6;
+        const ty = n.hy + Math.cos(vaultT * .010 + n.ph * 1.7) * 5;
+        n.vx += (tx - n.x) * .045; n.vy += (ty - n.y) * .045;
+        n.vx *= .86; n.vy *= .86;
+        n.x += n.vx; n.y += n.vy;
       }
-    }
-    for(const n of nodes){
-      n.x = Math.max(30, Math.min(W - 30, n.x));
-      n.y = Math.max(24, Math.min(H - 60, n.y));
+      n.x = Math.max(24, Math.min(W - 24, n.x));
+      n.y = Math.max(24, Math.min(H - 50, n.y));
       if(n.el) n.el.style.transform = 'translate(' + (n.x - n.w / 2).toFixed(1) + 'px,' + (n.y - n.h / 2).toFixed(1) + 'px)';
-    }
-    // 画线：文件夹口 → 纸片1 → 纸片2 … 顺成一条发光的串
-    ctx.clearRect(0, 0, W, H);
-    const pts = [{ x: fx, y: fy + 10 }].concat(nodes.filter(n => vaultT >= n.born).map(n => ({ x: n.x, y: n.y - n.h / 2 + 3 })));
-    if(pts.length > 1){
-      const passes = [[5, .10], [1.8, .55]];
-      for(const ps of passes){
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for(let i = 1; i < pts.length - 1; i++){
-          const mx = (pts[i].x + pts[i + 1].x) / 2, my = (pts[i].y + pts[i + 1].y) / 2 + 10;
-          ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
-        }
-        ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
-        ctx.strokeStyle = 'rgba(167,139,250,' + ps[1] + ')';
-        ctx.lineWidth = ps[0];
-        ctx.stroke();
-      }
-      // 串上的光点结
-      for(let i = 1; i < pts.length; i++){
-        ctx.beginPath();
-        ctx.arc(pts[i].x, pts[i].y, 2.6, 0, 6.2832);
-        ctx.fillStyle = 'rgba(' + FLUX_COLORS[(i - 1) % FLUX_COLORS.length] + ',.9)';
-        ctx.fill();
-      }
     }
     requestAnimationFrame(tick);
   })();
