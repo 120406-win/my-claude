@@ -576,7 +576,7 @@
     }
     .settings-page.show { display:flex; animation: pageIn .38s cubic-bezier(.22,1,.36,1); }
     /* ══ 交互手感：页面进场、按压回弹、消息与卡片入场，治「啪地闪现」的死板感 ══ */
-    @keyframes pageIn { from { opacity:0; transform:translateY(22px) scale(.99); } to { opacity:1; transform:none; } }
+    @keyframes pageIn { from { opacity:0; transform:translateX(48px); } to { opacity:1; transform:none; } }
     button { transition: transform .18s cubic-bezier(.34,1.56,.64,1); }
     button:active { transform: scale(.9); }
     .msg-row { animation: msgIn .32s cubic-bezier(.34,1.35,.64,1) both; transform-origin: 50% 100%; }
@@ -596,6 +596,12 @@
     #homePage.show .home-card:nth-child(8) { animation-delay:.35s; }
     .sidebar.show .nav-item { animation: riseIn .4s cubic-bezier(.22,1,.36,1) both; }
     .bg-mode-btn:active { transform: scale(.86, 1.12); }
+    /* ══ 镜子卡翻卡：点一下 3D 翻开 ══ */
+    .flip-wrap { perspective: 900px; cursor: pointer; margin-bottom: 10px; }
+    .flip-inner { display: grid; transform-style: preserve-3d; transition: transform .7s cubic-bezier(.34,1.3,.5,1); }
+    .flip-wrap.flipped .flip-inner { transform: rotateY(180deg); }
+    .flip-face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .flip-back { transform: rotateY(180deg); }
     /* Studio 预览全屏玩：同一个 iframe 只改尺寸、不重载，游戏进度不丢 */
     #studioPreviewWrap.studio-fs { position:fixed; inset:0; z-index:210; background:var(--bg); padding:10px; display:flex; flex-direction:column; margin:0; }
     #studioPreviewWrap.studio-fs #studioFrame { flex:1; height:auto; }
@@ -3051,7 +3057,8 @@ function refreshHomeLightBtn(){
   if(b){ b.textContent = homeDaylight() ? '开' : '关'; b.style.borderColor = homeDaylight() ? 'var(--accent)' : 'transparent'; }
 }
 // ══ 星尘粒子：背景里慢慢上浮、明暗呼吸的细尘，给界面留一口「活气」（外观设置可关）══
-let dustCtx = null, dustParts = [], dustRunning = false;
+let dustCtx = null, dustParts = [], dustRunning = false, dustMeteors = [], dustNextMeteor = 0;
+const dustPtr = { x: -999, y: -999, t: 0 };
 function dustOn(){ return localStorage.getItem('z_dust') !== '0'; }
 function toggleDust(){
   localStorage.setItem('z_dust', dustOn() ? '0' : '1');
@@ -3076,21 +3083,53 @@ function initDust(){
   const COLORS = ['255,255,255', '216,180,254', '249,168,212'];
   const N = Math.max(36, Math.min(64, Math.floor(innerWidth / 18)));
   dustParts = [];
-  for(let i = 0; i < N; i++) dustParts.push({ x: Math.random()*cv.width, y: Math.random()*cv.height, r: 1 + Math.random()*2.2, s: .06 + Math.random()*.18, ph: Math.random()*6.28, ps: .005 + Math.random()*.012, dr: (Math.random()-.5)*.06, c: COLORS[i % COLORS.length] });
+  for(let i = 0; i < N; i++) dustParts.push({ x: Math.random()*cv.width, y: Math.random()*cv.height, r: 1 + Math.random()*2.2, s: .06 + Math.random()*.18, ph: Math.random()*6.28, ps: .005 + Math.random()*.012, dr: (Math.random()-.5)*.06, c: COLORS[i % COLORS.length], star: i % 4 === 0 });
+  dustMeteors = [];
+  dustNextMeteor = performance.now() + 3500;
+  const setPtr = (x, y)=>{ dustPtr.x = x; dustPtr.y = y; dustPtr.t = performance.now(); };
+  document.addEventListener('touchmove', e=>{ const t = e.touches && e.touches[0]; if(t) setPtr(t.clientX, t.clientY); }, { passive:true });
+  document.addEventListener('mousemove', e=>setPtr(e.clientX, e.clientY), { passive:true });
   dustRunning = true;
   (function tick(){
     if(!dustOn()){ dustRunning = false; dustCtx.clearRect(0, 0, cv.width, cv.height); return; }
     if(!document.hidden){
       dustCtx.clearRect(0, 0, cv.width, cv.height);
+      const now = performance.now();
+      const ptrLive = now - dustPtr.t < 1200;
       for(const p of dustParts){
         p.y -= p.s; p.x += p.dr + Math.sin(p.ph)*.05; p.ph += p.ps;
+        // 手指/指针划过时，附近的尘会轻轻让开并亮一下
+        if(ptrLive){
+          const dx = p.x - dustPtr.x, dy = p.y - dustPtr.y, d2 = dx*dx + dy*dy;
+          if(d2 < 8100 && d2 > 1){ const d = Math.sqrt(d2), f = (90 - d) / 90 * .9; p.x += dx / d * f; p.y += dy / d * f; }
+        }
         if(p.y < -4){ p.y = cv.height + 4; p.x = Math.random()*cv.width; }
         if(p.x < -4) p.x = cv.width + 4; else if(p.x > cv.width + 4) p.x = -4;
-        const a = .22 + .38 * (0.5 + 0.5 * Math.sin(p.ph * 2));
+        const tw = 0.5 + 0.5 * Math.sin(p.ph * 2);
+        const a = p.star ? .3 + .55 * tw : .22 + .38 * tw;
         dustCtx.beginPath();
-        dustCtx.arc(p.x, p.y, p.r, 0, 6.2832);
+        dustCtx.arc(p.x, p.y, p.star ? p.r * (0.8 + 0.5 * tw) : p.r, 0, 6.2832);
         dustCtx.fillStyle = 'rgba(' + p.c + ',' + a.toFixed(3) + ')';
         dustCtx.fill();
+      }
+      // 流星：隔几秒划过一颗，带渐变尾巴
+      if(now >= dustNextMeteor){
+        dustMeteors.push({ x: cv.width * (0.25 + Math.random() * 0.7), y: cv.height * Math.random() * 0.3, vx: -(5 + Math.random() * 3), vy: 3 + Math.random() * 2, life: 1 });
+        dustNextMeteor = now + 5000 + Math.random() * 6000;
+      }
+      dustMeteors = dustMeteors.filter(m => m.life > 0);
+      for(const m of dustMeteors){
+        m.x += m.vx; m.y += m.vy; m.life -= .016;
+        const tail = 14;
+        const grad = dustCtx.createLinearGradient(m.x, m.y, m.x - m.vx * tail, m.y - m.vy * tail);
+        grad.addColorStop(0, 'rgba(255,255,255,' + (0.85 * Math.max(0, m.life)).toFixed(3) + ')');
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        dustCtx.strokeStyle = grad;
+        dustCtx.lineWidth = 2;
+        dustCtx.beginPath();
+        dustCtx.moveTo(m.x, m.y);
+        dustCtx.lineTo(m.x - m.vx * tail, m.y - m.vy * tail);
+        dustCtx.stroke();
       }
     }
     requestAnimationFrame(tick);
@@ -6935,11 +6974,23 @@ async function renderRings(){
     } else {
       const kindName = { reinforce:'印证', difference:'对不上', graduation:'毕业', budding:'萌芽', dormant:'休眠' };
       const stName = { pending:'还没递给他', surfaced:'递到他手边了', processed:'他接住了', dismissed:'他划掉了', expired:'安静沉底了' };
-      cEl.innerHTML = cards.map(c => '<div class="s-card" style="padding:14px 16px;margin-bottom:10px;">'
-        + '<div style="font-size:12px;color:var(--accent-s);margin-bottom:6px;">' + (kindName[c.kind] || c.kind || '卡') + ' · ' + (stName[c.status] || c.status || '') + '</div>'
-        + '<div style="font-size:14px;line-height:1.7;">' + escapeHtml(c.claim || '') + '</div>'
-        + ((c.evidence || []).length ? '<div style="font-size:12.5px;color:var(--text-dim);line-height:1.8;margin-top:6px;">' + c.evidence.map(e => '「' + escapeHtml(e.quote || '') + '」（' + escapeHtml(e.date || '') + '）').join('<br>') + '</div>' : '')
-        + '</div>').join('');
+      cEl.innerHTML = cards.map(c => {
+        const head = (kindName[c.kind] || c.kind || '卡') + ' · ' + (stName[c.status] || c.status || '');
+        const ev = ((c.evidence || []).length ? '<div style="font-size:12.5px;color:var(--text-dim);line-height:1.8;margin-top:6px;">' + c.evidence.map(e => '「' + escapeHtml(e.quote || '') + '」（' + escapeHtml(e.date || '') + '）').join('<br>') + '</div>' : '');
+        return '<div class="flip-wrap" onclick="this.classList.toggle(\'flipped\')">'
+          + '<div class="flip-inner">'
+          + '<div class="s-card flip-face" style="padding:16px;display:flex;flex-direction:column;justify-content:center;gap:6px;">'
+          + '<div style="font-size:12px;color:var(--accent-s);">' + head + '</div>'
+          + '<div style="font-size:15.5px;color:var(--text);">一张镜子卡</div>'
+          + '<div style="font-size:12px;color:var(--text-pale);">点开，看看他照见了什么</div>'
+          + '</div>'
+          + '<div class="s-card flip-face flip-back" style="padding:14px 16px;">'
+          + '<div style="font-size:12px;color:var(--accent-s);margin-bottom:6px;">' + head + '</div>'
+          + '<div style="font-size:14px;line-height:1.7;">' + escapeHtml(c.claim || '') + '</div>'
+          + ev
+          + '</div>'
+          + '</div></div>';
+      }).join('');
     }
   }
 }
