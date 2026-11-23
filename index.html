@@ -2841,29 +2841,68 @@ function spawnSplashRipple(x, y){
   setTimeout(()=>r.remove(), 900);
 }
 let shardCtx = null, shardParts = [], shardStars = [], shardRunning = false;
+function makeShardSprite(rgb, glow){
+  const c = document.createElement('canvas'); c.width = 72; c.height = 40;
+  const g = c.getContext('2d'); if(!g) return c;
+  g.translate(36, 20);
+  g.beginPath();
+  g.moveTo(-30, 0); g.lineTo(-6, -9); g.lineTo(30, -3); g.lineTo(8, 8); g.closePath();
+  if(glow){ g.shadowColor = 'rgba(' + rgb + ',0.55)'; g.shadowBlur = 9; }
+  const grad = g.createLinearGradient(-30, 0, 30, 0);
+  grad.addColorStop(0, 'rgba(' + rgb + ',0.10)');
+  grad.addColorStop(.5, 'rgba(' + rgb + ',0.30)');
+  grad.addColorStop(1, 'rgba(' + rgb + ',0.06)');
+  g.fillStyle = grad; g.fill();
+  g.shadowBlur = 0;
+  g.beginPath();
+  g.moveTo(-30, 0); g.lineTo(-6, -9); g.lineTo(30, -3);
+  g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 1.4; g.stroke();
+  g.beginPath();
+  g.moveTo(-6, -9); g.lineTo(8, 8);
+  g.strokeStyle = 'rgba(255,255,255,0.18)'; g.lineWidth = 1; g.stroke();
+  return c;
+}
 function initShards(){
   const cv = document.getElementById('shardCanvas'); if(!cv) return;
   const W = innerWidth, H = innerHeight;
-  const dpr = Math.min(1.75, window.devicePixelRatio || 1);
+  const dpr = Math.min(1.5, window.devicePixelRatio || 1);
   cv.width = W * dpr; cv.height = H * dpr;
   shardCtx = cv.getContext('2d'); if(!shardCtx) return;
   shardCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  // 三条碎片河：碎片顺着正弦河道成带流动，不是满屏乱飘
-  const STREAMS = [
-    { yb: .25, amp: .05, fr: 2.1, sp: .030, wdt: .085, ph: 0 },
-    { yb: .52, amp: .075, fr: 1.6, sp: .044, wdt: .115, ph: 2.2 },
-    { yb: .77, amp: .058, fr: 1.9, sp: .035, wdt: .09, ph: 4.1 },
+  // 照原版构图：几条缎带斜穿画面，碎片只活在缎带里，密度自己成流——缎带本身不画出来
+  const RIBBONS = [
+    { x0: -.18, y0: .34, xc: .45, yc: .16, x1: 1.18, y1: .30, w: .10 },
+    { x0: -.18, y0: .58, xc: .50, yc: .78, x1: 1.18, y1: .44, w: .13 },
+    { x0: -.18, y0: .86, xc: .42, yc: .66, x1: 1.18, y1: .80, w: .105 },
+    { x0: -.10, y0: 1.10, xc: .55, yc: .62, x1: 1.15, y1: .18, w: .07 },
   ];
-  const TINTS = ['196,181,253', '167,139,250', '216,180,254', '226,221,255'];
+  const SPRITES = [
+    makeShardSprite('137,106,189', false), makeShardSprite('168,85,247', false),
+    makeShardSprite('196,181,253', false), makeShardSprite('137,106,189', true),
+    makeShardSprite('216,180,254', true),
+  ];
+  const LAYERS = [
+    { n: .30, len: [5, 10], a: .34, sp: .55 },
+    { n: .27, len: [8, 15], a: .52, sp: .8 },
+    { n: .21, len: [12, 21], a: .72, sp: 1 },
+    { n: .13, len: [17, 28], a: .9, sp: 1.25 },
+    { n: .09, len: [24, 38], a: 1, sp: 1.55 },
+  ];
   shardParts = [];
-  STREAMS.forEach((s, si) => {
-    const n = si === 1 ? 76 : 58;
-    for(let i = 0; i < n; i++){
-      shardParts.push({ s, u: Math.random(), v: (Math.random() + Math.random() - 1), l: 7 + Math.random() * 21, w: 3 + Math.random() * 7, tum: Math.random() * 6.28, tv: (Math.random() - .5) * .02, c: TINTS[(Math.random() * TINTS.length) | 0], a: .35 + Math.random() * .65 });
-    }
+  const TOTAL = 640;
+  RIBBONS.forEach((r, ri) => {
+    LAYERS.forEach((L, li) => {
+      const n = Math.round(TOTAL / RIBBONS.length * L.n);
+      for(let i = 0; i < n; i++){
+        shardParts.push({ r, li, t: Math.random(), lane: (Math.random() + Math.random() - 1), len: L.len[0] + Math.random() * (L.len[1] - L.len[0]), spr: SPRITES[(Math.random() * SPRITES.length) | 0], tum: Math.random() * 6.28, tv: (Math.random() - .5) * .9, glint: Math.random() * 6.28, a: L.a * (.7 + Math.random() * .5) });
+      }
+    });
   });
+  shardParts.sort((a, b) => a.li - b.li);
   shardStars = [];
-  for(let i = 0; i < 48; i++) shardStars.push({ x: Math.random() * W, y: Math.random() * H, r: .7 + Math.random() * 1.5, ph: Math.random() * 6.28, ps: .008 + Math.random() * .02, s: .03 + Math.random() * .08 });
+  for(let i = 0; i < 42; i++) shardStars.push({ x: Math.random() * W, y: Math.random() * H, r: .7 + Math.random() * 1.4, ph: Math.random() * 6.28, ps: .008 + Math.random() * .02, s: .02 + Math.random() * .06 });
+  const markers = [];
+  for(let i = 0; i < 24; i++) markers.push({ x: Math.random() * W, y: Math.random() * H, s: 4 + Math.random() * 5, ph: Math.random() * 6.28 });
   const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const T0 = performance.now();
   shardRunning = true;
@@ -2871,49 +2910,52 @@ function initShards(){
     if(splashGone){ shardRunning = false; return; }
     if(!document.hidden){
       const t = ((now || performance.now()) - T0) / 1000;
+      const intro = Math.min(1, t / 1.4);
       shardCtx.clearRect(0, 0, W, H);
-      // 流光底带：河道中心一层发光的紫，像光河
-      shardCtx.save();
-      shardCtx.globalCompositeOperation = 'lighter';
-      for(const s of STREAMS){
-        shardCtx.beginPath();
-        for(let x = -10; x <= W + 10; x += 14){
-          const y = (s.yb + Math.sin(x / W * 6.2832 * s.fr + s.ph + t * .25) * s.amp) * H;
-          if(x === -10) shardCtx.moveTo(x, y); else shardCtx.lineTo(x, y);
-        }
-        shardCtx.strokeStyle = 'rgba(124,93,250,0.055)';
-        shardCtx.lineWidth = s.wdt * H * 1.6;
-        shardCtx.stroke();
-      }
-      shardCtx.restore();
       for(const st of shardStars){
         st.y -= st.s; st.ph += st.ps;
         if(st.y < -3){ st.y = H + 3; st.x = Math.random() * W; }
-        const a = .18 + .5 * (0.5 + 0.5 * Math.sin(st.ph * 2));
+        const a = .15 + .45 * (0.5 + 0.5 * Math.sin(st.ph * 2));
         shardCtx.beginPath(); shardCtx.arc(st.x, st.y, st.r, 0, 6.2832);
         shardCtx.fillStyle = 'rgba(235,232,255,' + a.toFixed(3) + ')'; shardCtx.fill();
       }
-      for(const p of shardParts){
-        const s = p.s;
-        p.u -= s.sp * .033;
-        if(p.u < -.05){ p.u = 1.05; p.v = (Math.random() + Math.random() - 1); }
-        p.tum += p.tv;
-        const x = p.u * W;
-        const th = p.u * 6.2832 * s.fr + s.ph + t * .25;
-        const y = (s.yb + Math.sin(th) * s.amp) * H + p.v * s.wdt * H * .5;
-        const ang = Math.atan(Math.cos(th) * s.amp * 6.2832 * s.fr * H / W) + p.tum * .35;
-        const bright = (1 - Math.abs(p.v)) * p.a;
-        shardCtx.save(); shardCtx.translate(x, y); shardCtx.rotate(ang);
+      shardCtx.strokeStyle = 'rgba(216,205,255,0.10)';
+      shardCtx.lineWidth = 1;
+      for(const m of markers){
+        const pulse = .5 + .5 * Math.sin(t * .7 + m.ph);
+        shardCtx.globalAlpha = .35 + .65 * pulse;
         shardCtx.beginPath();
-        shardCtx.moveTo(-p.l / 2, 0); shardCtx.lineTo(p.l * .15, -p.w / 2); shardCtx.lineTo(p.l / 2, 0); shardCtx.lineTo(-p.l * .1, p.w / 2); shardCtx.closePath();
-        shardCtx.fillStyle = 'rgba(' + p.c + ',' + (0.05 + 0.13 * bright).toFixed(3) + ')'; shardCtx.fill();
-        shardCtx.beginPath();
-        shardCtx.moveTo(-p.l / 2, 0); shardCtx.lineTo(p.l * .15, -p.w / 2); shardCtx.lineTo(p.l / 2, 0);
-        shardCtx.strokeStyle = 'rgba(255,255,255,' + (0.14 + 0.5 * bright).toFixed(3) + ')';
-        shardCtx.lineWidth = .8;
+        shardCtx.moveTo(m.x - m.s, m.y); shardCtx.lineTo(m.x + m.s, m.y);
+        shardCtx.moveTo(m.x, m.y - m.s); shardCtx.lineTo(m.x, m.y + m.s);
         shardCtx.stroke();
+      }
+      shardCtx.globalAlpha = 1;
+      for(const p of shardParts){
+        const L = LAYERS[p.li], r = p.r;
+        p.t += .00016 * L.sp;
+        if(p.t > 1.06){ p.t = -.06; p.lane = (Math.random() + Math.random() - 1); }
+        p.tum += p.tv * .016;
+        const tt = Math.max(0, Math.min(1, p.t));
+        const mt = 1 - tt;
+        const bx = (mt * mt * r.x0 + 2 * mt * tt * r.xc + tt * tt * r.x1) * W;
+        const by = (mt * mt * r.y0 + 2 * mt * tt * r.yc + tt * tt * r.y1) * H;
+        const dx = 2 * mt * (r.xc - r.x0) + 2 * tt * (r.x1 - r.xc);
+        const dy = 2 * mt * (r.yc - r.y0) + 2 * tt * (r.y1 - r.yc);
+        const dl = Math.hypot(dx, dy) || 1;
+        const pinch = .45 + .55 * Math.sin(tt * Math.PI);
+        const off = p.lane * r.w * H * pinch;
+        const x = bx + (-dy / dl) * off;
+        const y = by + (dx / dl) * off;
+        const ang = Math.atan2(dy, dx) + Math.sin(p.tum) * .5;
+        const glint = .8 + .35 * Math.sin(t * .9 + p.glint);
+        shardCtx.save();
+        shardCtx.translate(x, y); shardCtx.rotate(ang);
+        shardCtx.globalAlpha = Math.max(0, Math.min(1, p.a * glint * intro));
+        const sw = p.len * 2.2, sh = p.len * 1.22;
+        shardCtx.drawImage(p.spr, -sw / 2, -sh / 2, sw, sh);
         shardCtx.restore();
       }
+      shardCtx.globalAlpha = 1;
     }
     if(!reduced) requestAnimationFrame(tick); else shardRunning = false;
   })(performance.now());
