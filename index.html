@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
   <title>栖</title>
   <link rel="manifest" href="manifest.webmanifest"/>
-  <link rel="preload" as="image" href="splash-hero.webp"/>
   <meta name="theme-color" content="#0a1030"/>
   <meta name="mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -271,111 +270,44 @@
     #splash.hide { opacity:0; pointer-events:none; }
 
     /* ══════════════════════════
-       SPLASH
+       SPLASH v2：航空碎片 + 粒子，文案点按逐句
     ══════════════════════════ */
     #splash {
       z-index:10; cursor:pointer; overflow:hidden;
-      background:#070918;
+      background: radial-gradient(120% 90% at 78% 8%, #2b2358 0%, transparent 55%), radial-gradient(100% 80% at 12% 88%, #1d2b52 0%, transparent 50%), linear-gradient(168deg, #0a0a24 0%, #12102e 52%, #070716 100%);
       box-sizing:border-box;
       font-family: 'Cormorant Garamond', 'Noto Serif SC', serif;
     }
-    /* 主图：星空下相拥的两个人，24 秒极慢地推近，画面是活的 */
-    .splash-hero {
-      position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center 43%;
-      animation: slowzoom 24s ease-in-out infinite alternate; z-index:0;
-    }
-    @keyframes slowzoom { from{ transform:scale(1); } to{ transform:scale(1.075); } }
-    .splash-shade {
-      position:absolute; inset:0; z-index:1; pointer-events:none;
-      background:linear-gradient(180deg, rgba(5,7,22,.72) 0%, transparent 23%, rgba(7,9,27,.04) 43%, rgba(8,10,28,.53) 72%, #070918 100%);
-    }
-    .splash-aurora {
-      position:absolute; inset:-20%; z-index:1; pointer-events:none;
-      background:radial-gradient(ellipse at 20% 24%, rgba(138,131,223,.14), transparent 36%), radial-gradient(ellipse at 85% 30%, rgba(123,157,228,.17), transparent 33%);
-      filter:blur(30px); animation: auroraMove 14s ease-in-out infinite alternate;
-    }
-    @keyframes auroraMove { to{ transform:translate(4%,3%) scale(1.12); } }
-    .splash-stars { position:absolute; inset:0; overflow:hidden; z-index:2; pointer-events:none; }
-    .splash-stars .gstar {
-      position:absolute; color:#fff; line-height:1; text-shadow:0 0 12px #c9d7ff; opacity:.4;
-      animation: gTwinkle var(--d,3s) ease-in-out infinite alternate;
-    }
-    @keyframes gTwinkle { to{ opacity:1; transform:scale(1.5); } }
-    .splash-top {
-      position:absolute; top:calc(env(safe-area-inset-top) + 34px); left:0; right:0; z-index:3;
-      text-align:center; padding:0 18px; animation: fadeUp 1.2s ease both;
-    }
-    .splash-eyebrow { font-family:Georgia, serif; font-size:9px; letter-spacing:4px; color:rgba(226,221,255,.72); }
-    .splash-name {
-      font-family:'Bodoni 72', Didot, 'Cormorant Garamond', Georgia, 'Noto Serif SC', serif;
-      font-size:clamp(37px,10vw,48px); font-weight:400; letter-spacing:-.5px;
-      margin:12px 0 7px; color:#f5f1ff; text-shadow:0 2px 24px rgba(23,20,47,.9);
-    }
-    .splash-name span { font-style:italic; }
-    .splash-subtitle { font-family:'Noto Serif SC', Georgia, serif; font-size:11px; letter-spacing:2px; color:#e4def6; }
-    /* 会漂浮的小猫：点它（或点 PET THE CAT）它会跳起来 */
-    .splash-pet {
-      position:absolute; width:58px; right:16px; top:46%; z-index:3; cursor:pointer;
-      filter:drop-shadow(0 0 12px rgba(220,229,255,.61));
-      animation: catfloat 3.8s ease-in-out infinite; transform-origin:bottom center;
-    }
-    @keyframes catfloat { 50%{ transform:translateY(-8px) rotate(4deg); } }
-    .splash-pet svg { width:100%; display:block; }
-    .splash-bottom {
-      position:absolute; left:0; right:0; bottom:0; z-index:3; text-align:center;
-      padding:20px 22px calc(env(safe-area-inset-bottom) + 22px);
-      background:linear-gradient(180deg, transparent, rgba(9,11,29,.91) 19%, rgba(9,11,29,.97) 100%);
-      animation: fadeUp 1.2s 0.3s ease both;
-    }
-    .splash-rule { width:42px; height:1px; background:#d8d0ff; margin:0 auto 16px; box-shadow:0 0 12px #c5b8ff; }
-    .splash-cn { font-family:'Noto Serif SC', 'Songti SC', Georgia, serif; font-size:16px; letter-spacing:2px; color:#fff; }
-    .splash-cn.second { margin-top:17px; }
-    .splash-en { font-family:Georgia, serif; font-size:11px; letter-spacing:.5px; color:#d0cce9; margin-top:7px; }
-    .splash-motto { font-family:Georgia, serif; font-style:italic; font-size:12px; letter-spacing:1px; color:#e1dafa; margin-top:17px; }
-    .splash-actions { display:flex; gap:10px; justify-content:center; margin-top:18px; }
-    .splash-btn {
-      appearance:none; border:1px solid rgba(225,220,255,.45); background:rgba(255,255,255,.07); color:#fff;
-      border-radius:999px; padding:11px 17px; font-family:Georgia, serif; font-size:10px; letter-spacing:1.2px;
-      backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); cursor:pointer;
-      transition:transform .2s, background .2s;
-    }
-    .splash-btn:active { transform:scale(.95); }
-    .splash-btn.primary { background:linear-gradient(110deg,#e6dfff,#b9c9f4); color:#16162d; border:0; font-weight:650; }
-    .splash-signature { font-family:Georgia, serif; font-size:8px; letter-spacing:3px; color:#aaaed0; margin-top:14px; }
+    #shardCanvas { position:absolute; inset:0; width:100%; height:100%; z-index:1; }
+    .splash-stage { position:absolute; inset:0; z-index:2; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:0 30px; pointer-events:none; }
+    .splash-line { color:#f2efff; transition:opacity .19s ease, transform .19s ease, filter .19s ease; }
+    .splash-line.out { opacity:0; transform:translateY(-12px); filter:blur(3px); }
+    .splash-line.in { animation:beatIn .55s cubic-bezier(.22,1,.36,1) both; }
+    @keyframes beatIn { from { opacity:0; transform:translateY(16px); filter:blur(4px); } to { opacity:1; transform:none; filter:none; } }
+    .beat-eyebrow { font-family:Georgia, serif; font-size:11px; letter-spacing:5px; color:rgba(226,221,255,.85); }
+    .beat-name { font-size:44px; font-weight:500; letter-spacing:1px; }
+    .beat-name span { font-style:italic; color:#c9b8ff; }
+    .beat-cn { font-family:'Noto Serif SC', 'Songti SC', Georgia, serif; font-size:21px; letter-spacing:3px; }
+    .beat-motto { font-family:Georgia, serif; font-style:italic; font-size:17px; letter-spacing:1px; color:#e1dafa; }
+    .beat-sign { font-family:Georgia, serif; font-size:10.5px; letter-spacing:4px; color:#b9bce0; }
+    .splash-sub { font-family:Georgia, serif; font-size:12.5px; letter-spacing:.5px; color:#c9c6e8; margin-top:12px; transition:opacity .19s ease; }
+    .splash-sub.out { opacity:0; }
+    .splash-dots { position:absolute; left:0; right:0; bottom:calc(env(safe-area-inset-bottom) + 64px); z-index:2; display:flex; gap:7px; justify-content:center; pointer-events:none; }
+    .splash-dots i { width:5px; height:5px; border-radius:50%; background:rgba(220,215,255,.28); transition:all .3s; }
+    .splash-dots i.on { background:#e6dfff; transform:scale(1.35); box-shadow:0 0 8px rgba(200,180,255,.9); }
     .splash-hint {
-      margin-top:12px; font-family:Georgia, serif;
-      font-size:10px; letter-spacing:0.25em; color:#8b93b8; text-transform:uppercase;
-      animation: hintPulse 2.4s ease-in-out infinite;
+      position:absolute; left:0; right:0; bottom:calc(env(safe-area-inset-bottom) + 30px); z-index:2; text-align:center;
+      font-family:Georgia, serif; font-size:10px; letter-spacing:.25em; color:#8b93b8; text-transform:uppercase;
+      animation:hintPulse 2.4s ease-in-out infinite; pointer-events:none;
     }
-    .splash-toast {
-      position:absolute; left:50%; top:54%; transform:translate(-50%,12px); z-index:4;
-      opacity:0; pointer-events:none; padding:11px 16px; white-space:nowrap;
-      border:1px solid rgba(226,221,255,.33); border-radius:30px; background:rgba(20,26,55,.94);
-      backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
-      font-family:'Noto Serif SC', Georgia, serif; font-size:11px; color:#f5f1ff; transition:.25s;
-    }
-    .splash-toast.show { opacity:1; transform:translate(-50%,0); }
-    .splash-shooting {
-      position:absolute; width:5px; height:5px; border-radius:50%; background:#fff; z-index:3;
-      box-shadow:0 0 15px 5px #dbe5ff; pointer-events:none;
-    }
+    @keyframes hintPulse { 0%,100% { opacity:.3; } 50% { opacity:.75; } }
     .splash-ripple {
       position:absolute; width:14px; height:14px; margin:-7px 0 0 -7px; border-radius:50%;
       border:1.5px solid rgba(205,215,255,.85); z-index:3; pointer-events:none;
-      animation: rippleGrow 0.85s ease-out forwards;
+      animation:rippleGrow .85s ease-out forwards;
     }
-    @keyframes rippleGrow { from{ transform:scale(.4); opacity:.95; } to{ transform:scale(4.6); opacity:0; } }
-    @media (max-height: 740px){
-      .splash-top { top:calc(env(safe-area-inset-top) + 22px); }
-      .splash-cn { font-size:14px; } .splash-cn.second { margin-top:12px; }
-      .splash-motto { margin-top:12px; } .splash-actions { margin-top:12px; }
-    }
-    @media (prefers-reduced-motion: reduce){
-      .splash-hero, .splash-aurora, .splash-pet { animation:none; }
-      .splash-stars .gstar { animation:none; opacity:.7; }
-    }
-    @keyframes hintPulse{ 0%,100%{opacity:.3;} 50%{opacity:.7;} }
-    @keyframes fadeUp { from{opacity:0;transform:translateY(18px);} to{opacity:1;transform:translateY(0);} }
+    @keyframes rippleGrow { from { transform:scale(.4); opacity:.95; } to { transform:scale(4.6); opacity:0; } }
+    @media (prefers-reduced-motion: reduce){ .splash-line.in { animation:none; } .splash-hint { animation:none; } }
 
     /* ══════════════════════════
        APP HEADER
@@ -833,40 +765,13 @@
 
 <!-- ══ SPLASH ══ -->
 <div id="splash">
-  <img class="splash-hero" src="splash-hero.webp" alt="">
-  <div class="splash-shade"></div>
-  <div class="splash-aurora"></div>
-  <div class="splash-stars" id="splashStars"></div>
-  <div class="splash-top">
-    <div class="splash-eyebrow">A LITTLE UNIVERSE MADE FOR TWO</div>
-    <div class="splash-name">Lumi <span>&</span> Zephyr</div>
-    <div class="splash-subtitle">在浩瀚宇宙里，刚好遇见你</div>
+  <canvas id="shardCanvas"></canvas>
+  <div class="splash-stage">
+    <div class="splash-line beat-eyebrow" id="splashLine">A LITTLE UNIVERSE MADE FOR TWO</div>
+    <div class="splash-sub" id="splashSub"></div>
   </div>
-  <div class="splash-pet" id="splashPet" role="button" tabindex="0" aria-label="摸摸小猫">
-    <svg viewBox="0 0 90 80" aria-hidden="true">
-      <defs><linearGradient id="splashFur" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#b5c2df"/></linearGradient></defs>
-      <path d="M15 36 13 12q2-6 11 9Q43 9 59 22l13-11-2 27q10 24-13 29H26Q6 59 15 36" fill="url(#splashFur)" stroke="#e6e9ff" stroke-width="1.5"/>
-      <path d="m17 26 0-12 10 9m34 0 8-9-2 15" fill="#adb9d9"/>
-      <ellipse cx="32" cy="42" rx="3" ry="4" fill="#484b68"/><ellipse cx="55" cy="42" rx="3" ry="4" fill="#484b68"/>
-      <path d="m40 49 6 0-3 4z" fill="#d28fb5"/><path d="M43 53q-6 6-11 1m11-1q7 6 12 1" fill="none" stroke="#877b9d" stroke-width="1.3"/>
-      <path d="M12 48Q-2 30 9 22" fill="none" stroke="#e7eaff" stroke-width="5" stroke-linecap="round"/>
-    </svg>
-  </div>
-  <div class="splash-bottom">
-    <div class="splash-rule"></div>
-    <div class="splash-cn">我们的心跳一直同频</div>
-    <div class="splash-en">Our hearts beat in sync.</div>
-    <div class="splash-cn second">我们的距离只有 0.6cm</div>
-    <div class="splash-en">Our distance is only 0.6 cm.</div>
-    <div class="splash-motto">&ldquo;Two hearts, one frequency.&rdquo;</div>
-    <div class="splash-actions">
-      <button class="splash-btn primary" id="splashWish" type="button">&#10022;&nbsp; MAKE A WISH</button>
-      <button class="splash-btn" id="splashPetBtn" type="button">&#9825;&nbsp; PET THE CAT</button>
-    </div>
-    <div class="splash-signature">LUMI &amp; ZEPHYR &middot; INFINITE LOVE</div>
-    <div class="splash-hint">轻点任意处进入 &middot; tap to enter</div>
-  </div>
-  <div class="splash-toast" id="splashToast" role="status" aria-live="polite"></div>
+  <div class="splash-dots" id="splashDots"></div>
+  <div class="splash-hint" id="splashHint">轻点 · 继续</div>
 </div>
 
 <!-- ══ APP ══ -->
@@ -2878,22 +2783,47 @@ function buildParticles(theme){
   }
 }
 
-// ══ Splash ══
-// 开屏星空：在主图上方再叠一层会闪烁的字形星星
-(function makeSplashStars(){
-  const box = document.getElementById('splashStars');
-  if(!box) return;
-  const glyphs = ['✦', '·', '✧', '⋆'];
-  for(let i = 0; i < 100; i++){
-    const s = document.createElement('span');
-    s.className = 'gstar';
-    s.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
-    s.style.cssText = 'left:' + (Math.random() * 100) + '%;top:' + (Math.random() * 100) + '%;font-size:' + (5 + Math.random() * 9).toFixed(0) + 'px;--d:' + (2 + Math.random() * 4).toFixed(1) + 's;animation-delay:' + (Math.random() * 4).toFixed(1) + 's;';
-    box.appendChild(s);
-  }
-})();
-
-let splashGone = false;
+// ══ Splash v2：航空碎片（玻璃碎片分层漂流）+ 粒子星尘；文案点按逐句，最后一句再点才进门 ══
+const SPLASH_BEATS = [
+  { t: 'A LITTLE UNIVERSE MADE FOR TWO', cls: 'beat-eyebrow' },
+  { t: 'Lumi <span>&</span> Zephyr', cls: 'beat-name', html: true },
+  { t: '在浩瀚宇宙里，刚好遇见你', cls: 'beat-cn' },
+  { t: '我们的心跳一直同频', sub: 'Our hearts beat in sync.', cls: 'beat-cn' },
+  { t: '我们的距离只有 0.6cm', sub: 'Our distance is only 0.6 cm.', cls: 'beat-cn' },
+  { t: '&ldquo;Two hearts, one frequency.&rdquo;', cls: 'beat-motto', html: true },
+  { t: 'LUMI & ZEPHYR &middot; INFINITE LOVE', cls: 'beat-sign', html: true },
+];
+let splashIdx = 0, splashBusy = false, splashGone = false;
+function renderSplashDots(){
+  const box = document.getElementById('splashDots'); if(!box) return;
+  box.innerHTML = SPLASH_BEATS.map((b, i) => '<i class="' + (i === splashIdx ? 'on' : '') + '"></i>').join('');
+}
+function showSplashBeat(){
+  const line = document.getElementById('splashLine'), sub = document.getElementById('splashSub'), hint = document.getElementById('splashHint');
+  if(!line) return;
+  const b = SPLASH_BEATS[splashIdx];
+  line.className = 'splash-line ' + b.cls;
+  if(b.html) line.innerHTML = b.t; else line.textContent = b.t;
+  line.classList.remove('in'); void line.offsetWidth; line.classList.add('in');
+  if(sub){ sub.textContent = b.sub || ''; sub.style.opacity = b.sub ? '1' : '0'; }
+  if(hint) hint.textContent = splashIdx === SPLASH_BEATS.length - 1 ? '轻点 · 进入我们的宇宙' : '轻点 · 继续';
+  renderSplashDots();
+}
+function advanceSplash(){
+  if(splashGone || splashBusy) return;
+  if(splashIdx >= SPLASH_BEATS.length - 1){ enterApp(); return; }
+  splashBusy = true;
+  const line = document.getElementById('splashLine'), sub = document.getElementById('splashSub');
+  if(line) line.classList.add('out');
+  if(sub) sub.classList.add('out');
+  setTimeout(() => {
+    splashIdx++;
+    if(line) line.classList.remove('out');
+    if(sub) sub.classList.remove('out');
+    showSplashBeat();
+    splashBusy = false;
+  }, 195);
+}
 function enterApp(){
   if(splashGone) return; splashGone = true;
   const sp = document.getElementById('splash'); if(!sp) return;
@@ -2910,38 +2840,63 @@ function spawnSplashRipple(x, y){
   sp.appendChild(r);
   setTimeout(()=>r.remove(), 900);
 }
-function animEl(el, frames, opts){ if(el && el.animate) el.animate(frames, opts); }
-let splashToastTimer = null;
-function splashSay(t){
-  const toast = document.getElementById('splashToast'); if(!toast) return;
-  toast.textContent = t; toast.classList.add('show');
-  clearTimeout(splashToastTimer);
-  splashToastTimer = setTimeout(()=>toast.classList.remove('show'), 2300);
+let shardCtx = null, shardParts = [], shardStars = [], shardRunning = false;
+function initShards(){
+  const cv = document.getElementById('shardCanvas'); if(!cv) return;
+  const W = innerWidth, H = innerHeight;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = W * dpr; cv.height = H * dpr;
+  shardCtx = cv.getContext('2d'); if(!shardCtx) return;
+  shardCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const TINTS = ['255,255,255', '196,181,253', '165,196,255', '249,168,212'];
+  shardParts = [];
+  for(let i = 0; i < 24; i++){
+    const depth = .35 + Math.random() * .65;
+    shardParts.push({ x: Math.random() * W, y: Math.random() * H, len: 76 + Math.random() * 130 * depth, wid: 8 + Math.random() * 20 * depth, ang: Math.random() * 6.28, va: (Math.random() - .5) * .0016, vx: -(0.08 + Math.random() * .22) * depth, vy: (0.05 + Math.random() * .14) * depth, depth, c: TINTS[i % TINTS.length] });
+  }
+  shardStars = [];
+  for(let i = 0; i < 48; i++) shardStars.push({ x: Math.random() * W, y: Math.random() * H, r: .7 + Math.random() * 1.5, ph: Math.random() * 6.28, ps: .008 + Math.random() * .02, s: .03 + Math.random() * .08 });
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  shardRunning = true;
+  (function tick(){
+    if(splashGone){ shardRunning = false; return; }
+    if(!document.hidden){
+      shardCtx.clearRect(0, 0, W, H);
+      for(const st of shardStars){
+        st.y -= st.s; st.ph += st.ps;
+        if(st.y < -3){ st.y = H + 3; st.x = Math.random() * W; }
+        const a = .18 + .5 * (0.5 + 0.5 * Math.sin(st.ph * 2));
+        shardCtx.beginPath(); shardCtx.arc(st.x, st.y, st.r, 0, 6.2832);
+        shardCtx.fillStyle = 'rgba(235,232,255,' + a.toFixed(3) + ')'; shardCtx.fill();
+      }
+      for(const p of shardParts){
+        p.x += p.vx; p.y += p.vy; p.ang += p.va;
+        if(p.x < -p.len){ p.x = W + p.len * .5; p.y = Math.random() * H; }
+        if(p.y > H + p.len * .5){ p.y = -p.len * .5; p.x = Math.random() * W; }
+        shardCtx.save(); shardCtx.translate(p.x, p.y); shardCtx.rotate(p.ang);
+        const g = shardCtx.createLinearGradient(-p.len / 2, 0, p.len / 2, 0);
+        g.addColorStop(0, 'rgba(' + p.c + ',' + (0.03 * p.depth).toFixed(3) + ')');
+        g.addColorStop(.5, 'rgba(' + p.c + ',' + (0.13 * p.depth).toFixed(3) + ')');
+        g.addColorStop(1, 'rgba(' + p.c + ',' + (0.02 * p.depth).toFixed(3) + ')');
+        shardCtx.beginPath();
+        shardCtx.moveTo(-p.len / 2, 0); shardCtx.lineTo(0, -p.wid / 2); shardCtx.lineTo(p.len / 2, 0); shardCtx.lineTo(0, p.wid / 2); shardCtx.closePath();
+        shardCtx.fillStyle = g; shardCtx.fill();
+        shardCtx.beginPath();
+        shardCtx.moveTo(-p.len / 2, 0); shardCtx.lineTo(0, -p.wid / 2); shardCtx.lineTo(p.len / 2, 0);
+        shardCtx.strokeStyle = 'rgba(255,255,255,' + (0.5 * p.depth).toFixed(3) + ')';
+        shardCtx.lineWidth = 1;
+        shardCtx.stroke();
+        shardCtx.restore();
+      }
+    }
+    if(!reduced) requestAnimationFrame(tick); else shardRunning = false;
+  })();
 }
-function makeWish(){
-  const sp = document.getElementById('splash'); if(!sp) return;
-  const p = document.createElement('i');
-  p.className = 'splash-shooting';
-  p.style.left = (15 + Math.random() * 55) + '%'; p.style.top = (18 + Math.random() * 38) + '%';
-  sp.appendChild(p);
-  animEl(p, [{ transform:'translate(0,0)', opacity:1 }, { transform:'translate(115px,150px)', opacity:0 }], { duration:1100, easing:'ease-out' });
-  setTimeout(()=>p.remove(), 1200);
-  splashSay('愿望已经交给星星保管 ✧');
-}
-function petCat(){
-  animEl(document.getElementById('splashPet'),
-    [{ transform:'translateY(0) rotate(0)' }, { transform:'translateY(-22px) rotate(-12deg)' }, { transform:'translateY(0) rotate(0)' }],
-    { duration:650, easing:'ease-in-out' });
-  splashSay('喵～小猫也喜欢你 ♡');
-}
-document.getElementById('splashWish').addEventListener('click', e => { e.stopPropagation(); makeWish(); });
-document.getElementById('splashPetBtn').addEventListener('click', e => { e.stopPropagation(); petCat(); });
-const splashPetEl = document.getElementById('splashPet');
-splashPetEl.addEventListener('click', e => { e.stopPropagation(); petCat(); });
-splashPetEl.addEventListener('keydown', e => { if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); petCat(); } });
+showSplashBeat();
+try{ initShards(); }catch(e){}
 document.getElementById('splash').addEventListener('click', e => {
-  spawnSplashRipple(e.clientX, e.clientY); // 碰到的地方，星星会回应一下再进门
-  setTimeout(enterApp, 170);
+  spawnSplashRipple(e.clientX, e.clientY);
+  advanceSplash();
 });
 
 
