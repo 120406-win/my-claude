@@ -11856,7 +11856,7 @@ function makeSongCard(col, song){
   card.style.cssText = 'margin-top:6px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:11px 12px;max-width:302px;';
   const cover = '<span style="position:relative;width:54px;height:54px;flex:none;display:block;">'
     + '<span class="sc-tile" style="position:absolute;inset:0;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent-s));display:flex;align-items:center;justify-content:center;color:#fff;"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5.5L21 3v13.5"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="18.5" cy="16.5" r="2.5"/></svg></span>'
-    + (track && track.cover ? '<img class="sc-cover" src="' + escapeHtml(track.cover) + '" alt="" style="position:absolute;inset:0;width:54px;height:54px;border-radius:12px;object-fit:cover;">' : '<img class="sc-cover" alt="" style="display:none;position:absolute;inset:0;width:54px;height:54px;border-radius:12px;object-fit:cover;">')
+    + (track && track.cover ? '<img class="sc-cover" src="' + escapeHtml(track.cover) + '" alt="" onload="songCoverOk(this)" onerror="songCoverBad(this,\'' + track.id + '\')" style="display:none;position:absolute;inset:0;width:54px;height:54px;border-radius:12px;object-fit:cover;">' : '<img class="sc-cover" alt="" style="display:none;position:absolute;inset:0;width:54px;height:54px;border-radius:12px;object-fit:cover;">')
     + '</span>';
   const meta = '<div style="flex:1;min-width:0;"><div style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(song.title) + '</div><div style="font-size:12px;color:var(--text-dim);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHtml(song.artist || '佚名') + ' · Zephyr 分享的</div></div>';
   let btn = '';
@@ -11885,7 +11885,20 @@ function makeSongCard(col, song){
   if(track) ensureSongCover(track.id, card.querySelector('.sc-cover'));
   updateSongCards();
 }
-// 全网歌的封面：卡上先占位，背后从 GD 取一次封面图存进曲目，以后直接显示
+// 封面图真的加载成功才露脸；坏图（防盗链/失效）不缓存、不显示，免得卡上挂个裂图图标
+function songCoverOk(img){
+  img.style.display = '';
+  const tile = img.parentElement && img.parentElement.querySelector('.sc-tile');
+  if(tile) tile.style.display = 'none';
+}
+function songCoverBad(img, trackId){
+  img.remove();
+  if(!trackId) return;
+  const d = loadMusic();
+  const tr = d.tracks.find(x=>x.id===trackId);
+  if(tr && tr.cover){ delete tr.cover; storeMusic(d); }
+}
+// 全网歌的封面：卡上先占位，背后从 GD 取一次封面图、先试加载成功才存进曲目并显示
 function ensureSongCover(trackId, img){
   if(!img) return;
   const d = loadMusic();
@@ -11894,13 +11907,16 @@ function ensureSongCover(trackId, img){
   gdApi('types=pic&source=' + encodeURIComponent(t.gdSource) + '&id=' + encodeURIComponent(t.gdId)).then(j=>{
     const url = j && j.url;
     if(!url) return;
-    const d2 = loadMusic();
-    const tr = d2.tracks.find(x=>x.id===trackId);
-    if(tr && !tr.cover){ tr.cover = url; storeMusic(d2); }
-    img.src = url;
-    img.style.display = '';
-    const tile = img.parentElement && img.parentElement.querySelector('.sc-tile');
-    if(tile) tile.style.display = 'none';
+    const probe = new Image();
+    probe.onload = ()=>{
+      const d2 = loadMusic();
+      const tr = d2.tracks.find(x=>x.id===trackId);
+      if(tr && !tr.cover){ tr.cover = url; storeMusic(d2); }
+      img.src = url;
+      songCoverOk(img);
+    };
+    probe.onerror = ()=>{};
+    probe.src = url;
   }).catch(()=>{});
 }
 // 点卡上的进度条：正在放的这首就跳进度，不是这首就先放它
@@ -12218,6 +12234,12 @@ function buildApiMessages(histForApi, summaryPair){
     if(m.role === 'assistant' && typeof c === 'string'){
       const sp = splitLeakedThinking(c);
       if(sp) c = sp.reply;
+    }
+    // 他看不见自己发过的语音条/歌曲卡（入库时标记已被摘掉，只剩纯文字），历史里给他补一句落地注记，
+    // 免得他以为自己没发、还反过来认错（2026-11-24 凌晨实证：语音条明明发成功了，他却说自己没用标记）
+    if(m.role === 'assistant' && typeof c === 'string'){
+      if(m.voiceText) c += '\n[这条里的语音部分，你已经用语音条发给她了，她听到了]';
+      if(m.song && m.song.title) c += '\n[这条里你给她放了《' + m.song.title + '》，歌曲卡已经在她那边了]';
     }
     if(Array.isArray(c) && i !== lastUserIdx){
       const parts = [];
