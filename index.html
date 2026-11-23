@@ -603,14 +603,13 @@
     .flip-face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
     .flip-back { transform: rotateY(180deg); }
     /* ══ 记忆仓：线串纸片，牵引浮动 ══ */
-    .mem-vault { position:relative; height:104px; border-radius:16px; border:1px solid var(--border); background:color-mix(in srgb, var(--surface) 55%, transparent); overflow:hidden; transition:height .65s cubic-bezier(.34,1.25,.5,1); }
-    .mem-vault.open { height:368px; }
+    .mem-vault { position:relative; flex:1; overflow:hidden; }
     #fluxCanvas { position:absolute; inset:0; width:100%; height:100%; z-index:3; pointer-events:none; }
-    .mem-vault-folder { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:4; display:flex; align-items:center; gap:8px; padding:11px 18px; border-radius:14px; background:var(--surface); border:1px solid var(--border); color:var(--text); font-size:13.5px; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.10); white-space:nowrap; }
-    .mem-chip { position:absolute; left:0; top:0; z-index:2; width:38%; opacity:0; will-change:transform; touch-action:none; }
+    .mem-vault-folder { position:absolute; left:50%; bottom:20px; transform:translateX(-50%); z-index:4; display:flex; align-items:center; gap:8px; padding:10px 18px; border-radius:14px; background:var(--surface); border:1px solid var(--border); color:var(--text); font-size:13.5px; box-shadow:0 6px 18px rgba(0,0,0,.10); white-space:nowrap; pointer-events:none; }
+    .mem-chip { position:absolute; left:0; top:0; z-index:2; width:36%; opacity:0; will-change:transform; touch-action:none; }
     .mem-chip-in { background:color-mix(in srgb, var(--surface) 92%, transparent); border:1px solid var(--border); border-radius:12px; padding:7px 10px; box-shadow:0 4px 14px rgba(0,0,0,.10); cursor:grab; }
     .mem-chip-cat { display:block; font-size:10.5px; color:var(--accent-s); margin-bottom:2px; }
-    .mem-chip-txt { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:11.5px; line-height:1.55; color:var(--text); }
+    .mem-chip-txt { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; font-size:12px; line-height:1.55; color:var(--text); }
     /* Studio 预览全屏玩：同一个 iframe 只改尺寸、不重载，游戏进度不丢 */
     #studioPreviewWrap.studio-fs { position:fixed; inset:0; z-index:210; background:var(--bg); padding:10px; display:flex; flex-direction:column; margin:0; }
     #studioPreviewWrap.studio-fs #studioFrame { flex:1; height:auto; }
@@ -1658,14 +1657,10 @@
   <div class="settings-body">
     <div class="s-section">
       <div class="s-section-title">记忆仓</div>
-      <div class="mem-vault" id="memVault">
-        <canvas id="fluxCanvas"></canvas>
-        <div class="mem-vault-cloud" id="memVaultCloud"></div>
-        <button class="mem-vault-folder" id="memVaultFolder" onclick="toggleMemVault()">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
-          <span>记忆仓 · <span id="memVaultCount">0</span> 条</span>
-          <span style="font-size:12px;color:var(--text-pale);" id="memVaultHint">点开看看</span>
-        </button>
+      <div class="s-card" style="padding:14px 16px;display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="openMemVault()">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent);flex:none;"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+        <span style="flex:1;font-size:14px;color:var(--text);">记忆仓 · <span id="memVaultCount">0</span> 条</span>
+        <span style="font-size:12.5px;color:var(--accent);">打开</span>
       </div>
     </div>
     <div class="s-section">
@@ -2246,6 +2241,20 @@
   </div>
   <div class="settings-body">
     <div id="worksList"></div>
+  </div>
+</div>
+<div id="memVaultOverlay" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:205;flex-direction:column;">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="closeMemVault()">←</button>
+    <div class="settings-topbar-title">记忆仓</div>
+  </div>
+  <div class="mem-vault" id="memVault">
+    <canvas id="fluxCanvas"></canvas>
+    <div class="mem-vault-cloud" id="memVaultCloud"></div>
+    <div class="mem-vault-folder" id="memVaultFolder">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+      <span>记忆仓</span>
+    </div>
   </div>
 </div>
 <div id="workPlayer" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:200;flex-direction:column;">
@@ -4166,7 +4175,7 @@ function renderMemories(){
 }
 // ══ 记忆仓：纸片被发光的线串着，线能牵引纸片；拖一张，邻居会被扯动 ══
 let memVaultOpen = false, memVaultPicks = [], memVaultSig = '', memVaultNodes = [], vaultRunning = false, vaultT = 0, vaultDrag = null;
-const MEM_VAULT_SLOTS = [[16,20],[38,14],[62,14],[85,20],[27,46],[55,42],[78,48]];
+const MEM_VAULT_SLOTS = [[19,15],[41,10],[64,11],[81,16],[24,36],[52,32],[76,38]];
 const FLUX_COLORS = ['167,139,250', '249,168,212', '147,197,253', '251,191,36'];
 function refreshMemVault(listArg){
   const list = Array.isArray(listArg) ? listArg : loadMemories();
@@ -4215,6 +4224,7 @@ function refreshMemVault(listArg){
 function memVaultJump(i){
   const m = memVaultPicks[i];
   if(!m) return;
+  closeMemVault();
   const q = (m.text || '').slice(0, 10);
   const inp = document.getElementById('memSearch');
   memSearchText = q;
@@ -4223,28 +4233,33 @@ function memVaultJump(i){
   const list = document.getElementById('memList');
   if(list) list.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
-function toggleMemVault(){
-  memVaultOpen = !memVaultOpen;
-  const v = document.getElementById('memVault');
-  if(v) v.classList.toggle('open', memVaultOpen);
-  const hint = document.getElementById('memVaultHint');
-  if(hint) hint.textContent = memVaultOpen ? '收起来' : '点开看看';
-  if(memVaultOpen){ refreshMemVault(); startVault(); }
-  else { const cv = document.getElementById('fluxCanvas'); if(cv){ const c = cv.getContext('2d'); if(c) c.clearRect(0, 0, cv.width, cv.height); } }
+function openMemVault(){
+  memVaultOpen = true;
+  const o = document.getElementById('memVaultOverlay');
+  if(o) o.style.display = 'flex';
+  refreshMemVault();
+  startVault();
+}
+function closeMemVault(){
+  memVaultOpen = false;
+  const o = document.getElementById('memVaultOverlay');
+  if(o) o.style.display = 'none';
+  const cv = document.getElementById('fluxCanvas');
+  if(cv){ const c = cv.getContext('2d'); if(c) c.clearRect(0, 0, cv.width, cv.height); }
 }
 function startVault(){
   const cv = document.getElementById('fluxCanvas');
   const vault = document.getElementById('memVault');
   if(!cv || !vault) return;
-  const W = vault.clientWidth, H = 368;
-  if(!W) return;
+  const W = vault.clientWidth, H = vault.clientHeight;
+  if(!W || !H) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   cv.width = W * dpr; cv.height = H * dpr;
   const ctx = cv.getContext('2d');
   if(!ctx) return;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   // 节点出生在文件夹口，弹簧会把它们送到各自的家
-  const fx = W / 2, fy = H - 44;
+  const fx = W / 2, fy = H - 58;
   const els = vault.querySelectorAll('.mem-chip');
   memVaultNodes = memVaultPicks.map((m, i) => {
     const s = MEM_VAULT_SLOTS[i % MEM_VAULT_SLOTS.length];
@@ -4259,8 +4274,7 @@ function startVault(){
   if(vaultRunning) return;
   vaultRunning = true;
   (function tick(){
-    const page = document.getElementById('memoryPage');
-    if(!memVaultOpen || !page || !page.classList.contains('show') || document.hidden){ vaultRunning = false; return; }
+    if(!memVaultOpen || document.hidden){ vaultRunning = false; return; }
     vaultT += 1;
     const nodes = memVaultNodes;
     // 物理：弹簧回家 + 轻微浮动 + 相邻牵引
