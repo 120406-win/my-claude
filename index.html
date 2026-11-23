@@ -602,17 +602,15 @@
     .flip-wrap.flipped .flip-inner { transform: rotateY(180deg); }
     .flip-face { grid-area: 1 / 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
     .flip-back { transform: rotateY(180deg); }
-    /* ══ 记忆仓：文件夹浮动 + 通量线 ══ */
+    /* ══ 记忆仓：线串纸片，牵引浮动 ══ */
     .mem-vault { position:relative; height:104px; border-radius:16px; border:1px solid var(--border); background:color-mix(in srgb, var(--surface) 55%, transparent); overflow:hidden; transition:height .65s cubic-bezier(.34,1.25,.5,1); }
     .mem-vault.open { height:368px; }
-    #fluxCanvas { position:absolute; inset:0; width:100%; height:100%; }
-    .mem-vault-folder { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:3; display:flex; align-items:center; gap:8px; padding:11px 18px; border-radius:14px; background:var(--surface); border:1px solid var(--border); color:var(--text); font-size:13.5px; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.10); white-space:nowrap; }
-    .mem-chip { position:absolute; z-index:2; width:42%; transform:translate(-50%,-50%) scale(.25); opacity:0; pointer-events:none; transition:transform .7s cubic-bezier(.34,1.45,.5,1), opacity .45s ease; }
-    .mem-vault.open .mem-chip { transform:translate(-50%,-50%) scale(1); opacity:1; pointer-events:auto; }
-    .mem-chip-in { background:color-mix(in srgb, var(--surface) 90%, transparent); border:1px solid var(--border); border-radius:12px; padding:8px 11px; box-shadow:0 4px 14px rgba(0,0,0,.08); cursor:pointer; animation:chipFloat 5s ease-in-out infinite; }
+    #fluxCanvas { position:absolute; inset:0; width:100%; height:100%; z-index:3; pointer-events:none; }
+    .mem-vault-folder { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); z-index:4; display:flex; align-items:center; gap:8px; padding:11px 18px; border-radius:14px; background:var(--surface); border:1px solid var(--border); color:var(--text); font-size:13.5px; cursor:pointer; box-shadow:0 6px 18px rgba(0,0,0,.10); white-space:nowrap; }
+    .mem-chip { position:absolute; left:0; top:0; z-index:2; width:38%; opacity:0; will-change:transform; touch-action:none; }
+    .mem-chip-in { background:color-mix(in srgb, var(--surface) 92%, transparent); border:1px solid var(--border); border-radius:12px; padding:7px 10px; box-shadow:0 4px 14px rgba(0,0,0,.10); cursor:grab; }
     .mem-chip-cat { display:block; font-size:10.5px; color:var(--accent-s); margin-bottom:2px; }
-    .mem-chip-txt { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; font-size:12px; line-height:1.55; color:var(--text); }
-    @keyframes chipFloat { 0%,100% { transform:translateY(-3px) rotate(-.6deg); } 50% { transform:translateY(4px) rotate(.6deg); } }
+    .mem-chip-txt { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:11.5px; line-height:1.55; color:var(--text); }
     /* Studio 预览全屏玩：同一个 iframe 只改尺寸、不重载，游戏进度不丢 */
     #studioPreviewWrap.studio-fs { position:fixed; inset:0; z-index:210; background:var(--bg); padding:10px; display:flex; flex-direction:column; margin:0; }
     #studioPreviewWrap.studio-fs #studioFrame { flex:1; height:auto; }
@@ -4166,30 +4164,53 @@ function renderMemories(){
     wrap.innerHTML = '<div style="text-align:center;color:var(--text-pale);font-size:13px;padding:24px 0;">没有找到包含「' + q.replace(/</g,'') + '」的记忆</div>';
   }
 }
-// ══ 记忆仓：点开文件夹，记忆纸片弹簧散开成浮云，背后通量线随手指弯曲 ══
-let memVaultOpen = false, memVaultPicks = [], memVaultSig = '', fluxCtx = null, fluxRunning = false, fluxT = 0;
-const fluxPtr = { x: -9999, y: -9999 };
-const MEM_VAULT_SLOTS = [[15,18],[37,13],[60,16],[84,20],[25,40],[50,34],[75,42],[13,62],[35,58],[58,60],[83,63],[68,80]];
-const FLUX_COLORS = ['167,139,250', '249,168,212', '147,197,253', '255,255,255'];
+// ══ 记忆仓：纸片被发光的线串着，线能牵引纸片；拖一张，邻居会被扯动 ══
+let memVaultOpen = false, memVaultPicks = [], memVaultSig = '', memVaultNodes = [], vaultRunning = false, vaultT = 0, vaultDrag = null;
+const MEM_VAULT_SLOTS = [[16,20],[38,14],[62,14],[85,20],[27,46],[55,42],[78,48]];
+const FLUX_COLORS = ['167,139,250', '249,168,212', '147,197,253', '251,191,36'];
 function refreshMemVault(listArg){
   const list = Array.isArray(listArg) ? listArg : loadMemories();
   const cnt = document.getElementById('memVaultCount');
   if(cnt) cnt.textContent = list.length;
   const cloud = document.getElementById('memVaultCloud');
   if(!cloud) return;
-  const picks = list.filter(m => m && m.text).slice().sort((a, b) => ((b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)) || ((b.ts || 0) - (a.ts || 0))).slice(0, 12);
+  const picks = list.filter(m => m && m.text).slice().sort((a, b) => ((b.pinned ? 1 : 0) - (a.pinned ? 1 : 0)) || ((b.ts || 0) - (a.ts || 0))).slice(0, 7);
   const sig = picks.map(m => m.id || m.text).join('|');
   if(sig === memVaultSig) return;
   memVaultSig = sig;
   memVaultPicks = picks;
+  memVaultNodes = [];
   cloud.innerHTML = picks.map((m, i) => {
-    const s = MEM_VAULT_SLOTS[i % MEM_VAULT_SLOTS.length];
-    return '<div class="mem-chip" style="left:' + s[0] + '%;top:' + s[1] + '%;transition-delay:' + (i * 45) + 'ms;" onclick="memVaultJump(' + i + ')">'
-      + '<div class="mem-chip-in" style="animation-duration:' + (4.2 + (i % 5) * .7).toFixed(1) + 's;animation-delay:' + (i * .3).toFixed(1) + 's;">'
+    return '<div class="mem-chip" data-vi="' + i + '">'
+      + '<div class="mem-chip-in">'
       + '<span class="mem-chip-cat">' + escapeHtml(m.cat || '记忆') + (m.pinned ? ' · 置顶' : '') + '</span>'
       + '<span class="mem-chip-txt">' + escapeHtml(m.text) + '</span>'
       + '</div></div>';
   }).join('');
+  cloud.querySelectorAll('.mem-chip').forEach(el => {
+    const i = parseInt(el.dataset.vi, 10);
+    el.addEventListener('pointerdown', e => {
+      vaultDrag = { i, dx: 0, dy: 0, moved: 0, sx: e.clientX, sy: e.clientY };
+      try{ el.setPointerCapture(e.pointerId); }catch(err){}
+    });
+    el.addEventListener('pointermove', e => {
+      if(!vaultDrag || vaultDrag.i !== i) return;
+      const n = memVaultNodes[i]; if(!n) return;
+      const vault = document.getElementById('memVault');
+      const r = vault.getBoundingClientRect();
+      n.x = e.clientX - r.left; n.y = e.clientY - r.top;
+      n.vx = 0; n.vy = 0;
+      vaultDrag.moved = Math.max(vaultDrag.moved, Math.hypot(e.clientX - vaultDrag.sx, e.clientY - vaultDrag.sy));
+    });
+    const up = e => {
+      if(!vaultDrag || vaultDrag.i !== i) return;
+      const wasTap = vaultDrag.moved < 8;
+      vaultDrag = null;
+      if(wasTap) memVaultJump(i);
+    };
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', () => { vaultDrag = null; });
+  });
 }
 function memVaultJump(i){
   const m = memVaultPicks[i];
@@ -4208,47 +4229,92 @@ function toggleMemVault(){
   if(v) v.classList.toggle('open', memVaultOpen);
   const hint = document.getElementById('memVaultHint');
   if(hint) hint.textContent = memVaultOpen ? '收起来' : '点开看看';
-  if(memVaultOpen){ refreshMemVault(); startFlux(); }
+  if(memVaultOpen){ refreshMemVault(); startVault(); }
+  else { const cv = document.getElementById('fluxCanvas'); if(cv){ const c = cv.getContext('2d'); if(c) c.clearRect(0, 0, cv.width, cv.height); } }
 }
-function startFlux(){
+function startVault(){
   const cv = document.getElementById('fluxCanvas');
   const vault = document.getElementById('memVault');
   if(!cv || !vault) return;
-  const W = vault.clientWidth, H = vault.clientHeight;
-  if(!W || !H) return;
+  const W = vault.clientWidth, H = 368;
+  if(!W) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   cv.width = W * dpr; cv.height = H * dpr;
-  fluxCtx = cv.getContext('2d');
-  if(!fluxCtx) return;
-  fluxCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  if(!cv.dataset.bound){
-    cv.dataset.bound = '1';
-    const move = e => { const r = cv.getBoundingClientRect(); const t = (e.touches && e.touches[0]) || e; if(t && typeof t.clientX === 'number'){ fluxPtr.x = t.clientX - r.left; fluxPtr.y = t.clientY - r.top; } };
-    vault.addEventListener('pointermove', move, { passive: true });
-    vault.addEventListener('touchmove', move, { passive: true });
+  const ctx = cv.getContext('2d');
+  if(!ctx) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // 节点出生在文件夹口，弹簧会把它们送到各自的家
+  const fx = W / 2, fy = H - 44;
+  const els = vault.querySelectorAll('.mem-chip');
+  memVaultNodes = memVaultPicks.map((m, i) => {
+    const s = MEM_VAULT_SLOTS[i % MEM_VAULT_SLOTS.length];
+    const el = els[i];
+    return { hx: s[0] / 100 * W, hy: s[1] / 100 * H, x: fx, y: fy, vx: 0, vy: 0, ph: i * 1.3, born: vaultT + i * 6, w: el ? el.offsetWidth : 120, h: el ? el.offsetHeight : 54, el };
+  });
+  // 链的静止长度 = 相邻家位距离
+  for(let i = 0; i < memVaultNodes.length - 1; i++){
+    const a = memVaultNodes[i], b = memVaultNodes[i + 1];
+    a.rest = Math.hypot(b.hx - a.hx, b.hy - a.hy);
   }
-  if(fluxRunning) return;
-  fluxRunning = true;
-  const lines = [];
-  for(let i = 0; i < 6; i++) lines.push({ base: (i + .5) / 6, ph: i * 1.7, sp: .010 + i * .002, amp: 10 + (i % 3) * 6, c: FLUX_COLORS[i % FLUX_COLORS.length] });
+  if(vaultRunning) return;
+  vaultRunning = true;
   (function tick(){
     const page = document.getElementById('memoryPage');
-    if(!memVaultOpen || !page || !page.classList.contains('show') || document.hidden){ fluxRunning = false; return; }
-    fluxT += 1;
-    fluxCtx.clearRect(0, 0, W, H);
-    for(const L of lines){
-      const passes = [[5, .07], [1.6, .5]];
+    if(!memVaultOpen || !page || !page.classList.contains('show') || document.hidden){ vaultRunning = false; return; }
+    vaultT += 1;
+    const nodes = memVaultNodes;
+    // 物理：弹簧回家 + 轻微浮动 + 相邻牵引
+    for(let i = 0; i < nodes.length; i++){
+      const n = nodes[i];
+      if(vaultT < n.born){ n.x = fx; n.y = fy; continue; }
+      if(n.el && n.el.style.opacity !== '1') n.el.style.opacity = '1';
+      if(vaultDrag && vaultDrag.i === i) continue;
+      const tx = n.hx + Math.sin(vaultT * .012 + n.ph) * 5;
+      const ty = n.hy + Math.cos(vaultT * .010 + n.ph * 1.7) * 4;
+      n.vx += (tx - n.x) * .045; n.vy += (ty - n.y) * .045;
+      n.vx *= .86; n.vy *= .86;
+      n.x += n.vx; n.y += n.vy;
+    }
+    for(let pass = 0; pass < 2; pass++){
+      for(let i = 0; i < nodes.length - 1; i++){
+        const a = nodes[i], b = nodes[i + 1];
+        if(!a.rest) continue;
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const diff = (d - a.rest) / d * .5;
+        const aDrag = vaultDrag && vaultDrag.i === i, bDrag = vaultDrag && vaultDrag.i === i + 1;
+        if(!aDrag){ a.x += dx * diff * (bDrag ? 2 : 1); a.y += dy * diff * (bDrag ? 2 : 1); }
+        if(!bDrag){ b.x -= dx * diff * (aDrag ? 2 : 1); b.y -= dy * diff * (aDrag ? 2 : 1); }
+      }
+    }
+    for(const n of nodes){
+      n.x = Math.max(30, Math.min(W - 30, n.x));
+      n.y = Math.max(24, Math.min(H - 60, n.y));
+      if(n.el) n.el.style.transform = 'translate(' + (n.x - n.w / 2).toFixed(1) + 'px,' + (n.y - n.h / 2).toFixed(1) + 'px)';
+    }
+    // 画线：文件夹口 → 纸片1 → 纸片2 … 顺成一条发光的串
+    ctx.clearRect(0, 0, W, H);
+    const pts = [{ x: fx, y: fy + 10 }].concat(nodes.filter(n => vaultT >= n.born).map(n => ({ x: n.x, y: n.y - n.h / 2 + 3 })));
+    if(pts.length > 1){
+      const passes = [[5, .10], [1.8, .55]];
       for(const ps of passes){
-        fluxCtx.beginPath();
-        for(let x = 0; x <= W; x += 12){
-          let y = L.base * H + Math.sin(x * .012 + fluxT * L.sp + L.ph) * L.amp + Math.sin(x * .004 - fluxT * L.sp * .6 + L.ph) * L.amp * .6;
-          const dx = x - fluxPtr.x, dy = y - fluxPtr.y, d2 = dx * dx + dy * dy;
-          if(d2 < 12100){ const d = Math.sqrt(d2) || 1; y += (fluxPtr.y - y) * (1 - d / 110) * .45; }
-          if(x === 0) fluxCtx.moveTo(x, y); else fluxCtx.lineTo(x, y);
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for(let i = 1; i < pts.length - 1; i++){
+          const mx = (pts[i].x + pts[i + 1].x) / 2, my = (pts[i].y + pts[i + 1].y) / 2 + 10;
+          ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
         }
-        fluxCtx.strokeStyle = 'rgba(' + L.c + ',' + ps[1] + ')';
-        fluxCtx.lineWidth = ps[0];
-        fluxCtx.stroke();
+        ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+        ctx.strokeStyle = 'rgba(167,139,250,' + ps[1] + ')';
+        ctx.lineWidth = ps[0];
+        ctx.stroke();
+      }
+      // 串上的光点结
+      for(let i = 1; i < pts.length; i++){
+        ctx.beginPath();
+        ctx.arc(pts[i].x, pts[i].y, 2.6, 0, 6.2832);
+        ctx.fillStyle = 'rgba(' + FLUX_COLORS[(i - 1) % FLUX_COLORS.length] + ',.9)';
+        ctx.fill();
       }
     }
     requestAnimationFrame(tick);
