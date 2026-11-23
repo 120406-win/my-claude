@@ -738,6 +738,7 @@
     /* ══ Home 首页：星空 App 首页，配色全部跟随主题（星星是主题色的小星尘） ══ */
     #homePage { background:linear-gradient(180deg, color-mix(in srgb, var(--bg) 84%, var(--accent) 16%) 0%, var(--bg) 55%, color-mix(in srgb, var(--bg) 90%, var(--accent) 10%) 100%); color:var(--text); }
     .home-stars { position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:0; opacity:.5; }
+    #homeLight { position:absolute; inset:0; pointer-events:none; z-index:0; }
     .home-stars .star { position:absolute; border-radius:50%; background:var(--accent); animation:starTwinkle var(--tw,3s) ease-in-out infinite; }
     .home-scroll { flex:1; overflow-y:auto; position:relative; z-index:1; padding:30px 18px 36px; }
     .home-hello { text-align:center; margin:6px 0 22px; }
@@ -871,6 +872,7 @@
 
 <!-- ══ HOME PAGE ══ -->
 <div class="settings-page" id="homePage">
+  <div id="homeLight"></div>
   <div class="home-stars" id="homeStars"><div class="shooting-star"></div></div>
   <div class="home-scroll">
     <div class="home-hello">
@@ -1257,6 +1259,12 @@
             <div class="s-row-label">气泡小尾巴</div>
           </div>
           <button id="bubbleTailBtn" class="bg-mode-btn" onclick="toggleBubbleTail()" style="min-width:60px;">关</button>
+        </div>
+        <div class="s-row">
+          <div>
+            <div class="s-row-label">首页时光</div>
+          </div>
+          <button id="homeLightBtn" class="bg-mode-btn" onclick="toggleHomeDaylight()" style="min-width:60px;">开</button>
         </div>
         <div style="padding:0 16px 14px;">
           <button onclick="resetAppearance()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">恢复默认外观</button>
@@ -2995,6 +3003,54 @@ function toggleBubbleTail(){
   localStorage.setItem('z_bubbleTail', bubbleTail() ? 'false' : 'true');
   applyAppearance();
 }
+// ══ 首页时光：Home 的光跟着真实时间走——清晨桃色、正午明亮、黄昏橙红、夜里深蓝紫配星光 ══
+// 借鉴「光影随钟点变」的想法（小红书上 Fable 5.2 纯代码主页），实现是轻量版：一层光晕+一层天色，按小时在关键帧之间插值。
+function homeDaylight(){ return localStorage.getItem('z_homeDaylight') !== 'false'; }
+function toggleHomeDaylight(){
+  localStorage.setItem('z_homeDaylight', homeDaylight() ? 'false' : 'true');
+  applyHomeLight();
+  refreshHomeLightBtn();
+}
+function refreshHomeLightBtn(){
+  const b = document.getElementById('homeLightBtn');
+  if(b){ b.textContent = homeDaylight() ? '开' : '关'; b.style.borderColor = homeDaylight() ? 'var(--accent)' : 'transparent'; }
+}
+const HOME_LIGHT_STOPS = [
+  { h: 0,    top: [43, 36, 96, .50],   glow: [186, 198, 255, .20], x: 76, y: 10, stars: .90 },
+  { h: 5,    top: [43, 36, 96, .48],   glow: [186, 198, 255, .18], x: 76, y: 10, stars: .85 },
+  { h: 6.5,  top: [255, 166, 118, .30], glow: [255, 188, 128, .50], x: 16, y: 30, stars: .18 },
+  { h: 8,    top: [126, 178, 255, .18], glow: [255, 240, 198, .45], x: 28, y: 15, stars: .05 },
+  { h: 12,   top: [110, 175, 255, .12], glow: [255, 250, 220, .48], x: 50, y: 5,  stars: .03 },
+  { h: 16.5, top: [255, 196, 132, .15], glow: [255, 226, 170, .45], x: 72, y: 13, stars: .05 },
+  { h: 18.5, top: [255, 128, 108, .27], glow: [255, 148, 108, .50], x: 86, y: 27, stars: .28 },
+  { h: 20,   top: [74, 56, 138, .42],  glow: [198, 200, 255, .26], x: 80, y: 11, stars: .70 },
+  { h: 22.5, top: [43, 36, 96, .50],   glow: [186, 198, 255, .20], x: 76, y: 10, stars: .90 },
+  { h: 24,   top: [43, 36, 96, .50],   glow: [186, 198, 255, .20], x: 76, y: 10, stars: .90 }
+];
+function homeLightAt(date){
+  const t = date.getHours() + date.getMinutes() / 60;
+  const S = HOME_LIGHT_STOPS;
+  let a = S[0], b = S[S.length - 1];
+  for(let i = 0; i < S.length - 1; i++){ if(t >= S[i].h && t <= S[i + 1].h){ a = S[i]; b = S[i + 1]; break; } }
+  const f = b.h === a.h ? 0 : (t - a.h) / (b.h - a.h);
+  const mix = (u, v) => u.map((n, i) => n + (v[i] - n) * f);
+  return { top: mix(a.top, b.top), glow: mix(a.glow, b.glow), x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f, stars: a.stars + (b.stars - a.stars) * f };
+}
+function applyHomeLight(){
+  const layer = document.getElementById('homeLight');
+  if(!layer) return;
+  const stars = document.getElementById('homeStars');
+  if(!homeDaylight()){
+    layer.style.display = 'none';
+    if(stars) stars.style.opacity = '';
+    return;
+  }
+  layer.style.display = '';
+  const L = homeLightAt(new Date());
+  const rgba = c => 'rgba(' + Math.round(c[0]) + ',' + Math.round(c[1]) + ',' + Math.round(c[2]) + ',' + c[3].toFixed(3) + ')';
+  layer.style.background = 'radial-gradient(420px 300px at ' + L.x.toFixed(1) + '% ' + L.y.toFixed(1) + '%, ' + rgba(L.glow) + ' 0%, rgba(0,0,0,0) 62%), linear-gradient(180deg, ' + rgba(L.top) + ' 0%, rgba(0,0,0,0) 58%)';
+  if(stars) stars.style.opacity = L.stars.toFixed(2);
+}
 function resetAppearance(){
   ['z_accentCustom','z_bubbleUser','z_bubbleAi','z_glass','z_bubbleMaterial','z_bubbleOpacity','z_bubbleRadius','z_bubbleTail'].forEach(k=>localStorage.removeItem(k));
   const root = document.documentElement;
@@ -3477,6 +3533,7 @@ function editMeetDay(){
   showToast('相遇日记好啦');
 }
 function renderHome(){
+  applyHomeLight();
   const starBox = document.getElementById('homeStars');
   if(starBox && starBox.querySelectorAll('.star').length === 0){
     for(let i = 0; i < 80; i++){
@@ -14792,6 +14849,7 @@ initCallHeartbeatSel();
 initEnZhSel();
 initTtsEmotionSel();
 initLock(); // 必须放在初始化区：锁屏状态是后段才声明的 const，提前调用会让整个脚本在启动时崩掉
+applyHomeLight(); refreshHomeLightBtn(); setInterval(applyHomeLight, 60000); // 首页时光：开局上一次，之后每分钟跟着钟走
 refreshWeatherSnapshot(); // 天气快照超过半小时就后台悄悄刷新，让 Zephyr 知道糯糯那边的天气
 // PWA：注册 Service Worker（网络优先，改版刷新即新版；不支持的环境静默跳过）
 if ('serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {} }
