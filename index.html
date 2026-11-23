@@ -574,13 +574,13 @@
       display:none; flex-direction:column;
       transition: background 0.3s;
     }
-    .settings-page.show { display:flex; animation: pageIn .3s cubic-bezier(.22,1,.36,1); }
+    .settings-page.show { display:flex; animation: pageIn .38s cubic-bezier(.22,1,.36,1); }
     /* ══ 交互手感：页面进场、按压回弹、消息与卡片入场，治「啪地闪现」的死板感 ══ */
-    @keyframes pageIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
-    button { transition: transform .14s ease; }
-    button:active { transform: scale(.93); }
-    .msg-row { animation: msgIn .26s ease both; }
-    @keyframes msgIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+    @keyframes pageIn { from { opacity:0; transform:translateY(22px) scale(.99); } to { opacity:1; transform:none; } }
+    button { transition: transform .18s cubic-bezier(.34,1.56,.64,1); }
+    button:active { transform: scale(.9); }
+    .msg-row { animation: msgIn .3s ease both; }
+    @keyframes msgIn { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
     .song-share-card, .work-share-card { animation: cardIn .32s cubic-bezier(.22,1,.36,1) both; }
     @keyframes cardIn { from { opacity:0; transform:translateY(8px) scale(.97); } to { opacity:1; transform:none; } }
     /* Studio 预览全屏玩：同一个 iframe 只改尺寸、不重载，游戏进度不丢 */
@@ -3061,9 +3061,9 @@ function initDust(){
   fit();
   addEventListener('resize', fit);
   const COLORS = ['255,255,255', '216,180,254', '249,168,212'];
-  const N = Math.max(24, Math.min(46, Math.floor(innerWidth / 26)));
+  const N = Math.max(36, Math.min(64, Math.floor(innerWidth / 18)));
   dustParts = [];
-  for(let i = 0; i < N; i++) dustParts.push({ x: Math.random()*cv.width, y: Math.random()*cv.height, r: .7 + Math.random()*1.7, s: .05 + Math.random()*.15, ph: Math.random()*6.28, ps: .005 + Math.random()*.012, dr: (Math.random()-.5)*.05, c: COLORS[i % COLORS.length] });
+  for(let i = 0; i < N; i++) dustParts.push({ x: Math.random()*cv.width, y: Math.random()*cv.height, r: 1 + Math.random()*2.2, s: .06 + Math.random()*.18, ph: Math.random()*6.28, ps: .005 + Math.random()*.012, dr: (Math.random()-.5)*.06, c: COLORS[i % COLORS.length] });
   dustRunning = true;
   (function tick(){
     if(!dustOn()){ dustRunning = false; dustCtx.clearRect(0, 0, cv.width, cv.height); return; }
@@ -3073,7 +3073,7 @@ function initDust(){
         p.y -= p.s; p.x += p.dr + Math.sin(p.ph)*.05; p.ph += p.ps;
         if(p.y < -4){ p.y = cv.height + 4; p.x = Math.random()*cv.width; }
         if(p.x < -4) p.x = cv.width + 4; else if(p.x > cv.width + 4) p.x = -4;
-        const a = .12 + .3 * (0.5 + 0.5 * Math.sin(p.ph * 2));
+        const a = .22 + .38 * (0.5 + 0.5 * Math.sin(p.ph * 2));
         dustCtx.beginPath();
         dustCtx.arc(p.x, p.y, p.r, 0, 6.2832);
         dustCtx.fillStyle = 'rgba(' + p.c + ',' + a.toFixed(3) + ')';
@@ -14951,6 +14951,7 @@ initTtsEmotionSel();
 initLock(); // 必须放在初始化区：锁屏状态是后段才声明的 const，提前调用会让整个脚本在启动时崩掉
 applyHomeLight(); refreshHomeLightBtn(); setInterval(applyHomeLight, 60000); // 首页时光：开局上一次，之后每分钟跟着钟走
 initDust(); refreshDustBtn(); // 星尘粒子：背景细尘缓漂（外观可关）
+document.addEventListener('touchstart', function(){}, { passive:true }); // iOS 上要先有这句，按钮的 :active 按压回弹才肯触发
 refreshWeatherSnapshot(); // 天气快照超过半小时就后台悄悄刷新，让 Zephyr 知道糯糯那边的天气
 // PWA：注册 Service Worker（网络优先，改版刷新即新版；不支持的环境静默跳过）
 if ('serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {} }
