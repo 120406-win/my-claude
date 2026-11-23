@@ -574,7 +574,15 @@
       display:none; flex-direction:column;
       transition: background 0.3s;
     }
-    .settings-page.show { display:flex; }
+    .settings-page.show { display:flex; animation: pageIn .3s cubic-bezier(.22,1,.36,1); }
+    /* ══ 交互手感：页面进场、按压回弹、消息与卡片入场，治「啪地闪现」的死板感 ══ */
+    @keyframes pageIn { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+    button { transition: transform .14s ease; }
+    button:active { transform: scale(.93); }
+    .msg-row { animation: msgIn .26s ease both; }
+    @keyframes msgIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+    .song-share-card, .work-share-card { animation: cardIn .32s cubic-bezier(.22,1,.36,1) both; }
+    @keyframes cardIn { from { opacity:0; transform:translateY(8px) scale(.97); } to { opacity:1; transform:none; } }
     /* Studio 预览全屏玩：同一个 iframe 只改尺寸、不重载，游戏进度不丢 */
     #studioPreviewWrap.studio-fs { position:fixed; inset:0; z-index:210; background:var(--bg); padding:10px; display:flex; flex-direction:column; margin:0; }
     #studioPreviewWrap.studio-fs #studioFrame { flex:1; height:auto; }
@@ -795,6 +803,7 @@
 
 <div class="bg-layer" id="bgLayer"></div>
 <div class="particle-layer" id="particleLayer"></div>
+<canvas id="dustCanvas" style="position:fixed;inset:0;z-index:0;pointer-events:none;"></canvas>
 
 <!-- ══ SPLASH ══ -->
 <div id="splash">
@@ -1270,6 +1279,12 @@
             <div class="s-row-label">首页时光</div>
           </div>
           <button id="homeLightBtn" class="bg-mode-btn" onclick="toggleHomeDaylight()" style="min-width:60px;">开</button>
+        </div>
+        <div class="s-row">
+          <div>
+            <div class="s-row-label">星尘粒子</div>
+          </div>
+          <button id="dustBtn" class="bg-mode-btn" onclick="toggleDust()" style="min-width:60px;">开</button>
         </div>
         <div style="padding:0 16px 14px;">
           <button onclick="resetAppearance()" style="width:100%;padding:10px;border-radius:10px;background:var(--surface);border:1px solid var(--border);color:var(--text);font-size:13px;cursor:pointer;">恢复默认外观</button>
@@ -3021,6 +3036,52 @@ function toggleHomeDaylight(){
 function refreshHomeLightBtn(){
   const b = document.getElementById('homeLightBtn');
   if(b){ b.textContent = homeDaylight() ? '开' : '关'; b.style.borderColor = homeDaylight() ? 'var(--accent)' : 'transparent'; }
+}
+// ══ 星尘粒子：背景里慢慢上浮、明暗呼吸的细尘，给界面留一口「活气」（外观设置可关）══
+let dustCtx = null, dustParts = [], dustRunning = false;
+function dustOn(){ return localStorage.getItem('z_dust') !== '0'; }
+function toggleDust(){
+  localStorage.setItem('z_dust', dustOn() ? '0' : '1');
+  refreshDustBtn();
+  const cv = document.getElementById('dustCanvas');
+  if(dustOn()){ if(cv) cv.style.display = ''; initDust(); }
+  else if(cv){ cv.style.display = 'none'; }
+}
+function refreshDustBtn(){
+  const b = document.getElementById('dustBtn');
+  if(b){ b.textContent = dustOn() ? '开' : '关'; b.style.borderColor = dustOn() ? 'var(--accent)' : 'transparent'; }
+}
+function initDust(){
+  const cv = document.getElementById('dustCanvas');
+  if(!cv || !dustOn() || dustRunning) return;
+  const ctx = cv.getContext && cv.getContext('2d');
+  if(!ctx) return;
+  dustCtx = ctx;
+  const fit = ()=>{ cv.width = innerWidth; cv.height = innerHeight; };
+  fit();
+  addEventListener('resize', fit);
+  const COLORS = ['255,255,255', '216,180,254', '249,168,212'];
+  const N = Math.max(24, Math.min(46, Math.floor(innerWidth / 26)));
+  dustParts = [];
+  for(let i = 0; i < N; i++) dustParts.push({ x: Math.random()*cv.width, y: Math.random()*cv.height, r: .7 + Math.random()*1.7, s: .05 + Math.random()*.15, ph: Math.random()*6.28, ps: .005 + Math.random()*.012, dr: (Math.random()-.5)*.05, c: COLORS[i % COLORS.length] });
+  dustRunning = true;
+  (function tick(){
+    if(!dustOn()){ dustRunning = false; dustCtx.clearRect(0, 0, cv.width, cv.height); return; }
+    if(!document.hidden){
+      dustCtx.clearRect(0, 0, cv.width, cv.height);
+      for(const p of dustParts){
+        p.y -= p.s; p.x += p.dr + Math.sin(p.ph)*.05; p.ph += p.ps;
+        if(p.y < -4){ p.y = cv.height + 4; p.x = Math.random()*cv.width; }
+        if(p.x < -4) p.x = cv.width + 4; else if(p.x > cv.width + 4) p.x = -4;
+        const a = .12 + .3 * (0.5 + 0.5 * Math.sin(p.ph * 2));
+        dustCtx.beginPath();
+        dustCtx.arc(p.x, p.y, p.r, 0, 6.2832);
+        dustCtx.fillStyle = 'rgba(' + p.c + ',' + a.toFixed(3) + ')';
+        dustCtx.fill();
+      }
+    }
+    requestAnimationFrame(tick);
+  })();
 }
 const HOME_LIGHT_STOPS = [
   { h: 0,    top: [43, 36, 96, .50],   glow: [186, 198, 255, .20], x: 76, y: 10, stars: .90 },
@@ -14889,6 +14950,7 @@ initEnZhSel();
 initTtsEmotionSel();
 initLock(); // 必须放在初始化区：锁屏状态是后段才声明的 const，提前调用会让整个脚本在启动时崩掉
 applyHomeLight(); refreshHomeLightBtn(); setInterval(applyHomeLight, 60000); // 首页时光：开局上一次，之后每分钟跟着钟走
+initDust(); refreshDustBtn(); // 星尘粒子：背景细尘缓漂（外观可关）
 refreshWeatherSnapshot(); // 天气快照超过半小时就后台悄悄刷新，让 Zephyr 知道糯糯那边的天气
 // PWA：注册 Service Worker（网络优先，改版刷新即新版；不支持的环境静默跳过）
 if ('serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {} }
