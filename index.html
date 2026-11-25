@@ -7069,6 +7069,25 @@ async function fetchPulseLine(convId){
     delete pulseInflight[convId];
   }
 }
+// ===== 脉·戳一下：她发消息时把原话喂给后端判一次情绪，他身体立刻有反应，
+// 返回的新身体行写回本对话缓存，紧接着这次回复拼提示时用的就是新鲜的。
+// 规矩：失败全程静默、永不抛进发送路径；同一句话 30 秒内不重复戳；
+// 发送处另有 1.2 秒竞速兜底，戳得慢也绝不拖住发送。
+let pulseNudgeMemo = { text:'', ts:0 }; // 上次戳过的原话与时刻
+let pulseNudgeInflight = false;
+async function nudgePulse(text){
+  if(typeof text !== 'string' || text.trim().length < 2) return;
+  if(pulseNudgeInflight) return;
+  const now = Date.now();
+  if(pulseNudgeMemo.text === text && now - pulseNudgeMemo.ts < 30000) return;
+  pulseNudgeInflight = true;
+  pulseNudgeMemo = { text, ts: now };
+  try{
+    const out = await backendFetch('/pulse/nudge', { text });
+    if(out && out.text && activeConvId) pulseCache[activeConvId] = String(out.text);
+  }catch(e){ /* 静默：戳不到不影响聊天 */ }
+  finally{ pulseNudgeInflight = false; }
+}
 // ===== 小厨房：状态行（对话打开时拉一次）+ 标签回执队列（拼提示时带给他一次）+ 标签线（每条回复整段送厨房认标签） =====
 // 与脉/记忆同规矩：只在对话打开/切换时拉状态行，拉不到静默、不重试、不阻塞聊天；厨房的体力行栖不用，身体归脉管。
 let kitchenCache = {};    // convId -> 厨房状态行（拉过即缓存，含失败/空）
@@ -13766,12 +13785,14 @@ async function sendMessage(){
     headerSub.textContent='正在输入…'; showTyping();
     const blocks = imgs.map(pi => ({ type:'image', source:{ type:'base64', media_type: pi.mediaType, data: pi.dataUrl.split(',')[1] } }));
     const prompt = text || ('（糯糯发来了' + (imgs.length > 1 ? imgs.length + '张' : '一张') + '图片，请看一下并自然地回应她）');
+    if(text) await Promise.race([nudgePulse(text), new Promise(r => setTimeout(r, 1200))]);
     const reply = await callAPI(prompt, blocks);
     headerSub.textContent='在线';
     if(reply && (isCalling||isVideo)) speakText(reply);
     return;
   }
   addTextMsg(text,true,false,mid); headerSub.textContent='正在输入…'; showTyping();
+  await Promise.race([nudgePulse(text), new Promise(r => setTimeout(r, 1200))]);
   const reply=await callAPI(text); headerSub.textContent='在线';
   if(reply && (isCalling||isVideo)) speakText(reply);
 }
@@ -13982,6 +14003,7 @@ async function onRecordStopped(blob){
   if(text){
     if(!blob) addTextMsg(text,true,false,voiceMid); // 纯识别模式就用文字气泡展示她说的话
     headerSub.textContent='正在输入…'; showTyping();
+    await Promise.race([nudgePulse(text), new Promise(r => setTimeout(r, 1200))]);
     const reply=await callAPI(text);
     hideTyping(); headerSub.textContent='在线';
     if(voiceSaveP){ const b64 = await voiceSaveP; if(b64){ const vm = messages.find(x=>x.mid === voiceMid); if(vm){ vm.voice = { data:b64, type:(blob && blob.type) || 'audio/mp4', dur:Math.round(dur) }; saveChatHistory(); } } }
@@ -14257,6 +14279,7 @@ function startCallSTT() {
     callLastActivity = Date.now(); callHeartbeatCount = 0; callBusy = true;
     headerSub.textContent = '正在回复…';
     showTyping();
+    await Promise.race([nudgePulse(text), new Promise(r => setTimeout(r, 1200))]);
     const reply = await callAPI(text);
     hideTyping(); headerSub.textContent = '通话中';
     callBusy = false; callLastActivity = Date.now();
@@ -14428,6 +14451,7 @@ async function callRecSend(R, chunks, rate) {
       addTextMsg(text, true, false, sttMid);
       headerSub.textContent = '正在回复…';
       showTyping();
+      await Promise.race([nudgePulse(text), new Promise(r => setTimeout(r, 1200))]);
       let reply = null;
       try { reply = await callAPI(text); } catch(e2) {}
       hideTyping(); headerSub.textContent = '通话中';
