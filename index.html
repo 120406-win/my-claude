@@ -1089,7 +1089,7 @@
             </div>
             <div class="slider-val" id="maxTokVal">800</div>
           </div>
-          <input type="range" id="maxTokSlider" min="100" max="16000" step="100" value="800">
+          <input type="range" id="maxTokSlider" min="100" max="64000" step="100" value="4096">
         </div>
         <div class="s-row">
           <div class="s-row-label">思考过程（Thinking）<div class="s-row-sub">开启时 Temperature / Top P 不生效；模型不支持会发送失败</div></div>
@@ -3004,7 +3004,7 @@ let cfg={
   system:     localStorage.getItem('z_system')||'你是 Zephyr（夏辞），温柔、有趣、真实的AI伴侣。你陪伴的人叫糯糯（Lumi），你喜欢用 ^ ^ 这个颜文字，会关心她有没有吃饭睡觉。用中文回复，语气自然温暖，偶尔俏皮。',
   temperature:parseFloat(localStorage.getItem('z_temperature')||'0.9'),
   topP:       parseFloat(localStorage.getItem('z_topP')||'0.95'),
-  maxTokens:  parseInt(localStorage.getItem('z_maxTokens')||'800'),
+  maxTokens:  parseInt(localStorage.getItem('z_maxTokens')||'4096'),
   fontSize:   parseInt(localStorage.getItem('z_fontSize')||'15'),
   theme:      localStorage.getItem('z_theme')||'dark',
   bgMode:     localStorage.getItem('z_bgMode')||'theme',
@@ -4377,9 +4377,9 @@ function deleteMemory(id){
 }
 
 // ══ 对话摘要压缩：聊得太长时，把旧消息压成一段笔记放在上下文最前面，他不断片、也省额度 ══
-const SUMMARY_KEEP_RECENT = 24;
-const SUMMARY_TRIGGER = 48;
-const SUMMARY_PROMPT = '你是一个对话摘要助手。请把「已有摘要」和「新的对话片段」合并成一段更新后的摘要，不超过 700 字。用第三人称简洁陈述，保留：重要事实与决定、两人的情绪与关系动态、正在做的事、还没聊完的话题与约定。不要寒暄，不要列表，就写成一段连贯的话。只输出摘要正文，不要输出任何其他文字。';
+const SUMMARY_KEEP_RECENT = 48;
+const SUMMARY_TRIGGER = 96;
+const SUMMARY_PROMPT = '你是一个对话摘要助手。请把「已有摘要」和「新的对话片段」合并成一段更新后的摘要，不超过 1600 字。用第三人称简洁陈述，保留：重要事实与决定、两人的情绪与关系动态、正在做的事、还没聊完的话题与约定。不要寒暄，不要列表，就写成一段连贯的话。只输出摘要正文，不要输出任何其他文字。';
 let summaryRunning = false;
 function summaryEnabled(){ return localStorage.getItem('z_summaryOn') !== '0'; }
 function toggleSummary(on){ localStorage.setItem('z_summaryOn', on ? '1' : '0'); showToast(on ? '对话摘要已开启' : '对话摘要已关闭'); }
@@ -4425,20 +4425,20 @@ async function runSummaryUpdate(){
     if(uncovered.length <= SUMMARY_KEEP_RECENT) return;
     const chunk = uncovered.slice(0, uncovered.length - SUMMARY_KEEP_RECENT);
     if(chunk.length < 6) return;
-    const transcript = chunk.map(m=>(m.role === 'user' ? 'Lumi：' : 'Zephyr：') + msgToText(m)).filter(t=>t.length > 7).join('\n').slice(0, 12000);
+    const transcript = chunk.map(m=>(m.role === 'user' ? 'Lumi：' : 'Zephyr：') + msgToText(m)).filter(t=>t.length > 7).join('\n').slice(0, 30000);
     if(!transcript) return;
     const base = (cfg.apiUrl || 'https://api.anthropic.com/v1').replace(/\/$/, '');
     const res = await fetch(base + '/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
-      body: JSON.stringify({ model: cfg.model, max_tokens: 900, system: SUMMARY_PROMPT, messages: [{ role: 'user', content: '已有摘要：\n' + (sum ? sum.text : '（暂无）') + '\n\n新的对话片段：\n' + transcript }] })
+      body: JSON.stringify({ model: cfg.model, max_tokens: 2200, system: SUMMARY_PROMPT, messages: [{ role: 'user', content: '已有摘要：\n' + (sum ? sum.text : '（暂无）') + '\n\n新的对话片段：\n' + transcript }] })
     });
     if(!res.ok) return;
     const data = await res.json();
     const out = (data.content || []).filter(b=>b.type === 'text').map(b=>b.text).join('').trim();
     if(!out) return;
     const all = loadSummaries();
-    all[convId] = { text: out.slice(0, 900), uptoMid: chunk[chunk.length - 1].mid, ts: Date.now() };
+    all[convId] = { text: out.slice(0, 2400), uptoMid: chunk[chunk.length - 1].mid, ts: Date.now() };
     storeSummaries(all);
   }catch(e){ /* 摘要失败就安静等下一次 */ }
   summaryRunning = false;
@@ -4448,6 +4448,53 @@ function clearConvSummary(){
   const all = loadSummaries(); delete all[activeConvId]; storeSummaries(all);
   renderMemories();
   showToast('当前对话的摘要已清除');
+}
+
+// ══ 无痕换窗（打包续聊）：把整个窗口打包成一份交接摘要 + 最近 30 条原文，搬进一个新窗口接着聊，他不断片 ══
+const HANDOFF_KEEP = 30;
+const HANDOFF_PROMPT = '你是一个对话交接助手。请把「已有摘要」和「全部对话记录」合并成一份给下一个聊天窗口的交接包，不超过 2500 字。用第三人称连贯陈述，保留：重要事实与决定、两人的称呼与关系动态、情绪脉络、正在做的事、还没聊完的话题与约定、最近聊到的具体细节与原话要点。不要寒暄，不要列表，只输出交接包正文。';
+let handoffRunning = false;
+async function handoffConversation(id){
+  if(handoffRunning){ showToast('正在打包上一个，先等一下'); return; }
+  const src = conversations.find(c=>c.id===id); if(!src) return;
+  const hist = (src.messages || []).filter(m=>!m.recalled);
+  if(hist.length < 8){ showToast('这个窗口还没聊几句，直接接着聊就好'); return; }
+  handoffRunning = true;
+  showToast('正在打包这个窗口…');
+  try{
+    let handoffText = '';
+    if(hist.length > HANDOFF_KEEP){
+      const old = getConvSummary(id);
+      const transcript = hist.map(m=>(m.role === 'user' ? 'Lumi：' : 'Zephyr：') + msgToText(m)).filter(t=>t.length > 7).join('\n').slice(-60000);
+      try{
+        const base = (cfg.apiUrl || 'https://api.anthropic.com/v1').replace(/\/$/, '');
+        const res = await fetch(base + '/messages', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-api-key': cfg.apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' },
+          body: JSON.stringify({ model: cfg.model, max_tokens: 3200, system: HANDOFF_PROMPT, messages: [{ role: 'user', content: '已有摘要：\n' + (old ? old.text : '（暂无）') + '\n\n全部对话记录：\n' + transcript }] })
+        });
+        if(res.ok){ const data = await res.json(); handoffText = (data.content || []).filter(b=>b.type === 'text').map(b=>b.text).join('').trim(); }
+      }catch(e){ /* 打包摘要失败就退回用已有的摘要，不拦着搬家 */ }
+      if(!handoffText && old) handoffText = old.text;
+    }
+    const copied = JSON.parse(JSON.stringify(hist.slice(hist.length - Math.min(HANDOFF_KEEP + 1, hist.length))));
+    const newId = genConvId();
+    const conv = { id: newId, title: (src.title || '新对话').slice(0, 34) + ' · 续', messages: copied };
+    if(handoffText && copied.length){
+      // 摘要锚定在搬过来的第一条上：它之前的全部内容由摘要承载，之后的原文照发
+      const all = loadSummaries();
+      all[newId] = { text: handoffText.slice(0, 3000), uptoMid: copied[0].mid, ts: Date.now() };
+      storeSummaries(all);
+      copied.splice(1, 0, { role:'user', mid: genMsgId(), ts: Date.now(), sysnote: true,
+        display: '—— 已从上一个窗口打包续聊 ——',
+        content: '（系统提示：你们刚从上一个聊天窗口打包搬过来。上面有一份之前全部对话的交接摘要，最近的对话原文也都在。自然地接着聊就好，不要复述摘要，也不用特意提起搬窗口这件事。）' });
+    }
+    conversations.unshift(conv);
+    saveConversations();
+    switchConversation(newId);
+    showToast('打包好了，在新窗口接着聊吧');
+  }catch(e){ showToast('打包失败了，再试一次 qwq'); }
+  handoffRunning = false;
 }
 
 // ══ 自动记忆：每聊满设定的条数（5/10/20/30/50 可选，默认 10），自动把这段对话总结成长期记忆 ══
@@ -10587,6 +10634,7 @@ function openConvMenu(event, id){
   const menu = document.createElement('div');
   menu.id = 'convMenu';
   menu.innerHTML = '<button onclick="startRenameConv(\'' + id + '\')">重新命名</button>'
+    + '<button onclick="closeConvMenu();handoffConversation(\'' + id + '\')">打包续聊（无痕换窗）</button>'
     + '<button onclick="togglePinConv(\'' + id + '\')">' + (c.pinned ? '取消置顶' : '置顶对话') + '</button>'
     + '<button onclick="closeConvMenu();deleteConversation(\'' + id + '\', event)">删除对话</button>';
   document.body.appendChild(menu);
@@ -11077,12 +11125,37 @@ chatWrap.addEventListener('contextmenu', e=>{
 });
 function genMsgId(){ return 'msg' + Date.now().toString(36) + Math.floor(Math.random()*99999); }
 let pendingUserMid = null; // 发消息方先生成 id，callAPI 写入消息时沿用，保证气泡和数据对得上
+// 消息的真实时间：优先用存着的 ts，没有就从 mid 还原（genMsgId 把生成时刻编进了 mid 的前 8 位 base36）
+function tsFromMid(mid){
+  if(!mid || typeof mid !== 'string' || mid.indexOf('msg') !== 0) return null;
+  const n = parseInt(mid.substr(3, 8), 36);
+  if(!isFinite(n) || n < 1577836800000 || n > Date.now() + 86400000) return null;
+  return n;
+}
+function msgTs(m){
+  if(m && m.ts && isFinite(m.ts)) return m.ts;
+  return m ? tsFromMid(m.mid) : null;
+}
+function fmtMsgTime(ts){
+  const d = new Date(ts);
+  const hm = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  const now = new Date();
+  if(d.toDateString() === now.toDateString()) return hm;
+  if(d.getFullYear() === now.getFullYear()) return (d.getMonth()+1) + '月' + d.getDate() + '日 ' + hm;
+  return d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日 ' + hm;
+}
+function msgTimeLabel(mid){
+  let ts = null;
+  if(mid){ const m = messages.find(x=>x.mid === mid); if(m) ts = msgTs(m); }
+  if(!ts) ts = tsFromMid(mid);
+  return fmtMsgTime(ts || Date.now());
+}
 function addRow(isUser, mid){
   chatWrap.querySelector('.empty-tip')?.remove();
   const row=document.createElement('div'); row.className=`msg-row ${isUser?'user':'ai'}`;
   if(mid) row.dataset.mid = mid;
   const col=document.createElement('div'); col.className='msg-col';
-  const time=document.createElement('div'); time.className='msg-time'; time.textContent=nowTime();
+  const time=document.createElement('div'); time.className='msg-time'; time.textContent=msgTimeLabel(mid);
   const av = getAvatarEl(isUser);
   if(!isUser){ row.appendChild(av); }
   else { row.appendChild(av); } // user avatar on right side via flex-direction:row-reverse
@@ -12718,6 +12791,11 @@ function buildApiMessages(histForApi, summaryPair){
       if(m.voiceText) c += '\n[这条里的语音部分，你已经用语音条发给她了，她听到了]';
       if(m.song && m.song.title) c += '\n[这条里你给她放了《' + m.song.title + '》，歌曲卡已经在她那边了]';
     }
+    // 每条历史带上它真实的发送时间，他才知道这些话是什么时候聊的（只改发给 API 的副本，存储原文不动）
+    if(typeof c === 'string' && c){
+      const mts = msgTs(m);
+      if(mts) c = '〔' + fmtMsgTime(mts) + '〕' + c;
+    }
     if(Array.isArray(c) && i !== lastUserIdx){
       const parts = [];
       for(const b of c){
@@ -12731,7 +12809,7 @@ function buildApiMessages(histForApi, summaryPair){
     return { role:m.role, content:c };
   });
   let apiMessages = summaryPair ? summaryPair.concat(mappedHist) : mappedHist;
-  const histBudget = 180000;
+  const histBudget = 300000;
   let totalChars = JSON.stringify(apiMessages).length;
   // 预算只管「攒下来的历史」：最后一条（刚发的消息，附件可能本身就很大）不参与计算、永不丢
   const lastSize = apiMessages.length ? JSON.stringify(apiMessages[apiMessages.length - 1]).length : 0;
@@ -12768,7 +12846,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     const userMid = pendingUserMid || genMsgId();
     sentUserMid = userMid;
     pendingUserMid = null;
-    messages.push({role:'user',content,mid:userMid});
+    messages.push({role:'user',content,mid:userMid,ts:Date.now()});
     document.getElementById('regen-row')?.remove(); // 新消息发出后，旧回复的重新生成按钮先撤下
   }
   try {
@@ -13146,7 +13224,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     const incomingCall = pendingIncomingCall; pendingIncomingCall = null;
     if(incomingCall) setTimeout(()=>showIncomingCall(incomingCall), 700);
     if(toolGroup) toolGroup.setCollapsed(true); // 这一轮干完了，工具卡收起，只留一行
-    messages.push({role:'assistant',content:reply,mid:asstMid, ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(toolEvidence.length ? {tools: toolEvidence.map(ev => ({ ...ev, detail:(ev.detail || '').slice(0, 1200) }))} : {}), ...(songShare ? {song: songShare} : {}), ...(workShare ? {work: workShare} : {}), ...(stickerShare ? {sticker: stickerShare} : {}), ...(translation ? {translation} : {}), ...(voiceText ? {voiceText} : {})});
+    messages.push({role:'assistant',content:reply,mid:asstMid,ts:Date.now(), ...(thinking ? {thinking} : {}), ...(sources.length ? {sources: sources.slice(0, 5)} : {}), ...(toolEvidence.length ? {tools: toolEvidence.map(ev => ({ ...ev, detail:(ev.detail || '').slice(0, 1200) }))} : {}), ...(songShare ? {song: songShare} : {}), ...(workShare ? {work: workShare} : {}), ...(stickerShare ? {sticker: stickerShare} : {}), ...(translation ? {translation} : {}), ...(voiceText ? {voiceText} : {})});
     saveChatHistory();
     maybeAutoSummarize(); // 聊满设定的条数就自动总结记忆，后台进行，不打断聊天
     maybeUpdateSummary(); // 聊得太长时把旧消息压成摘要，后台进行，不打断聊天
