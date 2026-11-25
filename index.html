@@ -11179,7 +11179,17 @@ function buildVoiceWrap(src, dur){
   [6,10,14,10,8,12,16,12,8,10,6].forEach((h,i)=>{ const bar=document.createElement('div'); bar.className='voice-bar'; bar.style.cssText=`height:${h}px;--s:${(0.3+i*0.05).toFixed(2)}s;animation-delay:${(i*0.06).toFixed(2)}s`; waves.appendChild(bar); });
   const durEl=document.createElement('span'); durEl.className='voice-dur'; durEl.textContent=`${Math.round(dur)}"`;
   wrap.appendChild(icon); wrap.appendChild(waves); wrap.appendChild(durEl);
-  const audio=new Audio(src); wrap._audio = audio; audio.onended=()=>wrap.classList.remove('playing');
+  let audioSrc = src;
+  // 长语音条的 data URI 能长到几百万字符，iOS 对超长 data URI 播放不稳：大的转成 Blob 地址再播
+  if(typeof src === 'string' && src.indexOf('data:') === 0 && src.length > 1000000){
+    try{
+      const comma = src.indexOf(',');
+      const mime = (src.slice(5, comma).split(';')[0] || 'audio/wav');
+      const bb = Uint8Array.from(atob(src.slice(comma + 1)), c=>c.charCodeAt(0));
+      audioSrc = URL.createObjectURL(new Blob([bb], { type: mime }));
+    }catch(e){}
+  }
+  const audio=new Audio(audioSrc); wrap._audio = audio; audio.onended=()=>wrap.classList.remove('playing');
   audio.onloadedmetadata=()=>{ if(isFinite(audio.duration) && audio.duration > 0) durEl.textContent = Math.round(audio.duration) + '"'; };
   wrap.addEventListener('click',()=>{ if(wrap.classList.contains('playing')){audio.pause();audio.currentTime=0;wrap.classList.remove('playing');}else{ const p=audio.play(); if(p && p.catch) p.catch(()=>{ wrap.classList.remove('playing'); showToast('这条语音放不出来 qwq'); }); wrap.classList.add('playing');} });
   return wrap;
@@ -13328,7 +13338,10 @@ function wavDurationSecs(bytes){
     const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const rate = dv.getUint32(24, true), chans = dv.getUint16(22, true), bits = dv.getUint16(34, true);
     if(!rate || !chans || !bits) return 0;
-    return Math.max(1, Math.round((bytes.length - 44) / (rate * chans * (bits / 8))));
+    // 头不止 44 字节（MiniMax 夹 LIST 段）：能解析出 data 段就按 data 段大小算，否则退回旧估算
+    const parsed = (typeof parseWavParts === 'function') ? parseWavParts(bytes) : null;
+    const dataLen = parsed ? parsed.dataLen : (bytes.length - 44);
+    return Math.max(1, Math.round(dataLen / (rate * chans * (bits / 8))));
   }catch(e){ return 0; }
 }
 // ══ TTS 通道：mimo（默认，请求体与旧版一字不差）/ minimax / moss ══
@@ -13418,20 +13431,53 @@ async function synthVoiceOnce(text){
   if(data.audio.length > 3600000) return null;
   return data.audio;
 }
+// 解析一个 wav 的 fmt 与 data 段位置：各家合成的 wav 头不止 44 字节（MiniMax 的在 fmt 后还夹了一段 LIST，data 在第 78 字节才开始），必须逐个 chunk 走过去找，不能按 44 硬切——第一版就是这么把文件拼坏的，真机放不出来
+function parseWavParts(bytes){
+  try{
+    if(!bytes || bytes.length < 44) return null;
+    const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const tag = (o)=>String.fromCharCode(bytes[o], bytes[o + 1], bytes[o + 2], bytes[o + 3]);
+    if(tag(0) !== 'RIFF' || tag(8) !== 'WAVE') return null;
+    let fmt = null, dataOff = -1, dataLen = 0;
+    let off = 12;
+    while(off + 8 <= bytes.length){
+      const id = tag(off), size = dv.getUint32(off + 4, true);
+      if(id === 'fmt '){ fmt = { format: dv.getUint16(off + 8, true), chans: dv.getUint16(off + 10, true), rate: dv.getUint32(off + 12, true), bits: dv.getUint16(off + 22, true) }; }
+      else if(id === 'data'){ dataOff = off + 8; dataLen = Math.min(size, bytes.length - dataOff); break; }
+      off += 8 + size + (size % 2);
+    }
+    if(!fmt || dataOff < 0 || !dataLen) return null;
+    return { fmt, dataOff, dataLen };
+  }catch(e){ return null; }
+}
 function concatWavB64(b64List){
   const parts = b64List.map(b64=>Uint8Array.from(atob(b64), c=>c.charCodeAt(0)));
   if(!parts.length) return null;
   if(parts.length === 1) return b64List[0];
-  for(const p of parts){ if(p.length < 44) return null; }
-  let bodyLen = 0;
-  for(const p of parts) bodyLen += p.length - 44;
-  const out = new Uint8Array(44 + bodyLen);
-  out.set(parts[0].slice(0, 44), 0);
-  const dv = new DataView(out.buffer);
-  dv.setUint32(4, 36 + bodyLen, true);
-  dv.setUint32(40, bodyLen, true);
-  let off = 44;
-  for(const p of parts){ out.set(p.slice(44), off); off += p.length - 44; }
+  const parsed = parts.map(parseWavParts);
+  let out = null;
+  if(parsed.every(Boolean)){
+    const f = parsed[0].fmt;
+    let bodyLen = 0;
+    for(const p of parsed) bodyLen += p.dataLen;
+    out = new Uint8Array(44 + bodyLen);
+    const dv = new DataView(out.buffer);
+    const putTag = (o, s)=>{ for(let i = 0; i < 4; i++) out[o + i] = s.charCodeAt(i); };
+    putTag(0, 'RIFF'); dv.setUint32(4, 36 + bodyLen, true); putTag(8, 'WAVE');
+    putTag(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, f.format || 1, true);
+    dv.setUint16(22, f.chans, true); dv.setUint32(24, f.rate, true);
+    dv.setUint32(28, f.rate * f.chans * (f.bits / 8), true); dv.setUint16(32, f.chans * (f.bits / 8), true); dv.setUint16(34, f.bits, true);
+    putTag(36, 'data'); dv.setUint32(40, bodyLen, true);
+    let off = 44;
+    parts.forEach((p, i)=>{ out.set(p.subarray(parsed[i].dataOff, parsed[i].dataOff + parsed[i].dataLen), off); off += parsed[i].dataLen; });
+  } else {
+    // 不是标准 wav（比如某通道回的是 mp3 流）：整段首尾相接兜底，帧流格式一般能续上
+    let total = 0;
+    for(const p of parts) total += p.length;
+    out = new Uint8Array(total);
+    let off = 0;
+    for(const p of parts){ out.set(p, off); off += p.length; }
+  }
   let bin = '';
   for(let i = 0; i < out.length; i += 32768) bin += String.fromCharCode.apply(null, out.subarray(i, i + 32768));
   return btoa(bin);
