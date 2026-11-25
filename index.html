@@ -3904,7 +3904,7 @@ function buildSystemPrompt(lastUserText){
     const now = new Date();
     const dateStr = now.toLocaleDateString('zh-CN', { year:'numeric', month:'long', day:'numeric', weekday:'long' });
     const timeStr = now.toLocaleTimeString('zh-CN', { hour:'2-digit', minute:'2-digit', hour12:false });
-    out += '\n\n【现在的时间】\n现在是 ' + dateStr + ' ' + timeStr + '（糯糯那边的时间）。你们聊天时说到今天、昨天、明天、这周、最近，都以这个时间为准；要用联网搜索查「今天/昨天发生了什么」时，也先想清楚要查的是哪一天。';
+    out += '\n\n【现在的时间】\n现在是 ' + dateStr + ' ' + timeStr + '（糯糯那边的时间）。你们聊天时说到今天、昨天、明天、这周、最近，都以这个时间为准；要用联网搜索查「今天/昨天发生了什么」时，也先想清楚要查的是哪一天。聊天记录里每条消息前面的〔时间〕是系统标的发送时间，给你看的——你自己回复时不要带这个标记，开头直接说话。';
   try{
     const mi = meetAnnivInfo();
     out += '\n你们相遇于 ' + mi.md.getFullYear() + ' 年 ' + (mi.md.getMonth() + 1) + ' 月 ' + mi.md.getDate() + ' 日，到今天是第 ' + mi.days + ' 天' + (mi.years >= 1 && mi.toNext === 0 ? '，今天正好是你们相遇 ' + mi.years + ' 周年。' : (mi.years >= 1 && mi.toNext <= 30 ? '，' + mi.years + ' 周年还有 ' + mi.toNext + ' 天。' : '。'));
@@ -11144,6 +11144,11 @@ function fmtMsgTime(ts){
   if(d.getFullYear() === now.getFullYear()) return (d.getMonth()+1) + '月' + d.getDate() + '日 ' + hm;
   return d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日 ' + hm;
 }
+// 他偶尔会把历史里的时间标签学到自己回复的开头——那是系统标的，落地前摘掉
+function stripEchoedTimeTag(text){
+  if(!text || typeof text !== 'string') return text;
+  return text.replace(/^[\s　]*〔(?:\d{4}年)?(?:\d{1,2}月\d{1,2}日\s*)?\d{1,2}:\d{2}〕[\s　]*/, '');
+}
 function msgTimeLabel(mid){
   let ts = null;
   if(mid){ const m = messages.find(x=>x.mid === mid); if(m) ts = msgTs(m); }
@@ -13190,6 +13195,8 @@ async function callAPI(userText, extraBlocks=null, opts=null){
     if(sources.length) makeSourcesNote(col, sources.slice(0, 5));
     if(!reply && sources.length) reply = '（搜到了一些资料，但没组织好语言……再问我一次好吗）';
     if(!reply && thinking) reply = '（想了很多，但没组织好语言……再问我一次好吗）';
+    const untagged = stripEchoedTimeTag(reply);
+    if(untagged !== reply){ reply = untagged; if(bubble) bubble.textContent = reply; }
     reply = processZephyrActions(reply, bubble); // 他悄悄许的愿望在这里被 App 执行并抹掉标记
     sendKitchenInline(reply, asstMid, bubble); // 小厨房标签线：整段送厨房认 [买菜]/[吃] 等单括号标签，异步回来剥行+攒回执，不等它、失败原文不动
     let translation = '';
