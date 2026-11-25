@@ -995,6 +995,9 @@
     <div class="nav-item" id="nav-rings" onclick="navTo('rings')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2.1"/><path d="M7.6 7.6a6.2 6.2 0 0 0 0 8.8M16.4 7.6a6.2 6.2 0 0 1 0 8.8"/><path d="M4.9 4.9a10.1 10.1 0 0 0 0 14.2M19.1 4.9a10.1 10.1 0 0 1 0 14.2"/></svg></span> 共振
     </div>
+    <div class="nav-item" id="nav-memoryBuckets" onclick="navTo('memoryBuckets')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5.5" rx="7" ry="2.8"/><path d="M5 5.5v13c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-13"/><path d="M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8"/></svg></span> 他的记忆
+    </div>
     <div class="nav-item" id="nav-works" onclick="navTo('works')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="9.5" rx="1.5"/><path d="M12 10.5V20M4 15h16"/><path d="M12 10.5c-1.8 0-4-.4-4-2.2 0-1.2 1-2 2-1.8 1.4.3 2 2.4 2 4zm0 0c1.8 0 4-.4 4-2.2 0-1.2-1-2-2-1.8-1.4.3-2 2.4-2 4z"/></svg></span> 作品
     </div>
@@ -2148,6 +2151,15 @@
       <div class="s-section-title">他眼里的你</div>
       <div id="ringsPersonaHer"></div>
     </div>
+  </div>
+</div>
+<div class="settings-page" id="memoryBucketsPage">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="goBack()">←</button>
+    <div class="settings-topbar-title">他的记忆</div>
+  </div>
+  <div class="settings-body">
+    <div id="memoryBucketsList"></div>
   </div>
 </div>
 <div class="settings-page" id="worksPage">
@@ -3624,6 +3636,7 @@ function navTo(page){
   document.getElementById('notePage').classList.toggle('show', page==='note');
   document.getElementById('worldbookPage').classList.toggle('show', page==='worldbook');
   document.getElementById('ringsPage').classList.toggle('show', page==='rings');
+  document.getElementById('memoryBucketsPage').classList.toggle('show', page==='memoryBuckets');
   document.getElementById('worksPage').classList.toggle('show', page==='works');
   document.getElementById('gamesPage').classList.toggle('show', page==='games');
   document.getElementById('stickerPage').classList.toggle('show', page==='sticker');
@@ -3657,6 +3670,7 @@ function navTo(page){
   if(page==='note') renderNote();
   if(page==='worldbook') renderWorldBook();
   if(page==='rings') renderRings();
+  if(page==='memoryBuckets') renderMemoryBuckets();
   if(page==='works') renderWorks();
   if(page==='games') renderGames();
   if(page==='sticker') renderStickers();
@@ -7236,6 +7250,77 @@ async function renderRings(){
       }).join('');
     }
   }
+}
+
+// ══ 他的记忆（阶段 E）：后端记忆桶的只读全景——纯看，不给任何写入口；打开 /memory/view 本身会在后端打点 feel 读取，是他定的规矩 ══
+function memoryBucketChip(text){
+  return '<span style="font-size:11px;color:var(--accent-s);border:1px solid var(--border);border-radius:8px;padding:1px 7px;margin-left:6px;">' + escapeHtml(text) + '</span>';
+}
+function memoryBucketCardHtml(b){
+  let chips = '';
+  if(b.type === 'feel') chips += memoryBucketChip('感受');
+  if(b.anchored) chips += memoryBucketChip('坐标');
+  if(b.resolved) chips += memoryBucketChip('已了结');
+  if(b.digested) chips += memoryBucketChip('已消化');
+  if(b.crystallizedInto) chips += memoryBucketChip('已结晶');
+  const content = String(b.content || '');
+  const shown = content.length > 120 ? content.slice(0, 120) + '…' : content;
+  const meta = [];
+  if(b.created_at) meta.push(fmtDay(b.created_at));
+  if(Array.isArray(b.domain) && b.domain.length) meta.push(b.domain.join('、'));
+  if(b.importance != null) meta.push('重要度 ' + b.importance);
+  if(b.valence != null && b.arousal != null) meta.push('情感坐标 效价 ' + b.valence + ' · 唤醒 ' + b.arousal);
+  if(Array.isArray(b.tags) && b.tags.length) meta.push(b.tags.map(t => '#' + t).join(' '));
+  let h = '<div class="s-card" style="padding:14px 16px;margin-bottom:10px;">'
+    + '<div style="font-size:14.5px;line-height:1.6;">《' + escapeHtml(b.name || '') + '》' + chips + '</div>';
+  if(shown) h += '<div style="font-size:13px;line-height:1.75;margin-top:4px;">' + escapeHtml(shown) + '</div>';
+  if(meta.length) h += '<div style="font-size:12px;color:var(--text-dim);margin-top:6px;">' + escapeHtml(meta.join(' · ')) + '</div>';
+  return h + '</div>';
+}
+function memoryBucketsGroupHtml(title, list){
+  if(!list.length) return '';
+  return '<div style="font-size:12px;color:var(--text-dim);margin:14px 2px 8px;">' + title + '（' + list.length + ' 条）</div>'
+    + list.map(memoryBucketCardHtml).join('');
+}
+function memoryBucketsHtml(v){
+  const buckets = Array.isArray(v.buckets) ? v.buckets : [];
+  if(!buckets.length) return '<div style="font-size:13px;color:var(--text-dim);padding:4px 2px;">他还没有记下第一条。等他自己记。</div>';
+  const byCreatedDesc = (a, b) => (b.created_at || 0) - (a.created_at || 0);
+  const pinned = buckets.filter(b => b.pinned && b.type !== 'archived').sort(byCreatedDesc);
+  const archived = buckets.filter(b => b.type === 'archived').sort(byCreatedDesc);
+  const rest = buckets.filter(b => !b.pinned && b.type !== 'archived');
+  const feels = rest.filter(b => b.type === 'feel').sort(byCreatedDesc);
+  const active = rest.filter(b => b.type !== 'feel').sort(byCreatedDesc);
+  let h = '<div style="font-size:12.5px;color:var(--text-dim);padding:2px 2px 4px;">共 ' + buckets.length + ' 条'
+    + ((v.state && v.state.lastDreamTs) ? ' · 上次做梦：' + fmtChatWhen(v.state.lastDreamTs) : '') + '</div>';
+  h += memoryBucketsGroupHtml('钉选的', pinned);
+  h += memoryBucketsGroupHtml('还浮着的', active);
+  h += memoryBucketsGroupHtml('感受', feels);
+  if(archived.length){
+    h += '<div style="font-size:12px;color:var(--text-dim);margin:14px 2px 8px;cursor:pointer;" onclick="toggleMemoryArchived()">淡去了（' + archived.length + ' 条）<span id="memoryArchivedCaret"> ▸</span></div>'
+      + '<div id="memoryArchivedList" style="display:none;">' + archived.map(memoryBucketCardHtml).join('') + '</div>';
+  }
+  return h;
+}
+function toggleMemoryArchived(){
+  const el = document.getElementById('memoryArchivedList');
+  const caret = document.getElementById('memoryArchivedCaret');
+  if(!el) return;
+  const open = el.style.display !== 'none';
+  el.style.display = open ? 'none' : '';
+  if(caret) caret.textContent = open ? ' ▸' : ' ▾';
+}
+async function renderMemoryBuckets(){
+  const el = document.getElementById('memoryBucketsList');
+  if(!el) return;
+  el.innerHTML = '<div style="font-size:13px;color:var(--text-dim);padding:4px 2px;">正在翻他的记忆…</div>';
+  let v = null;
+  try{ const out = await backendGet('/memory/view'); if(out && out.ok) v = out; }catch(e){}
+  if(!v){
+    el.innerHTML = '<div style="font-size:13px;color:var(--text-dim);padding:4px 2px;">没连上后端，记忆暂时翻不开。</div>';
+    return;
+  }
+  el.innerHTML = memoryBucketsHtml(v);
 }
 
 // ══ 世界书：糯糯写给他的设定与相处说明，注入系统提示（常驻 + 关键词触发）══
