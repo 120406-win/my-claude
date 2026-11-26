@@ -9174,6 +9174,12 @@ async function resolveTrackSrc(t){
     return musObjUrl;
   }
   if(t.gdSource && t.gdId){
+    if(t.gdSource === 'netease'){
+      try{
+        const r = await backendFetch('/netease/url', { id: t.gdId });
+        if(r && r.url){ t.url = r.url; return r.url; }
+      }catch(e){}
+    }
     const u = await fetchGdUrl(t.gdSource, t.gdId).catch(()=> '');
     if(u){ t.url = u; return u; }
   }
