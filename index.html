@@ -5157,36 +5157,87 @@ async function backendFetch(path, body){
   if(!resp.ok || !out.ok) throw new Error(out.error || ('HTTP ' + resp.status));
   return out;
 }
+// 文本层：给后端夜间引擎（镜子/投影/画像/心跳上下文）读的轻量版备份——
+// 语音、贴纸图、聊天图片的 base64 对它们没用又占内存，剥掉，只留文字与结构。
+function stripBackupMedia(data){
+  try{
+    const out = Object.assign({}, data);
+    for(const k of ['z_avatarZephyr', 'z_avatarUser', 'z_bgImage', 'z_decoWatermark']) if(k in out) out[k] = '';
+    if('z_stickers' in out) out.z_stickers = typeof out.z_stickers === 'string' ? '[]' : [];
+    let convs = out.z_conversations;
+    const wasStr = typeof convs === 'string';
+    if(wasStr) convs = JSON.parse(convs || '[]');
+    if(Array.isArray(convs)){
+      convs = convs.map(c => Object.assign({}, c, { messages: (c.messages || []).map(m => {
+        const mm = Object.assign({}, m);
+        if(mm.voice && typeof mm.voice === 'object') mm.voice = Object.assign({}, mm.voice, { data: '' });
+        if(mm.sticker && typeof mm.sticker === 'object') mm.sticker = Object.assign({}, mm.sticker, { img: '' });
+        if(Array.isArray(mm.content)) mm.content = mm.content.map(p => (p && p.type === 'image') ? { type: 'text', text: '[图片]' } : p);
+        return mm;
+      }) }));
+      out.z_conversations = wasStr ? JSON.stringify(convs) : convs;
+    }
+    return out;
+  }catch(e){ return data; }
+}
+async function uploadBackupString(str, prefix, exportedAt, label){
+  const SLICE = 1200000;
+  const n = Math.max(1, Math.ceil(str.length / SLICE));
+  for(let i = 0; i < n; i++){
+    cloudStatus(label + ' ' + (i + 1) + '/' + n + ' 块…');
+    const items = {};
+    items[prefix + i] = str.slice(i * SLICE, (i + 1) * SLICE);
+    await backendFetch('/kv/set', { items });
+  }
+  const body = { parts: n, exportedAt };
+  if(prefix !== 'zephyr_backup_p') body.prefix = prefix;
+  await backendFetch('/backup/commit', body);
+}
 async function cloudSyncUpload(){
   try{
     cloudStatus('正在打包…');
     const collected = await collectBackupData();
     const payload = { app:collected.app, version:collected.version, exportedAt:collected.exportedAt, data:collected.data, files:collected.files };
-    // 分块上传：整包近 20MB 一口气 POST 在手机上容易被网络掐断（Load failed），
-    // 切成小块逐块传、后端最后拼回 zephyr_backup；中途断了旧备份不受影响。
-    const whole = JSON.stringify(payload);
-    const SLICE = 1200000;
-    const n = Math.max(1, Math.ceil(whole.length / SLICE));
-    for(let i = 0; i < n; i++){
-      cloudStatus('正在上传 ' + (i + 1) + '/' + n + ' 块…');
-      const items = {};
-      items['zephyr_backup_p' + i] = whole.slice(i * SLICE, (i + 1) * SLICE);
-      await backendFetch('/kv/set', { items });
-    }
-    cloudStatus('正在合并…');
-    await backendFetch('/backup/commit', { parts: n });
+    // 分块上传：整包 40MB+ 一口气 POST 会被网络掐断（Load failed），切成小块逐块传，
+    // 后端只登记清单、分块本身即存储（不在后端拼整串，内存顶不住）；中途断了旧备份不受影响。
+    await uploadBackupString(JSON.stringify(payload), 'zephyr_backup_p', payload.exportedAt, '正在上传');
+    // 再传一份剥掉媒体的文本层，喂后端的夜间引擎
+    const textPayload = { app:payload.app, version:payload.version, exportedAt:payload.exportedAt, data: stripBackupMedia(collected.data) };
+    await uploadBackupString(JSON.stringify(textPayload), 'zephyr_backup_text_p', payload.exportedAt, '正在上传文本层');
     cloudMetaSet({ up: Date.now() });
     cloudStatus('已同步到云端：' + new Date().toLocaleString());
     showToast('已同步到云端 ✓');
   }catch(e){ cloudStatus(''); showToast('同步失败：' + e.message); }
 }
+// 取云端全量备份：新版是分块清单（照清单逐块取回拼好），旧版是整串，直接解析。
+async function fetchCloudBackup(){
+  const out = await backendFetch('/kv/get', { keys:['zephyr_backup'] });
+  const raw = out.items && out.items.zephyr_backup;
+  if(!raw) return null;
+  const head = JSON.parse(raw);
+  if(head && head.format === 'chunked'){
+    const n = head.parts | 0;
+    const prefix = head.prefix || 'zephyr_backup_p';
+    const segs = [];
+    for(let i = 0; i < n; i += 4){
+      const keys = [];
+      for(let j = i; j < Math.min(i + 4, n); j++) keys.push(prefix + j);
+      const r = await backendFetch('/kv/get', { keys });
+      for(const k of keys){
+        const seg = r.items && r.items[k];
+        if(typeof seg !== 'string') throw new Error('云端备份不完整（缺分块）');
+        segs.push(seg);
+      }
+    }
+    return JSON.parse(segs.join(''));
+  }
+  return head;
+}
 async function cloudSyncDownload(){
   try{
     cloudStatus('正在从云端取备份…');
-    const out = await backendFetch('/kv/get', { keys:['zephyr_backup'] });
-    const raw = out.items && out.items.zephyr_backup;
-    if(!raw) throw new Error('云端还没有备份');
-    const obj = JSON.parse(raw);
+    const obj = await fetchCloudBackup();
+    if(!obj) throw new Error('云端还没有备份');
     cloudStatus('');
     await applyBackupObject(obj, { cloudTs: Date.parse(obj.exportedAt || '') || Date.now() });
   }catch(e){ cloudStatus(''); showToast('恢复失败：' + e.message); }
@@ -5500,10 +5551,8 @@ async function cloudBootSync(){
       const decision = cloudPullDecision(row ? row.updated_at : 0, cloudMetaGet().up || 0, localDataTs(), fresh);
       if(decision === 'pull' && row){
         cloudBootBusy = true;
-        const out = await backendFetch('/kv/get', { keys:['zephyr_backup'] });
-        const raw = out.items && out.items.zephyr_backup;
-        if(raw){
-          const obj = JSON.parse(raw);
+        const obj = await fetchCloudBackup();
+        if(obj){
           if(!cloudDataNewer(Date.parse(obj.exportedAt || '') || 0, localDataTs(), fresh)){ cloudBootBusy = false; cloudTouch(); return; }
           // 防死循环（2026-11-20 实测无限刷新）：拉取判断用的是云端行的 updated_at，
           // 「已同步」标记就必须记 updated_at；之前记的是备份里的 exportedAt，两者差着
