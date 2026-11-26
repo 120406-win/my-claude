@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>模型体检 · API 可用性检测</title>
+<style>
+  :root{
+    --bg:#0b1026; --card:#151b38; --card2:#1a2145; --line:#2a3260;
+    --text:#eef0ff; --muted:#9aa3d0; --accent:#8b7ff0; --accent2:#f2a7c3;
+    --ok:#3ecf8e; --bad:#ff6b81; --warn:#ffb84d; --radius:16px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  body{margin:0; font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    background:radial-gradient(1200px 600px at 80% -10%, #232a5e 0%, transparent 60%),
+               radial-gradient(900px 500px at -10% 110%, #2c1e4e 0%, transparent 55%), var(--bg);
+    color:var(--text); min-height:100vh; padding:18px 14px 40px;}
+  .wrap{max-width:760px; margin:0 auto}
+  h1{font-size:21px; margin:4px 0 2px; font-weight:700; letter-spacing:.5px}
+  .sub{color:var(--muted); font-size:12.5px; margin-bottom:14px}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin-bottom:12px}
+  label{display:block; font-size:12px; color:var(--muted); margin:10px 0 5px}
+  label:first-child{margin-top:0}
+  input[type=text],input[type=password],select{
+    width:100%; padding:11px 12px; border-radius:12px; border:1px solid var(--line);
+    background:var(--card2); color:var(--text); font-size:14px; outline:none}
+  input:focus,select:focus{border-color:var(--accent)}
+  .row{display:flex; gap:8px; flex-wrap:wrap}
+  .row>*{flex:1}
+  button{appearance:none; border:1px solid var(--line); background:var(--card2); color:var(--text);
+    padding:11px 12px; border-radius:12px; font-size:14px; cursor:pointer; transition:transform .15s cubic-bezier(.34,1.56,.64,1)}
+  button:active{transform:scale(.94)}
+  button.primary{background:linear-gradient(135deg, var(--accent), #6a5ae0); border-color:transparent; font-weight:600}
+  button.pink{background:linear-gradient(135deg, #e58bb1, var(--accent2)); border-color:transparent; color:#2a1030; font-weight:600}
+  button:disabled{opacity:.45; pointer-events:none}
+  .note{font-size:11.5px; color:var(--muted); line-height:1.6; margin-top:10px}
+  .summary{display:flex; gap:14px; flex-wrap:wrap; font-size:13px; align-items:center}
+  .summary b{font-size:17px}
+  .ok{color:var(--ok)} .bad{color:var(--bad)} .warn{color:var(--warn)}
+  .toolbar{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px}
+  .toolbar button{flex:0 0 auto; padding:9px 13px; font-size:13px}
+  .search{margin-bottom:10px}
+  .mrow{display:flex; align-items:center; gap:9px; padding:10px 10px; border:1px solid var(--line);
+    border-radius:12px; margin-bottom:8px; background:var(--card2)}
+  .mrow input[type=checkbox]{width:18px; height:18px; accent-color:var(--accent); flex:0 0 auto}
+  .mid{flex:1; min-width:0}
+  .mname{font-size:13.5px; word-break:break-all; line-height:1.35}
+  .mdetail{font-size:11.5px; color:var(--muted); margin-top:2px; word-break:break-all; line-height:1.5}
+  .mdetail.err{color:#ff9fb0}
+  .badge{flex:0 0 auto; font-size:11.5px; padding:4px 9px; border-radius:999px; border:1px solid var(--line); color:var(--muted); white-space:nowrap}
+  .badge.ok{color:#06281a; background:var(--ok); border-color:transparent; font-weight:700}
+  .badge.bad{color:#fff; background:var(--bad); border-color:transparent; font-weight:700}
+  .badge.busy{color:#2a1a00; background:var(--warn); border-color:transparent; font-weight:700}
+  .pin,.one{flex:0 0 auto; padding:6px 8px; font-size:14px; border-radius:9px; line-height:1}
+  .pin.on{background:var(--accent); border-color:transparent}
+  .empty{color:var(--muted); font-size:13px; text-align:center; padding:22px 0}
+  .spin{display:inline-block; width:11px; height:11px; border:2px solid rgba(255,255,255,.35); border-top-color:#fff; border-radius:50%; animation:sp .7s linear infinite; vertical-align:-1px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>模型体检</h1>
+  <div class="sub">给中转站的模型挨个探活：哪个通、哪个挂、挂在哪，一眼看清。</div>
+
+  <div class="card">
+    <label>站点地址（Base URL）</label>
+    <input type="text" id="base" placeholder="https://mengmenguu.top/v1" autocomplete="off">
+    <label>API Key</label>
+    <input type="password" id="key" placeholder="sk-..." autocomplete="off">
+    <div class="row" style="margin-top:12px">
+      <div>
+        <label style="margin-top:0">接口格式</label>
+        <select id="fmt">
+          <option value="auto">自动（先 OpenAI，格式不对再换 Anthropic）</option>
+          <option value="openai">OpenAI 格式</option>
+          <option value="anthropic">Anthropic 格式</option>
+        </select>
+      </div>
+      <div style="display:flex; align-items:flex-end">
+        <button class="primary" id="btnModels" style="width:100%">拉取模型列表</button>
+      </div>
+    </div>
+    <div class="note">Key 只保存在你这台设备的浏览器里，不写进网页代码、不上传到任何别的地方。每次「探活」会对那个模型发一句最小的 ping（max_tokens=1），按次计费的站等于花一次最小调用。</div>
+  </div>
+
+  <div class="card" id="sumCard" style="display:none">
+    <div class="summary">
+      <span>共 <b id="sTotal">0</b></span>
+      <span class="ok">通 <b id="sOk">0</b></span>
+      <span class="bad">挂 <b id="sBad">0</b></span>
+      <span>未测 <b id="sIdle">0</b></span>
+      <span style="color:var(--muted); font-size:12px" id="sTime"></span>
+    </div>
+  </div>
+
+  <div class="toolbar" id="toolbar" style="display:none">
+    <button class="pink" id="btnAll">全部检测</button>
+    <button id="btnChecked">检测勾选</button>
+    <button id="btnPins">只测收藏 ★</button>
+    <button id="btnStop" disabled>停止</button>
+  </div>
+
+  <input type="text" class="search" id="search" placeholder="搜模型名…" style="display:none">
+  <div id="list"></div>
+  <div class="empty" id="empty">先填好地址和 Key，点「拉取模型列表」</div>
+</div>
+
+<script>
+"use strict";
+var $ = function(id){ return document.getElementById(id); };
+var models = [];           // [{id}]
+var state = {};            // id -> {st:'idle|busy|ok|bad', ms, msg}
+var running = false, stopFlag = false;
+
+function lsGet(k, d){ try{ var v = localStorage.getItem(k); return v==null? d : JSON.parse(v); }catch(e){ return d; } }
+function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function pins(){ return lsGet('probe_pins', []); }
+function setPin(id, on){ var p = pins().filter(function(x){ return x!==id; }); if(on) p.push(id); lsSet('probe_pins', p); }
+
+$('base').value = lsGet('probe_base', 'https://mengmenguu.top/v1');
+$('key').value  = lsGet('probe_key', '');
+$('fmt').value  = lsGet('probe_fmt', 'auto');
+['base','key','fmt'].forEach(function(id){
+  $(id).addEventListener('change', function(){
+    lsSet('probe_base', $('base').value.trim()); lsSet('probe_key', $('key').value.trim()); lsSet('probe_fmt', $('fmt').value);
+  });
+});
+function base(){ return $('base').value.trim().replace(/\/+$/,''); }
+function key(){ return $('key').value.trim(); }
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+function render(){
+  var q = $('search').value.trim().toLowerCase();
+  var p = pins();
+  var sorted = models.slice().sort(function(a,b){
+    var pa = p.indexOf(a.id)>=0?0:1, pb = p.indexOf(b.id)>=0?0:1;
+    if(pa!==pb) return pa-pb; return a.id<b.id?-1:1;
+  });
+  var html = '';
+  sorted.forEach(function(m){
+    if(q && m.id.toLowerCase().indexOf(q)<0) return;
+    var s = state[m.id] || {st:'idle'};
+    var badge = s.st==='ok' ? '<span class="badge ok">通 ' + s.ms + 'ms</span>'
+      : s.st==='bad' ? '<span class="badge bad">挂</span>'
+      : s.st==='busy' ? '<span class="badge busy"><span class="spin"></span> 测中</span>'
+      : '<span class="badge">未测</span>';
+    var detail = s.st==='bad' ? '<div class="mdetail err">' + esc(s.msg) + '</div>'
+      : s.st==='ok' ? '<div class="mdetail">延迟 ' + s.ms + 'ms' + (s.via? ' · ' + esc(s.via) : '') + '</div>' : '';
+    html += '<div class="mrow">'
+      + '<input type="checkbox" data-act="chk" data-id="' + esc(m.id) + '" checked>'
+      + '<div class="mid"><div class="mname">' + esc(m.id) + '</div>' + detail + '</div>'
+      + badge
+      + '<button class="pin' + (p.indexOf(m.id)>=0?' on':'') + '" data-act="pin" data-id="' + esc(m.id) + '" title="收藏">★</button>'
+      + '<button class="one" data-act="one" data-id="' + esc(m.id) + '">测</button>'
+      + '</div>';
+  });
+  $('list').innerHTML = html || '<div class="empty">没有匹配的模型</div>';
+  var t = models.length, ok=0, bad=0, idle=0;
+  models.forEach(function(m){ var s = state[m.id]; if(!s||s.st==='idle') idle++; else if(s.st==='ok') ok++; else if(s.st==='bad') bad++; else idle++; });
+  $('sTotal').textContent = t; $('sOk').textContent = ok; $('sBad').textContent = bad; $('sIdle').textContent = idle;
+  $('sumCard').style.display = t? 'block':'none';
+  $('empty').style.display = t? 'none':'block';
+}
+$('list').addEventListener('click', function(e){
+  var b = e.target.closest('[data-act]'); if(!b) return;
+  var id = b.getAttribute('data-id'), act = b.getAttribute('data-act');
+  if(act==='pin'){ setPin(id, pins().indexOf(id)<0); render(); }
+  if(act==='one'){ probeMany([id]); }
+});
+$('search').addEventListener('input', render);
+
+function fetchWithTimeout(url, opts, ms){
+  var c = new AbortController(); var t = setTimeout(function(){ c.abort(); }, ms);
+  opts.signal = c.signal;
+  return fetch(url, opts).finally(function(){ clearTimeout(t); });
+}
+function errText(j, fallback){
+  try{ if(j && j.error && j.error.message) return j.error.message; if(j && j.message) return j.message; }catch(e){}
+  return fallback;
+}
+function classify(status, msg){
+  var m = String(msg||'');
+  if(status===401 || status===403) return 'Key 被拒（' + status + '）：' + m.slice(0,120);
+  if(status===429) return '限流（429）：' + m.slice(0,120);
+  if(/无可用渠道|no available|model_not_found|不存在|not found/i.test(m) && status!==404) return '上游无可用渠道（' + status + '）：' + m.slice(0,120);
+  if(status===404) return '接口 404（多半是格式/地址不对）：' + m.slice(0,120);
+  if(status>=500) return '上游错误（' + status + '）：' + m.slice(0,120);
+  return 'HTTP ' + status + '：' + m.slice(0,140);
+}
+async function probeOnce(id, fmt){
+  var t0 = Date.now();
+  var isAnth = fmt==='anthropic';
+  var url = base() + (isAnth? '/messages' : '/chat/completions');
+  var headers = {'Content-Type':'application/json'};
+  if(isAnth){ headers['x-api-key'] = key(); headers['anthropic-version'] = '2023-06-01'; }
+  else { headers['Authorization'] = 'Bearer ' + key(); }
+  var body = { model:id, max_tokens:1, messages:[{role:'user', content:'ping'}] };
+  var resp = await fetchWithTimeout(url, {method:'POST', headers:headers, body:JSON.stringify(body)}, 25000);
+  var txt = await resp.text();
+  var j = null; try{ j = JSON.parse(txt); }catch(e){}
+  var ms = Date.now()-t0;
+  if(resp.ok) return {ok:true, ms:ms, via: isAnth?'Anthropic':'OpenAI'};
+  return {ok:false, status:resp.status, msg: errText(j, txt.slice(0,160))};
+}
+async function probe(id){
+  state[id] = {st:'busy'}; render();
+  var fmt = $('fmt').value;
+  try{
+    var r;
+    if(fmt==='auto'){
+      r = await probeOnce(id, 'openai');
+      if(!r.ok && (r.status===404 || (r.status===400 && /chat|completion|endpoint|unsupported|invalid/i.test(r.msg||'')))){
+        r = await probeOnce(id, 'anthropic');
+      }
+    } else {
+      r = await probeOnce(id, fmt);
+    }
+    if(r.ok) state[id] = {st:'ok', ms:r.ms, via:r.via};
+    else state[id] = {st:'bad', msg: classify(r.status, r.msg)};
+  }catch(e){
+    state[id] = {st:'bad', msg: (e && e.name==='AbortError')? '超时（25 秒没应答）' : '网络错误：' + (e && e.message || e)};
+  }
+  render();
+}
+async function probeMany(ids){
+  if(running) return;
+  if(!key()){ alert('先填 API Key'); return; }
+  running = true; stopFlag = false; $('btnStop').disabled = false;
+  var queue = ids.slice(), workers = [];
+  function next(){
+    if(stopFlag || !queue.length) return Promise.resolve();
+    var id = queue.shift();
+    return probe(id).then(next);
+  }
+  for(var i=0;i<Math.min(3, ids.length);i++) workers.push(next());
+  await Promise.all(workers);
+  running = false; $('btnStop').disabled = true;
+  $('sTime').textContent = '上次检测 ' + new Date().toLocaleTimeString();
+  render();
+}
+$('btnStop').addEventListener('click', function(){ stopFlag = true; });
+
+$('btnModels').addEventListener('click', async function(){
+  if(!key()){ alert('先填 API Key'); return; }
+  lsSet('probe_base', base()); lsSet('probe_key', key());
+  $('btnModels').disabled = true; $('btnModels').textContent = '拉取中…';
+  try{
+    var resp = await fetchWithTimeout(base() + '/models', {headers:{'Authorization':'Bearer ' + key()}}, 20000);
+    var j = await resp.json().catch(function(){ return null; });
+    if(!resp.ok) throw new Error(classify(resp.status, errText(j, '')));
+    var arr = (j && j.data) || [];
+    models = arr.map(function(x){ return {id: x.id}; }).filter(function(x){ return x.id; });
+    if(!models.length) throw new Error('模型列表是空的');
+    state = {};
+    $('toolbar').style.display = 'flex'; $('search').style.display = 'block';
+    render();
+  }catch(e){ alert('拉取失败：' + (e && e.message || e)); }
+  $('btnModels').disabled = false; $('btnModels').textContent = '拉取模型列表';
+});
+$('btnAll').addEventListener('click', function(){ probeMany(models.map(function(m){ return m.id; })); });
+$('btnChecked').addEventListener('click', function(){
+  var ids = Array.prototype.map.call(document.querySelectorAll('[data-act="chk"]:checked'), function(c){ return c.getAttribute('data-id'); });
+  probeMany(ids);
+});
+$('btnPins').addEventListener('click', function(){
+  var ids = pins().filter(function(id){ return models.some(function(m){ return m.id===id; }); });
+  if(!ids.length){ alert('还没收藏模型：点模型右边的 ★ 先收藏你常用的'); return; }
+  probeMany(ids);
+});
+render();
+</script>
+</body>
+</html>
