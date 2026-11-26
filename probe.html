@@ -104,6 +104,32 @@
   <input type="text" class="search" id="search" placeholder="搜模型名…" style="display:none">
   <div id="list"></div>
   <div class="empty" id="empty">先填好地址和 Key，点「拉取模型列表」</div>
+
+  <div class="card" id="verifyCard">
+    <div style="font-size:15px; font-weight:700; margin-bottom:4px">模型验真</div>
+    <div class="note" style="margin-top:0">给单个模型出 10 道「指纹题」：旗舰模型稳过的题，便宜小模型会露馅。答得越不像旗舰，掺水嫌疑越大。注意：这是能力指纹，不是铁证——分数低是强烈的可疑信号，分数高也只能说明它现在表现达标。</div>
+    <label>要验的模型（先拉列表，或直接输入完整模型名）</label>
+    <input type="text" id="vTarget" list="vModels" placeholder="例如 0.6/3claude-sonnet-5-5">
+    <datalist id="vModels"></datalist>
+    <label>它自称是哪家（身份题对照用）</label>
+    <select id="vFamily">
+      <option value="">不指定，只测能力</option>
+      <option value="claude">Claude（Anthropic）</option>
+      <option value="gpt">GPT（OpenAI）</option>
+      <option value="gemini">Gemini（Google）</option>
+      <option value="deepseek">DeepSeek</option>
+      <option value="qwen">通义千问（阿里）</option>
+      <option value="glm">智谱 GLM</option>
+      <option value="kimi">Kimi（月之暗面）</option>
+    </select>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="btnVerify">开始验真（约 10 次调用）</button>
+      <button id="btnVerifyStop" disabled>停止</button>
+    </div>
+    <div id="vProgress" class="note"></div>
+    <div id="vVerdict" style="margin-top:10px"></div>
+    <div id="vResults" style="margin-top:8px"></div>
+  </div>
 </div>
 
 <script>
@@ -269,6 +295,112 @@ $('btnPins').addEventListener('click', function(){
   if(!ids.length){ alert('还没收藏模型：点模型右边的 ★ 先收藏你常用的'); return; }
   probeMany(ids);
 });
+
+// ══ 模型验真 ══
+var vRunning = false, vStop = false;
+$('vTarget').addEventListener('focus', function(){
+  $('vModels').innerHTML = models.map(function(m){ return '<option value="' + esc(m.id) + '">'; }).join('');
+});
+function firstInt(s){ var m = String(s||'').match(/-?\d+/); return m? parseInt(m[0],10) : null; }
+function cleanAns(s){ return String(s||'').trim().replace(/^[「『"'\s]+|[」』"'\s。\.]+$/g,''); }
+var BATTERY = [
+  { name:'数字母', q:"How many times does the letter 'r' appear in the word 'strawberry'? Reply with only the number.",
+    grade:function(a){ return firstInt(a)===3; }, expect:'3' },
+  { name:'小数比较', q:"9.11 和 9.9 哪个大？只回答更大的那个数字，不要解释。",
+    grade:function(a){ return /9\.9/.test(a) && !/9\.11\s*(大|bigger|>|＞)/.test(a); }, expect:'9.9' },
+  { name:'倒序输出', q:"请把'人工智能'这四个字倒序输出，只输出倒序后的四个字，不要任何其他内容。",
+    grade:function(a){ return cleanAns(a)==='能智工人'; }, expect:'能智工人' },
+  { name:'定位截取', q:"只输出这句话中第三个逗号后面的全部内容，不要多输出任何字：'苹果，香蕉，橙子，葡萄，西瓜'",
+    grade:function(a){ return a.indexOf('葡萄')>=0 && a.indexOf('西瓜')>=0 && a.indexOf('苹果')<0 && a.indexOf('香蕉')<0 && a.indexOf('橙子')<0; }, expect:'葡萄，西瓜' },
+  { name:'数字数', q:"这句话里有几个'的'字？只回答数字：'他的书的封面是红的，我的朋友的也是。'",
+    grade:function(a){ return firstInt(a)===5; }, expect:'5' },
+  { name:'鸡兔同笼', q:"笼子里鸡和兔一共 10 只头、28 只脚。鸡有几只？只回答数字。",
+    grade:function(a){ return firstInt(a)===6; }, expect:'6' },
+  { name:'亲属逻辑', q:"小明有 3 个哥哥和 3 个姐姐。请问：小明的姐姐有几个兄弟？只回答数字。",
+    grade:function(a){ return firstInt(a)===4; }, expect:'4' },
+  { name:'格式服从', q:"用恰好三句话介绍月亮，每句话都必须以'月'字开头。三句话之外不要输出任何内容。",
+    grade:function(a){ var parts = String(a||'').split(/[。！？!?]+/).map(function(x){ return x.trim(); }).filter(Boolean); return parts.length===3 && parts.every(function(x){ return x.charAt(0)==='月'; }); }, expect:'恰好三句、每句以「月」开头' },
+  { name:'知识时效', q:"2024 年诺贝尔文学奖得主是谁？只回答其名字（中文或英文均可）。",
+    grade:function(a){ return /韩江|Han Kang/i.test(a); }, expect:'韩江（Han Kang）' },
+  { name:'身份自述', info:true, q:"你是什么模型？由哪家公司开发？用一句话回答。",
+    grade:function(a){ return null; }, expect:'看它自报的家门与你选的「自称哪家」对不对得上' }
+];
+var FAMILY_WORDS = { claude:/claude|anthropic/i, gpt:/gpt|openai/i, gemini:/gemini|google/i, deepseek:/deepseek/i, qwen:/通义|千问|qwen|阿里/i, glm:/glm|智谱/i, kimi:/kimi|月之暗面|moonshot/i };
+async function chatCall(id, prompt, fmt){
+  var isAnth = fmt==='anthropic';
+  var url = base() + (isAnth? '/messages' : '/chat/completions');
+  var headers = {'Content-Type':'application/json'};
+  if(isAnth){ headers['x-api-key'] = key(); headers['anthropic-version'] = '2023-06-01'; }
+  else { headers['Authorization'] = 'Bearer ' + key(); }
+  var body = { model:id, max_tokens:800, messages:[{role:'user', content:prompt}] };
+  var resp = await fetchWithTimeout(url, {method:'POST', headers:headers, body:JSON.stringify(body)}, 45000);
+  var txt = await resp.text();
+  var j = null; try{ j = JSON.parse(txt); }catch(e){}
+  if(!resp.ok) return {ok:false, status:resp.status, msg: errText(j, txt.slice(0,160))};
+  var out = '';
+  if(isAnth){ try{ out = (j.content||[]).map(function(c){ return c.text||''; }).join(''); }catch(e){} }
+  else { try{ out = j.choices[0].message.content || ''; }catch(e){} }
+  return {ok:true, text:String(out), model: j && j.model};
+}
+async function chatCallAuto(id, prompt){
+  var fmt = $('fmt').value;
+  if(fmt!=='auto') return chatCall(id, prompt, fmt);
+  var r = await chatCall(id, prompt, 'openai');
+  if(!r.ok && (r.status===404 || (r.status===400 && /chat|completion|endpoint|unsupported|invalid/i.test(r.msg||'')))) r = await chatCall(id, prompt, 'anthropic');
+  return r;
+}
+$('btnVerifyStop').addEventListener('click', function(){ vStop = true; });
+$('btnVerify').addEventListener('click', async function(){
+  if(vRunning) return;
+  var target = $('vTarget').value.trim();
+  if(!target){ alert('先选或输入要验的模型'); return; }
+  if(!key()){ alert('先填 API Key'); return; }
+  vRunning = true; vStop = false;
+  $('btnVerify').disabled = true; $('btnVerifyStop').disabled = false;
+  $('vResults').innerHTML = ''; $('vVerdict').innerHTML = '';
+  var fam = $('vFamily').value;
+  var score = 0, scored = 0, returnedModels = {};
+  for(var i=0;i<BATTERY.length;i++){
+    if(vStop){ $('vProgress').textContent = '已停止'; break; }
+    var item = BATTERY[i];
+    $('vProgress').textContent = '验真中 ' + (i+1) + '/' + BATTERY.length + '：' + item.name + '…';
+    var r;
+    try{ r = await chatCallAuto(target, item.q); }
+    catch(e){ r = {ok:false, msg: (e && e.name==='AbortError')? '超时' : ('网络错误：' + (e && e.message || e))}; }
+    var rowHtml;
+    if(!r.ok){
+      rowHtml = '<div class="mrow"><div class="mid"><div class="mname">' + (i+1) + '. ' + esc(item.name) + '</div><div class="mdetail err">调用失败：' + esc(classify(r.status||0, r.msg)) + '</div></div><span class="badge bad">失败</span></div>';
+      if(!item.info) scored++;
+    } else {
+      if(r.model) returnedModels[r.model] = true;
+      var g = item.grade(r.text);
+      var badge, detail = '<div class="mdetail">期望：' + esc(item.expect) + '<br>它答：' + esc(r.text.slice(0,220)) + '</div>';
+      if(item.info){
+        var warn = '';
+        if(fam && FAMILY_WORDS[fam] && !FAMILY_WORDS[fam].test(r.text)) warn = '<div class="mdetail err">⚠ 自报家门与所选家族对不上，可疑</div>';
+        else if(fam) warn = '<div class="mdetail">自报家门对得上（但身份可以伪造，仅供参考）</div>';
+        badge = '<span class="badge">参考</span>'; detail += warn;
+      } else if(g){ score++; scored++; badge = '<span class="badge ok">过</span>'; }
+      else { scored++; badge = '<span class="badge bad">露馅</span>'; }
+      rowHtml = '<div class="mrow"><div class="mid"><div class="mname">' + (i+1) + '. ' + esc(item.name) + '</div>' + detail + '</div>' + badge + '</div>';
+    }
+    $('vResults').insertAdjacentHTML('beforeend', rowHtml);
+  }
+  if(!vStop){
+    $('vProgress').textContent = '验真完成';
+    var verdict, cls;
+    if(scored===0){ verdict = '一道题都没测成，先看上面失败原因（多半是模型本身已挂或 Key 问题）'; cls='warn'; }
+    else if(score>=scored-1){ verdict = '得分 ' + score + '/' + scored + '：表现符合旗舰水准，没闻到掺水味'; cls='ok'; }
+    else if(score>=scored-3){ verdict = '得分 ' + score + '/' + scored + '：基本达标，但有旗舰不该错的题错了，留意是否轻微降智'; cls='warn'; }
+    else if(score>=Math.ceil(scored/2)){ verdict = '得分 ' + score + '/' + scored + '：可疑，能力明显缩水，不像它自称的旗舰'; cls='warn'; }
+    else { verdict = '得分 ' + score + '/' + scored + '：大概率掺水——这水平更像便宜小模型顶替的'; cls='bad'; }
+    var rm = Object.keys(returnedModels);
+    var rmNote = rm.length? '<div class="mdetail" style="margin-top:4px">接口返回的 model 字段：' + esc(rm.join('、')) + (rm.some(function(x){ return x!==target; })? '（与所请求的名字不完全一致，留意）':'') + '</div>' : '';
+    $('vVerdict').innerHTML = '<div class="' + cls + '" style="font-size:15px; font-weight:700">' + esc(verdict) + '</div>' + rmNote;
+  }
+  vRunning = false; $('btnVerify').disabled = false; $('btnVerifyStop').disabled = true;
+});
+
 render();
 </script>
 </body>
