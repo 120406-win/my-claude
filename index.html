@@ -5159,10 +5159,22 @@ async function backendFetch(path, body){
 }
 async function cloudSyncUpload(){
   try{
-    cloudStatus('正在打包上传…');
+    cloudStatus('正在打包…');
     const collected = await collectBackupData();
     const payload = { app:collected.app, version:collected.version, exportedAt:collected.exportedAt, data:collected.data, files:collected.files };
-    await backendFetch('/kv/set', { items:{ zephyr_backup: JSON.stringify(payload) } });
+    // 分块上传：整包近 20MB 一口气 POST 在手机上容易被网络掐断（Load failed），
+    // 切成小块逐块传、后端最后拼回 zephyr_backup；中途断了旧备份不受影响。
+    const whole = JSON.stringify(payload);
+    const SLICE = 1200000;
+    const n = Math.max(1, Math.ceil(whole.length / SLICE));
+    for(let i = 0; i < n; i++){
+      cloudStatus('正在上传 ' + (i + 1) + '/' + n + ' 块…');
+      const items = {};
+      items['zephyr_backup_p' + i] = whole.slice(i * SLICE, (i + 1) * SLICE);
+      await backendFetch('/kv/set', { items });
+    }
+    cloudStatus('正在合并…');
+    await backendFetch('/backup/commit', { parts: n });
     cloudMetaSet({ up: Date.now() });
     cloudStatus('已同步到云端：' + new Date().toLocaleString());
     showToast('已同步到云端 ✓');
