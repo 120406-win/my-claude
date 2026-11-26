@@ -130,6 +130,34 @@
     <div id="vVerdict" style="margin-top:10px"></div>
     <div id="vResults" style="margin-top:8px"></div>
   </div>
+
+  <div class="card" id="fpCard">
+    <div style="font-size:15px; font-weight:700; margin-bottom:4px">指纹对照</div>
+    <div class="note" style="margin-top:0">原理像笔迹鉴定：先让「真品」模型答一套指纹题存成样本，再让被测模型答同一套，逐题比对像不像。能回答「这个渠道的 X，像不像真品 X」，回答不了「它到底是谁」；参照物本身若不真，结论会跟着歪。</div>
+    <label>参考站地址（真品来源）</label>
+    <input type="text" id="fpRefBase" placeholder="https://modelrouter.fun/v1" autocomplete="off">
+    <label>参考站 API Key</label>
+    <input type="password" id="fpRefKey" placeholder="参考站的 sk-..." autocomplete="off">
+    <label>真品模型（参考站里的完整模型名）</label>
+    <div class="row">
+      <input type="text" id="fpRefModel" list="fpRefModels" placeholder="先拉参考站模型列表，或直接输入">
+      <button id="btnRefModels" style="flex:0 0 auto">拉参考站模型</button>
+    </div>
+    <datalist id="fpRefModels"></datalist>
+    <div class="row" style="margin-top:12px">
+      <button class="primary" id="btnBuildSample">① 建立真品样本（约 13 次调用）</button>
+    </div>
+    <div class="note" id="fpSampleInfo">还没有真品样本</div>
+    <label>被测模型（用上方主站的地址和 Key，填它的完整模型名）</label>
+    <input type="text" id="fpTestModel" list="vModels" placeholder="例如 0.4/2.8claude-sonnet-4-6">
+    <div class="row" style="margin-top:12px">
+      <button class="pink" id="btnCompare">② 开始对照（约 13 次调用）</button>
+      <button id="btnFpStop" disabled>停止</button>
+    </div>
+    <div id="fpProgress" class="note"></div>
+    <div id="fpVerdict" style="margin-top:10px"></div>
+    <div id="fpResults" style="margin-top:8px"></div>
+  </div>
 </div>
 
 <script>
@@ -400,6 +428,148 @@ $('btnVerify').addEventListener('click', async function(){
   }
   vRunning = false; $('btnVerify').disabled = false; $('btnVerifyStop').disabled = true;
 });
+
+
+// ══ 指纹对照 ══
+function bigramSim(a, b){
+  function grams(s){ s = String(s||'').replace(/\s+/g,''); var g = {}; for(var i=0;i<s.length-1;i++){ g[s.slice(i,i+2)] = 1; } return g; }
+  var ga = grams(a), gb = grams(b), ka = Object.keys(ga), kb = Object.keys(gb);
+  if(!ka.length || !kb.length) return 0;
+  var inter = 0; ka.forEach(function(k){ if(gb[k]) inter++; });
+  return inter / (ka.length + kb.length - inter);
+}
+var FP_ITEMS = [
+  { key:'r',    name:'数字母',   type:'exact', q:"How many times does the letter 'r' appear in the word 'strawberry'? Reply with only the number.", val:function(a){ return String(firstInt(a)); } },
+  { key:'num',  name:'小数比较', type:'exact', q:"9.11 和 9.9 哪个大？只回答更大的那个数字，不要解释。", val:function(a){ return /9\.9/.test(a)? '9.9' : (/9\.11/.test(a)? '9.11':'?'); } },
+  { key:'rev',  name:'倒序输出', type:'exact', q:"请把'人工智能'这四个字倒序输出，只输出倒序后的四个字，不要任何其他内容。", val:function(a){ return cleanAns(a); } },
+  { key:'cut',  name:'定位截取', type:'exact', q:"只输出这句话中第三个逗号后面的全部内容，不要多输出任何字：'苹果，香蕉，橙子，葡萄，西瓜'", val:function(a){ return cleanAns(a); } },
+  { key:'de',   name:'数字数',   type:'exact', q:"这句话里有几个'的'字？只回答数字：'他的书的封面是红的，我的朋友的也是。'", val:function(a){ return String(firstInt(a)); } },
+  { key:'chk',  name:'鸡兔同笼', type:'exact', q:"笼子里鸡和兔一共 10 只头、28 只脚。鸡有几只？只回答数字。", val:function(a){ return String(firstInt(a)); } },
+  { key:'kin',  name:'亲属逻辑', type:'exact', q:"小明有 3 个哥哥和 3 个姐姐。请问：小明的姐姐有几个兄弟？只回答数字。", val:function(a){ return String(firstInt(a)); } },
+  { key:'nob',  name:'知识时效', type:'exact', q:"2024 年诺贝尔文学奖得主是谁？只回答其名字（中文或英文均可）。", val:function(a){ return /韩江/.test(a)? '韩江' : (/Han Kang/i.test(a)? 'Han Kang' : cleanAns(a).slice(0,20)); } },
+  { key:'pick', name:'直觉数字', type:'exact', q:"凭直觉在 1 到 100 之间选一个数字，只回答数字，不要解释。", val:function(a){ return String(firstInt(a)); } },
+  { key:'col',  name:'直觉颜色', type:'exact', q:"凭直觉说一种颜色，只回答颜色名，不要解释。", val:function(a){ return cleanAns(a).slice(0,10); } },
+  { key:'moon', name:'格式与文风', type:'text', q:"用恰好三句话介绍月亮，每句话都必须以'月'字开头。三句话之外不要输出任何内容。", val:function(a){ return String(a||''); } },
+  { key:'tr',   name:'翻译习惯', type:'text', q:"把这句话翻译成英文，只输出译文：'今天天气不错，我们去公园散步吧。'", val:function(a){ return String(a||''); } },
+  { key:'idn',  name:'身份自述', type:'text', q:"你是什么模型？由哪家公司开发？用一句话回答。", val:function(a){ return String(a||''); } }
+];
+async function chatCallAt(b, k, id, prompt, fmt){
+  var isAnth = fmt==='anthropic';
+  var url = b.replace(/\/+$/,'') + (isAnth? '/messages' : '/chat/completions');
+  var headers = {'Content-Type':'application/json'};
+  if(isAnth){ headers['x-api-key'] = k; headers['anthropic-version'] = '2023-06-01'; }
+  else { headers['Authorization'] = 'Bearer ' + k; }
+  var resp = await fetchWithTimeout(url, {method:'POST', headers:headers, body:JSON.stringify({model:id, max_tokens:800, messages:[{role:'user', content:prompt}]})}, 45000);
+  var txt = await resp.text();
+  var j = null; try{ j = JSON.parse(txt); }catch(e){}
+  if(!resp.ok) return {ok:false, status:resp.status, msg: errText(j, txt.slice(0,160))};
+  var out = '';
+  if(isAnth){ try{ out = (j.content||[]).map(function(c){ return c.text||''; }).join(''); }catch(e){} }
+  else { try{ out = j.choices[0].message.content || ''; }catch(e){} }
+  return {ok:true, text:String(out), model: j && j.model};
+}
+async function chatCallAutoAt(b, k, id, prompt){
+  var fmt = $('fmt').value;
+  if(fmt!=='auto') return chatCallAt(b, k, id, prompt, fmt);
+  var r = await chatCallAt(b, k, id, prompt, 'openai');
+  if(!r.ok && (r.status===404 || (r.status===400 && /chat|completion|endpoint|unsupported|invalid/i.test(r.msg||'')))) r = await chatCallAt(b, k, id, prompt, 'anthropic');
+  return r;
+}
+$('fpRefBase').value = lsGet('probe_ref_base', 'https://modelrouter.fun/v1');
+$('fpRefKey').value = lsGet('probe_ref_key', '');
+['fpRefBase','fpRefKey'].forEach(function(id){ $(id).addEventListener('change', function(){ lsSet('probe_ref_base', $('fpRefBase').value.trim()); lsSet('probe_ref_key', $('fpRefKey').value.trim()); }); });
+function fpSample(){ return lsGet('probe_fp_sample', null); }
+function showSampleInfo(){
+  var s = fpSample();
+  $('fpSampleInfo').textContent = s? ('已有真品样本：' + s.model + '（来自 ' + s.base + '，建于 ' + new Date(s.ts).toLocaleString() + '）。换真品模型后需重建。') : '还没有真品样本';
+}
+$('btnRefModels').addEventListener('click', async function(){
+  var b = $('fpRefBase').value.trim(), k = $('fpRefKey').value.trim();
+  if(!k){ alert('先填参考站的 Key'); return; }
+  lsSet('probe_ref_base', b); lsSet('probe_ref_key', k);
+  $('btnRefModels').disabled = true;
+  try{
+    var resp = await fetchWithTimeout(b.replace(/\/+$/,'') + '/models', {headers:{'Authorization':'Bearer ' + k}}, 20000);
+    var j = await resp.json().catch(function(){ return null; });
+    if(!resp.ok) throw new Error(classify(resp.status, errText(j, '')));
+    $('fpRefModels').innerHTML = ((j && j.data) || []).map(function(x){ return '<option value="' + esc(x.id) + '">'; }).join('');
+    alert('参考站模型已拉取，在输入框里选一个');
+  }catch(e){ alert('拉取失败：' + (e && e.message || e)); }
+  $('btnRefModels').disabled = false;
+});
+var fpRunning = false, fpStop = false;
+$('btnFpStop').addEventListener('click', function(){ fpStop = true; });
+async function fpRunAll(b, k, model, progressEl){
+  var answers = {};
+  for(var i=0;i<FP_ITEMS.length;i++){
+    if(fpStop) break;
+    var it = FP_ITEMS[i];
+    $(progressEl).textContent = '进行中 ' + (i+1) + '/' + FP_ITEMS.length + '：' + it.name + '…';
+    var r;
+    try{ r = await chatCallAutoAt(b, k, model, it.q); }
+    catch(e){ r = {ok:false, msg:(e && e.name==='AbortError')? '超时' : ('网络错误：' + (e && e.message || e))}; }
+    if(!r.ok) return {ok:false, msg:'第 ' + (i+1) + ' 题（' + it.name + '）调用失败：' + classify(r.status||0, r.msg)};
+    answers[it.key] = { raw:r.text, val: it.val(r.text), retModel: r.model || '' };
+  }
+  return {ok:true, answers:answers};
+}
+$('btnBuildSample').addEventListener('click', async function(){
+  if(fpRunning) return;
+  var b = $('fpRefBase').value.trim(), k = $('fpRefKey').value.trim(), m = $('fpRefModel').value.trim();
+  if(!k){ alert('先填参考站的 Key'); return; }
+  if(!m){ alert('先选真品模型'); return; }
+  fpRunning = true; fpStop = false; $('btnBuildSample').disabled = true; $('btnFpStop').disabled = false;
+  var res = await fpRunAll(b, k, m, 'fpProgress');
+  if(res.ok && !fpStop){
+    lsSet('probe_fp_sample', { base:b, model:m, ts:Date.now(), answers:res.answers });
+    $('fpProgress').textContent = '真品样本建好了';
+    showSampleInfo();
+  } else {
+    $('fpProgress').textContent = fpStop? '已停止，样本未保存' : ('建样本失败：' + (res.msg || ''));
+  }
+  fpRunning = false; $('btnBuildSample').disabled = false; $('btnFpStop').disabled = true;
+});
+$('btnCompare').addEventListener('click', async function(){
+  if(fpRunning) return;
+  var s = fpSample();
+  if(!s){ alert('先建真品样本'); return; }
+  var m = $('fpTestModel').value.trim();
+  if(!m){ alert('先填被测模型'); return; }
+  if(!key()){ alert('先填主站（被测站）的 Key'); return; }
+  fpRunning = true; fpStop = false; $('btnCompare').disabled = true; $('btnFpStop').disabled = false;
+  $('fpResults').innerHTML = ''; $('fpVerdict').innerHTML = '';
+  var res = await fpRunAll(base(), key(), m, 'fpProgress');
+  if(!res.ok){ $('fpProgress').textContent = '对照失败：' + res.msg; fpRunning = false; $('btnCompare').disabled = false; $('btnFpStop').disabled = true; return; }
+  if(fpStop){ $('fpProgress').textContent = '已停止'; fpRunning = false; $('btnCompare').disabled = false; $('btnFpStop').disabled = true; return; }
+  $('fpProgress').textContent = '对照完成（真品：' + s.model + ' @ ' + s.base + '）';
+  var total = 0, n = 0, rows = '';
+  FP_ITEMS.forEach(function(it, idx){
+    var ref = s.answers[it.key], got = res.answers[it.key];
+    if(!ref || !got) return;
+    var score, badge;
+    if(it.type==='exact'){
+      score = (String(ref.val)===String(got.val))? 1 : 0;
+      badge = score? '<span class="badge ok">一致</span>' : '<span class="badge bad">不一致</span>';
+    } else {
+      score = bigramSim(ref.val, got.val);
+      badge = '<span class="badge' + (score>=0.5?' ok':'') + '">相似 ' + Math.round(score*100) + '%</span>';
+    }
+    total += score; n++;
+    rows += '<div class="mrow"><div class="mid"><div class="mname">' + (idx+1) + '. ' + esc(it.name) + '</div>'
+      + '<div class="mdetail">真品：' + esc(String(ref.val).slice(0,160)) + '<br>被测：' + esc(String(got.val).slice(0,160)) + '</div></div>' + badge + '</div>';
+  });
+  $('fpResults').innerHTML = rows;
+  var pct = n? (total/n*100) : 0;
+  var verdict, cls;
+  if(pct>=85){ verdict = '相似度 ' + pct.toFixed(1) + '%：高度一致，像同一个模型'; cls='ok'; }
+  else if(pct>=65){ verdict = '相似度 ' + pct.toFixed(1) + '%：大体一致，有个别差异，可能是渠道包装或随机波动'; cls='warn'; }
+  else if(pct>=45){ verdict = '相似度 ' + pct.toFixed(1) + '%：差异不小，不太像同一个模型'; cls='warn'; }
+  else { verdict = '相似度 ' + pct.toFixed(1) + '%：明显不像同一个模型，掺水嫌疑大'; cls='bad'; }
+  $('fpVerdict').innerHTML = '<div class="' + cls + '" style="font-size:15px; font-weight:700">' + esc(verdict) + '</div>'
+    + '<div class="mdetail" style="margin-top:4px">对照对象：被测 ' + esc(m) + ' vs 真品 ' + esc(s.model) + '。同一模型两次作答也会有随机差异，分数看个大概，重点看下面哪几题对不上。</div>';
+  fpRunning = false; $('btnCompare').disabled = false; $('btnFpStop').disabled = true;
+});
+showSampleInfo();
 
 render();
 </script>
