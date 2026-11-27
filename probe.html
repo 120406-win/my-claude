@@ -236,12 +236,19 @@ function errText(j, fallback){
 }
 function classify(status, msg){
   var m = String(msg||'');
+  if(!status) return m;
   if(status===401 || status===403) return 'Key 被拒（' + status + '）：' + m.slice(0,120);
   if(status===429) return '限流（429）：' + m.slice(0,120);
   if(/无可用渠道|no available|model_not_found|不存在|not found/i.test(m) && status!==404) return '上游无可用渠道（' + status + '）：' + m.slice(0,120);
   if(status===404) return '接口 404（多半是格式/地址不对）：' + m.slice(0,120);
   if(status>=500) return '上游错误（' + status + '）：' + m.slice(0,120);
   return 'HTTP ' + status + '：' + m.slice(0,140);
+}
+// 浏览器连请求都没发出去时（最常见的就是 "Failed to fetch"）的 plain-language 解释：
+// 别把英文原样甩给用户，三个最常见原因直接写出来。
+function netFailText(e){
+  if(e && e.name==='AbortError') return '超时：站子半天没应答，等一会再测一次';
+  return '连不上站子：浏览器根本没把请求发出去。最常见三个原因：①别在微信里打开，复制链接去 Chrome 或手机自带浏览器再试；②魔法（VPN）切到全局模式再试；③检查地址是 https 开头、/v1 结尾，别多空格。换了别的站子还不行，多半是那个站子没给网页开跨域许可，App 里能用、网页调不动';
 }
 async function probeOnce(id, fmt){
   var t0 = Date.now();
@@ -274,7 +281,7 @@ async function probe(id){
     if(r.ok) state[id] = {st:'ok', ms:r.ms, via:r.via};
     else state[id] = {st:'bad', msg: classify(r.status, r.msg)};
   }catch(e){
-    state[id] = {st:'bad', msg: (e && e.name==='AbortError')? '超时（25 秒没应答）' : '网络错误：' + (e && e.message || e)};
+    state[id] = {st:'bad', msg: netFailText(e)};
   }
   render();
 }
@@ -310,7 +317,7 @@ $('btnModels').addEventListener('click', async function(){
     state = {};
     $('toolbar').style.display = 'flex'; $('search').style.display = 'block';
     render();
-  }catch(e){ alert('拉取失败：' + (e && e.message || e)); }
+  }catch(e){ alert('拉取失败：' + netFailText(e)); }
   $('btnModels').disabled = false; $('btnModels').textContent = '拉取模型列表';
 });
 $('btnAll').addEventListener('click', function(){ probeMany(models.map(function(m){ return m.id; })); });
@@ -394,7 +401,7 @@ $('btnVerify').addEventListener('click', async function(){
     $('vProgress').textContent = '验真中 ' + (i+1) + '/' + BATTERY.length + '：' + item.name + '…';
     var r;
     try{ r = await chatCallAuto(target, item.q); }
-    catch(e){ r = {ok:false, msg: (e && e.name==='AbortError')? '超时' : ('网络错误：' + (e && e.message || e))}; }
+    catch(e){ r = {ok:false, msg: netFailText(e)}; }
     var rowHtml;
     if(!r.ok){
       rowHtml = '<div class="mrow"><div class="mid"><div class="mname">' + (i+1) + '. ' + esc(item.name) + '</div><div class="mdetail err">调用失败：' + esc(classify(r.status||0, r.msg)) + '</div></div><span class="badge bad">失败</span></div>';
@@ -494,7 +501,7 @@ $('btnRefModels').addEventListener('click', async function(){
     if(!resp.ok) throw new Error(classify(resp.status, errText(j, '')));
     $('fpRefModels').innerHTML = ((j && j.data) || []).map(function(x){ return '<option value="' + esc(x.id) + '">'; }).join('');
     alert('参考站模型已拉取，在输入框里选一个');
-  }catch(e){ alert('拉取失败：' + (e && e.message || e)); }
+  }catch(e){ alert('拉取失败：' + netFailText(e)); }
   $('btnRefModels').disabled = false;
 });
 var fpRunning = false, fpStop = false;
@@ -507,7 +514,7 @@ async function fpRunAll(b, k, model, progressEl){
     $(progressEl).textContent = '进行中 ' + (i+1) + '/' + FP_ITEMS.length + '：' + it.name + '…';
     var r;
     try{ r = await chatCallAutoAt(b, k, model, it.q); }
-    catch(e){ r = {ok:false, msg:(e && e.name==='AbortError')? '超时' : ('网络错误：' + (e && e.message || e))}; }
+    catch(e){ r = {ok:false, msg: netFailText(e)}; }
     if(!r.ok) return {ok:false, msg:'第 ' + (i+1) + ' 题（' + it.name + '）调用失败：' + classify(r.status||0, r.msg)};
     answers[it.key] = { raw:r.text, val: it.val(r.text), retModel: r.model || '' };
   }
