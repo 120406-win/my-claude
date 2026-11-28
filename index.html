@@ -747,10 +747,10 @@
     .home-card-sub { font-size:12px; color:var(--text-pale); margin-top:4px; line-height:1.55; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
     .home-foot { text-align:center; font-size:11.5px; color:var(--text-pale); margin-top:24px; letter-spacing:.14em; }
     /* ══ 气泡材质：半磨砂 / 液态玻璃（透明度由 --bubble-alpha 控制，可滑杆调） ══ */
-    html.mat-frost .msg-row.ai .msg, html.mat-frost .msg-row.ai .voice-bubble { background:color-mix(in srgb, var(--bubble-ai) calc(var(--bubble-alpha, .7) * 100%), transparent); backdrop-filter:blur(9px) saturate(1.3); -webkit-backdrop-filter:blur(9px) saturate(1.3); }
-    html.mat-frost .msg-row.user .msg, html.mat-frost .msg-row.user .voice-bubble { background:color-mix(in srgb, var(--bubble-user) calc(var(--bubble-alpha, .7) * 100%), transparent); backdrop-filter:blur(9px) saturate(1.3); -webkit-backdrop-filter:blur(9px) saturate(1.3); }
-    html.mat-glass .msg-row.ai .msg, html.mat-glass .msg-row.ai .voice-bubble { background:linear-gradient(135deg, color-mix(in srgb, var(--bubble-ai) calc(var(--bubble-alpha, .55) * 100%), transparent), color-mix(in srgb, var(--bubble-ai) calc(var(--bubble-alpha, .55) * 55%), transparent)); backdrop-filter:blur(18px) saturate(1.6); -webkit-backdrop-filter:blur(18px) saturate(1.6); border:1px solid color-mix(in srgb, #ffffff 32%, transparent); box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 38%, transparent), 0 8px 22px rgba(30,20,60,.10); }
-    html.mat-glass .msg-row.user .msg, html.mat-glass .msg-row.user .voice-bubble { background:linear-gradient(135deg, color-mix(in srgb, var(--bubble-user) calc(var(--bubble-alpha, .55) * 100%), transparent), color-mix(in srgb, var(--bubble-user) calc(var(--bubble-alpha, .55) * 55%), transparent)); backdrop-filter:blur(18px) saturate(1.6); -webkit-backdrop-filter:blur(18px) saturate(1.6); border:1px solid color-mix(in srgb, #ffffff 30%, transparent); box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 35%, transparent), 0 8px 22px rgba(30,20,60,.10); }
+    html.mat-frost .msg-row.ai .msg, html.mat-frost .msg-row.ai .voice-bubble { background:color-mix(in srgb, var(--bubble-ai) calc(var(--bubble-alpha, .7) * 100%), var(--bg)); }
+    html.mat-frost .msg-row.user .msg, html.mat-frost .msg-row.user .voice-bubble { background:color-mix(in srgb, var(--bubble-user) calc(var(--bubble-alpha, .7) * 100%), var(--bg)); }
+    html.mat-glass .msg-row.ai .msg, html.mat-glass .msg-row.ai .voice-bubble { background:linear-gradient(135deg, color-mix(in srgb, var(--bubble-ai) calc(var(--bubble-alpha, .55) * 100%), var(--bg)), color-mix(in srgb, var(--bubble-ai) calc(var(--bubble-alpha, .55) * 55%), var(--bg))); border:1px solid color-mix(in srgb, #ffffff 32%, transparent); box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 38%, transparent), 0 8px 22px rgba(30,20,60,.10); }
+    html.mat-glass .msg-row.user .msg, html.mat-glass .msg-row.user .voice-bubble { background:linear-gradient(135deg, color-mix(in srgb, var(--bubble-user) calc(var(--bubble-alpha, .55) * 100%), var(--bg)), color-mix(in srgb, var(--bubble-user) calc(var(--bubble-alpha, .55) * 55%), var(--bg))); border:1px solid color-mix(in srgb, #ffffff 30%, transparent); box-shadow:inset 0 1px 0 color-mix(in srgb, #ffffff 35%, transparent), 0 8px 22px rgba(30,20,60,.10); }
     html.mat-frost .header, html.mat-frost .input-bar { background:color-mix(in srgb, var(--bg) 62%, transparent); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
     html.mat-glass .header { background:color-mix(in srgb, var(--bg) 42%, transparent); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); }
     html.mat-glass .input-bar { background:color-mix(in srgb, var(--bg) 42%, transparent); backdrop-filter:blur(18px) saturate(1.4); -webkit-backdrop-filter:blur(18px) saturate(1.4); }
@@ -3148,7 +3148,7 @@ function refreshHomeLightBtn(){
   if(b){ b.textContent = homeDaylight() ? '开' : '关'; b.style.borderColor = homeDaylight() ? 'var(--accent)' : 'transparent'; }
 }
 // ══ 星尘粒子：背景里慢慢上浮、明暗呼吸的细尘，给界面留一口「活气」（外观设置可关）══
-let dustCtx = null, dustParts = [], dustRunning = false, dustMeteors = [], dustNextMeteor = 0;
+let dustCtx = null, dustParts = [], dustRunning = false, dustMeteors = [], dustNextMeteor = 0, dustCv = null, dustInited = false;
 const dustPtr = { x: -999, y: -999, t: 0 };
 function dustOn(){ return localStorage.getItem('z_dust') !== '0'; }
 function toggleDust(){
@@ -3162,69 +3162,79 @@ function refreshDustBtn(){
   const b = document.getElementById('dustBtn');
   if(b){ b.textContent = dustOn() ? '开' : '关'; b.style.borderColor = dustOn() ? 'var(--accent)' : 'transparent'; }
 }
+// 星尘只在 Home 可见时转：别的页面（聊天/设置/各模块）停掉 rAF 循环省帧，切回 Home 再续
+function dustHomeShown(){ const hp = document.getElementById('homePage'); return !!(hp && hp.classList.contains('show')); }
 function initDust(){
   const cv = document.getElementById('dustCanvas');
   if(!cv || !dustOn() || dustRunning) return;
-  const ctx = cv.getContext && cv.getContext('2d');
-  if(!ctx) return;
-  dustCtx = ctx;
-  const fit = ()=>{ cv.width = innerWidth; cv.height = innerHeight; };
-  fit();
-  addEventListener('resize', fit);
-  const COLORS = ['255,255,255', '216,180,254', '249,168,212'];
-  const N = Math.max(36, Math.min(64, Math.floor(innerWidth / 18)));
-  dustParts = [];
-  for(let i = 0; i < N; i++) dustParts.push({ x: Math.random()*cv.width, y: Math.random()*cv.height, r: 1 + Math.random()*2.2, s: .06 + Math.random()*.18, ph: Math.random()*6.28, ps: .005 + Math.random()*.012, dr: (Math.random()-.5)*.06, c: COLORS[i % COLORS.length], star: i % 4 === 0 });
-  dustMeteors = [];
-  dustNextMeteor = performance.now() + 3500;
-  const setPtr = (x, y)=>{ dustPtr.x = x; dustPtr.y = y; dustPtr.t = performance.now(); };
-  document.addEventListener('touchmove', e=>{ const t = e.touches && e.touches[0]; if(t) setPtr(t.clientX, t.clientY); }, { passive:true });
-  document.addEventListener('mousemove', e=>setPtr(e.clientX, e.clientY), { passive:true });
+  if(!dustInited){
+    const ctx = cv.getContext && cv.getContext('2d');
+    if(!ctx) return;
+    dustCtx = ctx;
+    dustCv = cv;
+    const fit = ()=>{ cv.width = innerWidth; cv.height = innerHeight; };
+    fit();
+    addEventListener('resize', fit);
+    const COLORS = ['255,255,255', '216,180,254', '249,168,212'];
+    const N = Math.max(36, Math.min(64, Math.floor(innerWidth / 18)));
+    dustParts = [];
+    for(let i = 0; i < N; i++) dustParts.push({ x: Math.random()*cv.width, y: Math.random()*cv.height, r: 1 + Math.random()*2.2, s: .06 + Math.random()*.18, ph: Math.random()*6.28, ps: .005 + Math.random()*.012, dr: (Math.random()-.5)*.06, c: COLORS[i % COLORS.length], star: i % 4 === 0 });
+    dustMeteors = [];
+    dustNextMeteor = performance.now() + 3500;
+    const setPtr = (x, y)=>{ dustPtr.x = x; dustPtr.y = y; dustPtr.t = performance.now(); };
+    document.addEventListener('touchmove', e=>{ const t = e.touches && e.touches[0]; if(t) setPtr(t.clientX, t.clientY); }, { passive:true });
+    document.addEventListener('mousemove', e=>setPtr(e.clientX, e.clientY), { passive:true });
+    dustInited = true;
+  }
+  if(!dustHomeShown()) return;
   dustRunning = true;
-  (function tick(){
-    if(!dustOn()){ dustRunning = false; dustCtx.clearRect(0, 0, cv.width, cv.height); return; }
-    if(!document.hidden){
-      dustCtx.clearRect(0, 0, cv.width, cv.height);
-      const now = performance.now();
-      const ptrLive = now - dustPtr.t < 1200;
-      for(const p of dustParts){
-        p.y -= p.s; p.x += p.dr + Math.sin(p.ph)*.05; p.ph += p.ps;
-        // 手指/指针划过时，附近的尘会轻轻让开并亮一下
-        if(ptrLive){
-          const dx = p.x - dustPtr.x, dy = p.y - dustPtr.y, d2 = dx*dx + dy*dy;
-          if(d2 < 8100 && d2 > 1){ const d = Math.sqrt(d2), f = (90 - d) / 90 * .9; p.x += dx / d * f; p.y += dy / d * f; }
-        }
-        if(p.y < -4){ p.y = cv.height + 4; p.x = Math.random()*cv.width; }
-        if(p.x < -4) p.x = cv.width + 4; else if(p.x > cv.width + 4) p.x = -4;
-        const tw = 0.5 + 0.5 * Math.sin(p.ph * 2);
-        const a = p.star ? .3 + .55 * tw : .22 + .38 * tw;
-        dustCtx.beginPath();
-        dustCtx.arc(p.x, p.y, p.star ? p.r * (0.8 + 0.5 * tw) : p.r, 0, 6.2832);
-        dustCtx.fillStyle = 'rgba(' + p.c + ',' + a.toFixed(3) + ')';
-        dustCtx.fill();
+  requestAnimationFrame(dustTick);
+}
+function dustTick(){
+  const cv = dustCv;
+  if(!cv || !dustCtx) { dustRunning = false; return; }
+  if(!dustOn() || !dustHomeShown()){ dustRunning = false; dustCtx.clearRect(0, 0, cv.width, cv.height); return; }
+  if(!document.hidden){
+    dustCtx.clearRect(0, 0, cv.width, cv.height);
+    const now = performance.now();
+    const ptrLive = now - dustPtr.t < 1200;
+    for(const p of dustParts){
+      p.y -= p.s; p.x += p.dr + Math.sin(p.ph)*.05; p.ph += p.ps;
+      // 手指/指针划过时，附近的尘会轻轻让开并亮一下
+      if(ptrLive){
+        const dx = p.x - dustPtr.x, dy = p.y - dustPtr.y, d2 = dx*dx + dy*dy;
+        if(d2 < 8100 && d2 > 1){ const d = Math.sqrt(d2), f = (90 - d) / 90 * .9; p.x += dx / d * f; p.y += dy / d * f; }
       }
-      // 流星：隔几秒划过一颗，带渐变尾巴
-      if(now >= dustNextMeteor){
-        dustMeteors.push({ x: cv.width * (0.25 + Math.random() * 0.7), y: cv.height * Math.random() * 0.3, vx: -(5 + Math.random() * 3), vy: 3 + Math.random() * 2, life: 1 });
-        dustNextMeteor = now + 5000 + Math.random() * 6000;
-      }
-      dustMeteors = dustMeteors.filter(m => m.life > 0);
-      for(const m of dustMeteors){
-        m.x += m.vx; m.y += m.vy; m.life -= .016;
-        const tail = 14;
-        const grad = dustCtx.createLinearGradient(m.x, m.y, m.x - m.vx * tail, m.y - m.vy * tail);
-        grad.addColorStop(0, 'rgba(255,255,255,' + (0.85 * Math.max(0, m.life)).toFixed(3) + ')');
-        grad.addColorStop(1, 'rgba(255,255,255,0)');
-        dustCtx.strokeStyle = grad;
-        dustCtx.lineWidth = 2;
-        dustCtx.beginPath();
-        dustCtx.moveTo(m.x, m.y);
-        dustCtx.lineTo(m.x - m.vx * tail, m.y - m.vy * tail);
-        dustCtx.stroke();
-      }
+      if(p.y < -4){ p.y = cv.height + 4; p.x = Math.random()*cv.width; }
+      if(p.x < -4) p.x = cv.width + 4; else if(p.x > cv.width + 4) p.x = -4;
+      const tw = 0.5 + 0.5 * Math.sin(p.ph * 2);
+      const a = p.star ? .3 + .55 * tw : .22 + .38 * tw;
+      dustCtx.beginPath();
+      dustCtx.arc(p.x, p.y, p.star ? p.r * (0.8 + 0.5 * tw) : p.r, 0, 6.2832);
+      dustCtx.fillStyle = 'rgba(' + p.c + ',' + a.toFixed(3) + ')';
+      dustCtx.fill();
     }
-    requestAnimationFrame(tick);
-  })();
+    // 流星：隔几秒划过一颗，带渐变尾巴
+    if(now >= dustNextMeteor){
+      dustMeteors.push({ x: cv.width * (0.25 + Math.random() * 0.7), y: cv.height * Math.random() * 0.3, vx: -(5 + Math.random() * 3), vy: 3 + Math.random() * 2, life: 1 });
+      dustNextMeteor = now + 5000 + Math.random() * 6000;
+    }
+    dustMeteors = dustMeteors.filter(m => m.life > 0);
+    for(const m of dustMeteors){
+      m.x += m.vx; m.y += m.vy; m.life -= .016;
+      const tail = 14;
+      const grad = dustCtx.createLinearGradient(m.x, m.y, m.x - m.vx * tail, m.y - m.vy * tail);
+      grad.addColorStop(0, 'rgba(255,255,255,' + (0.85 * Math.max(0, m.life)).toFixed(3) + ')');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      dustCtx.strokeStyle = grad;
+      dustCtx.lineWidth = 2;
+      dustCtx.beginPath();
+      dustCtx.moveTo(m.x, m.y);
+      dustCtx.lineTo(m.x - m.vx * tail, m.y - m.vy * tail);
+      dustCtx.stroke();
+    }
+  }
+  requestAnimationFrame(dustTick);
 }
 const HOME_LIGHT_STOPS = [
   { h: 0,    top: [43, 36, 96, .50],   glow: [186, 198, 255, .20], x: 76, y: 10, stars: .90 },
@@ -3675,6 +3685,7 @@ function navTo(page){
   if(page==='games') renderGames();
   if(page==='sticker') renderStickers();
   if(page==='home') renderHome();
+  if(page === 'home') initDust(); // 星尘只在 Home 转：进 Home 时续跑，离开后 dustTick 自己停
 }
 
 // ══ Home 首页：星空 App 首页，卡片内容都从各模块的现有数据里取 ══
@@ -6988,7 +6999,7 @@ function jumpToFav(id){
   if(f.convId && f.convId !== activeConvId && conversations.some(c=>c.id === f.convId)) switchConversation(f.convId);
   navTo('chat');
   setTimeout(()=>{
-    const row = document.querySelector('.msg-row[data-mid="' + f.mid + '"]');
+    const row = ensureRowRendered(f.mid);
     if(row){
       row.scrollIntoView({ block:'center' });
       const old = row.style.background;
@@ -10962,113 +10973,136 @@ function clearChatHistory(){
   showToast('聊天记录已清空');
 }
 
+// ══ 消息窗口化：长对话只把最近一段渲染进 DOM，往上滚再向前补，治 1000+ 条时的卡顿 ══
+const CHAT_WINDOW = 60;
+let chatFloor = 0; // 当前已渲染的第一条消息在 messages 里的下标
+let rowSink = null; // 建行收集器：非 null 时 addRow 等把行建进这个 fragment（批量渲染/向前补），null=直播追加进 chatWrap
+let chatPrepending = false;
+
+function buildMsgRowInto(m, sink){
+  const prev = rowSink; rowSink = sink;
+  try { buildMsgRow(m); } finally { rowSink = prev; }
+}
+
+// 把一条消息建成行（去向由 rowSink 决定）——原 renderMessagesIntoChat 的逐条逻辑原样搬来，分支一个不少
+function buildMsgRow(m){
+  const isUser = m.role === 'user';
+  if(m.recalled){
+    const note = document.createElement('div');
+    note.className = 'msg-row';
+    note.dataset.mid = m.mid;
+    note.style.cssText = 'justify-content:center;';
+    const span = document.createElement('span');
+    span.style.cssText = 'font-size:11px;color:var(--text-pale);padding:2px 10px;';
+    span.textContent = (isUser ? '糯糯' : 'Zephyr') + ' 撤回了一条消息';
+    note.appendChild(span);
+    (rowSink || chatWrap).appendChild(note);
+    return;
+  }
+  if(m.sysnote){
+    const note = document.createElement('div');
+    note.className = 'msg-row';
+    note.dataset.mid = m.mid;
+    note.style.cssText = 'justify-content:center;';
+    const span = document.createElement('span');
+    span.style.cssText = 'font-size:11px;color:var(--text-pale);padding:2px 10px;';
+    span.textContent = m.display || '';
+    note.appendChild(span);
+    (rowSink || chatWrap).appendChild(note);
+    return;
+  }
+  if(m.callrec){
+    appendCallRecRow(m);
+    return;
+  }
+  if(typeof m.content === 'string'){
+    let dispText = m.content;
+    let dispThinking = m.thinking || '';
+    // 旧记录里混着的思考，显示时也切开折好
+    if(!isUser && !dispThinking){
+      const sp = splitLeakedThinking(dispText);
+      if(sp){ dispThinking = sp.thinking; dispText = sp.reply; }
+    }
+    // 旧记录里 <|channel> 标记包着的思考同样摘出来折好（截图里那条就会自己归位）
+    if(!isUser){
+      const cs = splitChannelThinking(dispText);
+      if(cs){
+        if(cs.thinking) dispThinking = dispThinking ? (dispThinking + '\n\n' + cs.thinking) : cs.thinking;
+        dispText = cs.reply;
+      }
+    }
+    if(!isUser && m.voice && m.voice.data && m.voiceText && dispText.length > m.voiceText.length && dispText.endsWith('\n' + m.voiceText)) dispText = dispText.slice(0, dispText.length - m.voiceText.length - 1);
+    // 情绪标记与语气词标签只给声音听：旧记录重渲染时同样剥掉（存储原文不动，语音重播还要用）
+    const dispShow = !isUser ? stripEmotionForDisplay(dispText) : dispText;
+    let b = null;
+    if(isUser && m.voice && m.voice.data) addVoiceBubble('data:' + (m.voice.type || 'audio/mp4') + ';base64,' + m.voice.data, m.voice.dur || 0, true, m.mid);
+    else if(!isUser && m.voice && m.voice.data && m.voiceText && dispText === m.voiceText){ /* 只有一条语音的回复：文字由语音条下的小字承载 */ }
+    else b = addTextMsg(dispShow, isUser, false, m.mid);
+    if(!isUser && dispThinking && b && b.parentElement){
+      const tb = makeThinkingBlock(b.parentElement, b, true);
+      tb.body.textContent = dispThinking;
+    }
+    if(!isUser && m.sources && m.sources.length && b && b.parentElement){
+      makeSourcesNote(b.parentElement, m.sources);
+    }
+    if(!isUser && m.tools && m.tools.length && b && b.parentElement){
+      const tg = makeToolGroup(b.parentElement, b, true);
+      m.tools.forEach(ev => tg.add(ev));
+    }
+    if(!isUser && m.translation && b && b.parentElement){
+      makeTranslationNote(b.parentElement, m.translation);
+    }
+    if(!isUser && m.song && b && b.parentElement){
+      makeSongCard(b.parentElement, m.song);
+    }
+    if(!isUser && m.work && b && b.parentElement){
+      makeWorkCard(b.parentElement, m.work);
+    }
+    if(!isUser && m.sticker && m.sticker.img && b && b.parentElement){
+      makeStickerImg(b.parentElement, m.sticker);
+    }
+    if(!isUser && m.voice && m.voice.data){
+      const vcol = addVoiceBubble('data:' + (m.voice.type || 'audio/wav') + ';base64,' + m.voice.data, m.voice.dur || 0, false, m.mid);
+      if(vcol && m.voiceText){ const cap = document.createElement('div'); cap.style.cssText = 'font-size:12.5px;color:var(--text-dim);line-height:1.6;max-width:85%;'; cap.textContent = stripEmotionForDisplay(m.voiceText); vcol.appendChild(cap); }
+      if(vcol && m.translation && !b) makeTranslationNote(vcol, m.translation);
+    }
+  } else if(Array.isArray(m.content)){
+    const hasMedia = m.content.some(b=>b.type==='image'||b.type==='document');
+    if(hasMedia){
+      const col = addRow(isUser, m.mid);
+      m.content.forEach(block=>{
+        if(block.type === 'image' && block.source?.data){
+          col.appendChild(imgWrapEl(`data:${block.source.media_type};base64,${block.source.data}`));
+        } else if(block.type === 'document'){
+          const fb = document.createElement('div'); fb.className = 'msg'; fb.textContent = '📄 文件'; col.appendChild(fb);
+        } else if(block.type === 'text' && !/^（糯糯发来了.*图片，请.*自然地回应/.test(block.text || '')){
+          const tb = document.createElement('div'); tb.className = 'msg'; tb.textContent = block.text; col.appendChild(tb);
+        }
+      });
+      if(!rowSink) chatWrap.scrollTop = chatWrap.scrollHeight;
+    } else {
+      m.content.forEach(block=>{ if(block.type === 'text') addTextMsg(block.text, isUser, false, m.mid); });
+    }
+  }
+
+}
+
 function renderMessagesIntoChat(){
   chatWrap.innerHTML = '<div class="empty-tip">✨ 和 Zephyr 说说话吧～</div>';
+  chatFloor = Math.max(0, messages.length - CHAT_WINDOW);
   if(!messages.length) return;
   chatWrap.querySelector('.empty-tip')?.remove();
-  messages.forEach(m=>{
-    const isUser = m.role === 'user';
-    if(m.recalled){
-      const note = document.createElement('div');
-      note.className = 'msg-row';
-      note.dataset.mid = m.mid;
-      note.style.cssText = 'justify-content:center;';
-      const span = document.createElement('span');
-      span.style.cssText = 'font-size:11px;color:var(--text-pale);padding:2px 10px;';
-      span.textContent = (isUser ? '糯糯' : 'Zephyr') + ' 撤回了一条消息';
-      note.appendChild(span);
-      chatWrap.appendChild(note);
-      return;
-    }
-    if(m.sysnote){
-      const note = document.createElement('div');
-      note.className = 'msg-row';
-      note.dataset.mid = m.mid;
-      note.style.cssText = 'justify-content:center;';
-      const span = document.createElement('span');
-      span.style.cssText = 'font-size:11px;color:var(--text-pale);padding:2px 10px;';
-      span.textContent = m.display || '';
-      note.appendChild(span);
-      chatWrap.appendChild(note);
-      return;
-    }
-    if(m.callrec){
-      appendCallRecRow(m);
-      return;
-    }
-    if(typeof m.content === 'string'){
-      let dispText = m.content;
-      let dispThinking = m.thinking || '';
-      // 旧记录里混着的思考，显示时也切开折好
-      if(!isUser && !dispThinking){
-        const sp = splitLeakedThinking(dispText);
-        if(sp){ dispThinking = sp.thinking; dispText = sp.reply; }
-      }
-      // 旧记录里 <|channel> 标记包着的思考同样摘出来折好（截图里那条就会自己归位）
-      if(!isUser){
-        const cs = splitChannelThinking(dispText);
-        if(cs){
-          if(cs.thinking) dispThinking = dispThinking ? (dispThinking + '\n\n' + cs.thinking) : cs.thinking;
-          dispText = cs.reply;
-        }
-      }
-      if(!isUser && m.voice && m.voice.data && m.voiceText && dispText.length > m.voiceText.length && dispText.endsWith('\n' + m.voiceText)) dispText = dispText.slice(0, dispText.length - m.voiceText.length - 1);
-      // 情绪标记与语气词标签只给声音听：旧记录重渲染时同样剥掉（存储原文不动，语音重播还要用）
-      const dispShow = !isUser ? stripEmotionForDisplay(dispText) : dispText;
-      let b = null;
-      if(isUser && m.voice && m.voice.data) addVoiceBubble('data:' + (m.voice.type || 'audio/mp4') + ';base64,' + m.voice.data, m.voice.dur || 0, true, m.mid);
-      else if(!isUser && m.voice && m.voice.data && m.voiceText && dispText === m.voiceText){ /* 只有一条语音的回复：文字由语音条下的小字承载 */ }
-      else b = addTextMsg(dispShow, isUser, false, m.mid);
-      if(!isUser && dispThinking && b && b.parentElement){
-        const tb = makeThinkingBlock(b.parentElement, b, true);
-        tb.body.textContent = dispThinking;
-      }
-      if(!isUser && m.sources && m.sources.length && b && b.parentElement){
-        makeSourcesNote(b.parentElement, m.sources);
-      }
-      if(!isUser && m.tools && m.tools.length && b && b.parentElement){
-        const tg = makeToolGroup(b.parentElement, b, true);
-        m.tools.forEach(ev => tg.add(ev));
-      }
-      if(!isUser && m.translation && b && b.parentElement){
-        makeTranslationNote(b.parentElement, m.translation);
-      }
-      if(!isUser && m.song && b && b.parentElement){
-        makeSongCard(b.parentElement, m.song);
-      }
-      if(!isUser && m.work && b && b.parentElement){
-        makeWorkCard(b.parentElement, m.work);
-      }
-      if(!isUser && m.sticker && m.sticker.img && b && b.parentElement){
-        makeStickerImg(b.parentElement, m.sticker);
-      }
-      if(!isUser && m.voice && m.voice.data){
-        const vcol = addVoiceBubble('data:' + (m.voice.type || 'audio/wav') + ';base64,' + m.voice.data, m.voice.dur || 0, false, m.mid);
-        if(vcol && m.voiceText){ const cap = document.createElement('div'); cap.style.cssText = 'font-size:12.5px;color:var(--text-dim);line-height:1.6;max-width:85%;'; cap.textContent = stripEmotionForDisplay(m.voiceText); vcol.appendChild(cap); }
-        if(vcol && m.translation && !b) makeTranslationNote(vcol, m.translation);
-      }
-    } else if(Array.isArray(m.content)){
-      const hasMedia = m.content.some(b=>b.type==='image'||b.type==='document');
-      if(hasMedia){
-        const col = addRow(isUser, m.mid);
-        m.content.forEach(block=>{
-          if(block.type === 'image' && block.source?.data){
-            col.appendChild(imgWrapEl(`data:${block.source.media_type};base64,${block.source.data}`));
-          } else if(block.type === 'document'){
-            const fb = document.createElement('div'); fb.className = 'msg'; fb.textContent = '📄 文件'; col.appendChild(fb);
-          } else if(block.type === 'text' && !/^（糯糯发来了.*图片，请.*自然地回应/.test(block.text || '')){
-            const tb = document.createElement('div'); tb.className = 'msg'; tb.textContent = block.text; col.appendChild(tb);
-          }
-        });
-        chatWrap.scrollTop = chatWrap.scrollHeight;
-      } else {
-        m.content.forEach(block=>{ if(block.type === 'text') addTextMsg(block.text, isUser, false, m.mid); });
-      }
-    }
-  });
+  const frag = document.createDocumentFragment();
+  const sentinel = document.createElement('div');
+  sentinel.id = 'chatTopSentinel';
+  frag.appendChild(sentinel);
+  for(let i = chatFloor; i < messages.length; i++) buildMsgRowInto(messages[i], frag);
+  chatWrap.appendChild(frag);
+  chatWrap.scrollTop = chatWrap.scrollHeight;
   // 封档线：画在被封档的那条消息下面
   const convForSeal = getActiveConv();
   if(convForSeal && convForSeal.sealedMid){
+    ensureRowRendered(convForSeal.sealedMid);
     const row = chatWrap.querySelector('.msg-row[data-mid="' + convForSeal.sealedMid + '"]');
     if(row){
       const div = document.createElement('div');
@@ -11080,6 +11114,38 @@ function renderMessagesIntoChat(){
   if(selecting) paintSelection();
   updateRegenButton();
 }
+// 向前补一窗旧消息：插到哨兵之后、现有第一行之前，并用高度差锚定滚动位置不跳位
+function prependOlderMessages(){
+  if(chatPrepending || chatFloor <= 0) return false;
+  chatPrepending = true;
+  try {
+    const from = Math.max(0, chatFloor - CHAT_WINDOW);
+    const frag = document.createDocumentFragment();
+    for(let i = from; i < chatFloor; i++) buildMsgRowInto(messages[i], frag);
+    const prevH = chatWrap.scrollHeight, prevTop = chatWrap.scrollTop;
+    const sentinel = document.getElementById('chatTopSentinel');
+    if(sentinel) sentinel.after(frag); else chatWrap.prepend(frag);
+    chatFloor = from;
+    chatWrap.scrollTop = prevTop + (chatWrap.scrollHeight - prevH);
+    return true;
+  } finally { chatPrepending = false; }
+}
+
+// 按 mid 找行前先确保它在窗口内：不在就向前补渲染直到出现，返回行元素（找不到返回 null）
+function ensureRowRendered(mid){
+  if(!mid) return null;
+  let row = chatWrap.querySelector('.msg-row[data-mid="' + mid + '"]');
+  if(row) return row;
+  const idx = messages.findIndex(m=>m.mid === mid);
+  if(idx < 0) return null;
+  while(chatFloor > idx && prependOlderMessages()){}
+  return chatWrap.querySelector('.msg-row[data-mid="' + mid + '"]');
+}
+
+function onChatScroll(){
+  if(chatFloor > 0 && chatWrap.scrollTop < 160) prependOlderMessages();
+}
+
 
 function loadChatHistory(){
   loadConversations();
@@ -11420,7 +11486,7 @@ function msgTimeLabel(mid){
   return fmtMsgTime(ts || Date.now());
 }
 function addRow(isUser, mid){
-  chatWrap.querySelector('.empty-tip')?.remove();
+  if(!rowSink) chatWrap.querySelector('.empty-tip')?.remove();
   const row=document.createElement('div'); row.className=`msg-row ${isUser?'user':'ai'}`;
   if(mid) row.dataset.mid = mid;
   const col=document.createElement('div'); col.className='msg-col';
@@ -11429,9 +11495,9 @@ function addRow(isUser, mid){
   if(!isUser){ row.appendChild(av); }
   else { row.appendChild(av); } // user avatar on right side via flex-direction:row-reverse
   col.appendChild(time); row.appendChild(col);
-  chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; return col;
+  (rowSink || chatWrap).appendChild(row); if(!rowSink) chatWrap.scrollTop=chatWrap.scrollHeight; return col;
 }
-function addTextMsg(text,isUser,skipSave,mid){ const col=addRow(isUser,mid); const b=document.createElement('div'); b.className='msg'; b.textContent=text; col.appendChild(b); chatWrap.scrollTop=chatWrap.scrollHeight; return b; }
+function addTextMsg(text,isUser,skipSave,mid){ const col=addRow(isUser,mid); const b=document.createElement('div'); b.className='msg'; b.textContent=text; col.appendChild(b); if(!rowSink) chatWrap.scrollTop=chatWrap.scrollHeight; return b; }
 function imgWrapEl(src){ const wrap=document.createElement('div'); wrap.className='msg-img-wrap'; const img=document.createElement('img'); img.className='msg-img'; img.src=src; img.onclick=()=>{ if(window.__suppressImgClick && Date.now()-window.__suppressImgClick<900) return; document.getElementById('imgPreviewEl').src=src; document.getElementById('imgPreview').classList.add('show'); }; wrap.appendChild(img); return wrap; }
 function addImgMsg(src,isUser,skipSave,mid){ const col=addRow(isUser,mid); col.appendChild(imgWrapEl(src)); chatWrap.scrollTop=chatWrap.scrollHeight; }
 async function voiceBlobToB64(blob){ const buf = new Uint8Array(await blob.arrayBuffer()); return bytesToB64(buf); }
@@ -11461,7 +11527,7 @@ function buildVoiceWrap(src, dur){
 function addVoiceBubble(src,dur,isUser,mid){
   const col=addRow(isUser,mid);
   col.appendChild(buildVoiceWrap(src, dur));
-  chatWrap.scrollTop=chatWrap.scrollHeight;
+  if(!rowSink) chatWrap.scrollTop=chatWrap.scrollHeight;
   return col;
 }
 function showTyping(){ document.getElementById('typing-row')?.remove(); chatWrap.querySelector('.empty-tip')?.remove(); const row=document.createElement('div'); row.className='msg-row ai'; row.id='typing-row'; const av=getAvatarEl(false); const col=document.createElement('div'); col.className='msg-col'; const b=document.createElement('div'); b.className='msg'; b.innerHTML='<div class="typing-dots"><span></span><span></span><span></span></div>'; col.appendChild(b); row.appendChild(av); row.appendChild(col); chatWrap.appendChild(row); chatWrap.scrollTop=chatWrap.scrollHeight; }
@@ -13532,7 +13598,7 @@ async function callAPI(userText, extraBlocks=null, opts=null){
   } catch(e){
     hideTyping();
     // 失败回滚要按 mid 精确删自己这条：等待期间心跳留言可能已经追加到末尾，pop() 会误删他的话
-    if(!regen && sentUserMid){ const ix = messages.findIndex(m=>m.mid === sentUserMid); if(ix >= 0) messages.splice(ix, 1); }
+    if(!regen && sentUserMid){ const ix = messages.findIndex(m=>m.mid === sentUserMid); if(ix >= 0){ messages.splice(ix, 1); if(ix < chatFloor) chatFloor--; } }
     const failHint = thinkingEnabled() ? '（开着思考模式时若反复失败，可能是模型或接口不支持，去设置里关掉它）' : '';
     const failFull = '发送失败：' + e.message + (e.status ? '\nHTTP 状态：' + e.status : '') + (failHint ? '\n' + failHint : '');
     showErrorToast('发送失败：' + e.message + '（点开看全文）', failFull); return null;
@@ -14679,7 +14745,7 @@ function appendCallRecRow(m) {
   b.innerHTML = (m.callrec.kind === 'video' ? CALLREC_VIDEO_SVG : CALLREC_PHONE_SVG) + '<span></span>';
   b.querySelector('span').textContent = callRecLabel(m);
   col.appendChild(b);
-  chatWrap.scrollTop = chatWrap.scrollHeight;
+  if(!rowSink) chatWrap.scrollTop = chatWrap.scrollHeight;
 }
 function addCallRecord(kind, seconds, cancelled) {
   const label = cancelled ? '已取消' : '通话时长 ' + fmtCallDur(seconds);
@@ -15824,6 +15890,7 @@ initTtsEmotionSel();
 initLock(); // 必须放在初始化区：锁屏状态是后段才声明的 const，提前调用会让整个脚本在启动时崩掉
 applyHomeLight(); refreshHomeLightBtn(); setInterval(applyHomeLight, 60000); // 首页时光：开局上一次，之后每分钟跟着钟走
 initDust(); refreshDustBtn(); // 星尘粒子：背景细尘缓漂（外观可关）
+chatWrap.addEventListener('scroll', onChatScroll, { passive:true }); // 消息窗口化：滚到接近顶部时向前补旧消息
 document.addEventListener('touchstart', function(){}, { passive:true }); // iOS 上要先有这句，按钮的 :active 按压回弹才肯触发
 refreshWeatherSnapshot(); // 天气快照超过半小时就后台悄悄刷新，让 Zephyr 知道糯糯那边的天气
 // PWA：注册 Service Worker（网络优先，改版刷新即新版；不支持的环境静默跳过）
