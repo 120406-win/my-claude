@@ -2455,8 +2455,10 @@
   <div class="settings-body">
     <div id="placeSceneWrap" style="display:none;margin-bottom:12px;">
       <div id="placeSceneBox" style="position:relative;border-radius:18px;overflow:hidden;aspect-ratio:16/9;background:var(--surface);">
-        <img id="placeSceneImg" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
-        <img id="placeZephyrImg" alt="Zephyr" onclick="placeZephyrTap()" style="position:absolute;display:none;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));">
+        <div id="placeStage" style="position:absolute;inset:0;transform-origin:0 0;">
+          <img id="placeSceneImg" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">
+          <img id="placeZephyrImg" alt="Zephyr" onclick="placeZephyrTap()" style="position:absolute;display:none;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));">
+        </div>
         <div id="placeZephyrBubble"></div>
       </div>
       <div id="placeRoomTabs" style="display:none;gap:6px;margin-top:8px;flex-wrap:wrap;"></div>
@@ -7831,6 +7833,7 @@ function wardrobeCardHtml(){
   return h + '</div></div>';
 }
 function renderPlaceScene(p, here){
+  resetPlaceZoom(); // 客厅 2.5D 试点：切房间/切地点先把推镜归零
   const wrap = document.getElementById('placeSceneWrap'); if(!wrap) return;
   const img = document.getElementById('placeSceneImg');
   const z = document.getElementById('placeZephyrImg');
@@ -7861,6 +7864,91 @@ function renderPlaceScene(p, here){
     if(look){ z.src = look.img; z.style.cssText = 'position:absolute;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));' + (ZEPHYR_IMG_POS[look.mode] || ZEPHYR_IMG_POS.stand); z.style.display = 'block'; z.className = look.mode === 'sleep' ? 'z-live-sleep' : 'z-live'; const bl = BLINK_MAP[look.img]; if(bl){ const pi = new Image(); pi.src = bl; } startBlinkLoop(); bindGaze(); }
     else { z.style.display = 'none'; z.className = ''; }
   }
+}
+// ══ 客厅 2.5D 试点：点景推镜 + 拖动差速视差 ══
+// 只对「家 · 客厅」启用，其他房间/地点行为与原来完全一致。素材零改动：
+// 推镜变换只写 #placeStage，差速只写 #placeSceneImg；绝不碰立绘的 transform/translate/rotate（呼吸与视线跟随在用）。
+let placeZoom = { s:1, tx:0, ty:0 };
+let placeZoomDrag = null;      // 进行中的手势 { id, x0, y0, tx, ty, moved, onZephyr }
+let placeZoomDragMoved = false; // 刚结束一次拖动 → 紧接着的那记 click 要拦下，免得误戳到他
+let placeZoomBound = false;
+const PLACE_ZOOM_HOTSPOTS = [
+  { x0:0.36, y0:0.02, x1:0.60, y1:0.55, cx:0.48, cy:0.30, s:1.75 }, // 落地窗
+  { x0:0.00, y0:0.00, x1:0.28, y1:0.52, cx:0.14, cy:0.26, s:1.75 }, // 星空屏
+  { x0:0.55, y0:0.68, x1:1.00, y1:1.00, cx:0.78, cy:0.85, s:1.60 }, // 沙发
+];
+function placeZoomEnabled(){ return currentWorldPlace === 'home' && currentHomeRoom === 'living'; }
+function clampPlaceZoom(){
+  const box = document.getElementById('placeSceneBox'); if(!box) return;
+  const r = box.getBoundingClientRect(); if(!r.width) return;
+  placeZoom.tx = Math.min(0, Math.max(r.width * (1 - placeZoom.s), placeZoom.tx));
+  placeZoom.ty = Math.min(0, Math.max(r.height * (1 - placeZoom.s), placeZoom.ty));
+}
+function applyPlaceZoom(animate){
+  const stage = document.getElementById('placeStage'); if(!stage) return;
+  const scene = document.getElementById('placeSceneImg');
+  const box = document.getElementById('placeSceneBox');
+  clampPlaceZoom();
+  stage.style.transition = animate ? 'transform .55s cubic-bezier(.34,1.3,.5,1)' : 'none';
+  stage.style.transform = 'translate(' + placeZoom.tx + 'px,' + placeZoom.ty + 'px) scale(' + placeZoom.s + ')';
+  if(scene) scene.style.transform = placeZoom.s > 1 ? 'translate(' + (-placeZoom.tx * 0.10).toFixed(1) + 'px,' + (-placeZoom.ty * 0.10).toFixed(1) + 'px) scale(1.06)' : '';
+  if(box) box.style.touchAction = placeZoom.s > 1 ? 'none' : '';
+}
+function resetPlaceZoom(){
+  placeZoom = { s:1, tx:0, ty:0 };
+  placeZoomDrag = null;
+  const stage = document.getElementById('placeStage');
+  if(stage){ stage.style.transition = 'none'; stage.style.transform = ''; }
+  const scene = document.getElementById('placeSceneImg');
+  if(scene) scene.style.transform = '';
+  const box = document.getElementById('placeSceneBox');
+  if(box) box.style.touchAction = '';
+}
+function zoomPlaceTo(fx, fy, s){
+  const box = document.getElementById('placeSceneBox'); if(!box) return;
+  const r = box.getBoundingClientRect(); if(!r.width) return;
+  placeZoom.s = s;
+  placeZoom.tx = r.width / 2 - s * fx * r.width;   // 点 p 映射为 t + s·p：让目标点落到画面中心
+  placeZoom.ty = r.height / 2 - s * fy * r.height;
+  applyPlaceZoom(true);
+}
+function onPlaceSceneTap(fx, fy){
+  if(placeZoom.s > 1){ placeZoom.s = 1; placeZoom.tx = 0; placeZoom.ty = 0; applyPlaceZoom(true); return; }
+  for(const h of PLACE_ZOOM_HOTSPOTS){
+    if(fx >= h.x0 && fx <= h.x1 && fy >= h.y0 && fy <= h.y1){ zoomPlaceTo(h.cx, h.cy, h.s); return; }
+  }
+  zoomPlaceTo(fx, fy, 1.75);
+}
+function bindPlaceZoom(){
+  if(placeZoomBound) return;
+  const box = document.getElementById('placeSceneBox'); if(!box) return;
+  placeZoomBound = true;
+  box.addEventListener('pointerdown', e => {
+    placeZoomDragMoved = false;
+    if(!placeZoomEnabled()){ placeZoomDrag = null; return; }
+    placeZoomDrag = { id:e.pointerId, x0:e.clientX, y0:e.clientY, tx:placeZoom.tx, ty:placeZoom.ty, moved:false, onZephyr:e.target === document.getElementById('placeZephyrImg') };
+    try{ box.setPointerCapture(e.pointerId); }catch(err){}
+  });
+  box.addEventListener('pointermove', e => {
+    const d = placeZoomDrag; if(!d || e.pointerId !== d.id) return;
+    if(Math.abs(e.clientX - d.x0) > 8 || Math.abs(e.clientY - d.y0) > 8) d.moved = true;
+    if(!d.moved || placeZoom.s <= 1) return; // 未放大时拖动不做任何事，页面滚动照旧
+    placeZoom.tx = d.tx + (e.clientX - d.x0);
+    placeZoom.ty = d.ty + (e.clientY - d.y0);
+    applyPlaceZoom(false);
+  });
+  box.addEventListener('pointerup', e => {
+    const d = placeZoomDrag; if(!d || e.pointerId !== d.id) return;
+    placeZoomDrag = null;
+    if(d.moved){ placeZoomDragMoved = true; return; }
+    if(d.onZephyr) return; // 点他走他自己的 onclick（戳他），绝不触发缩放
+    const r = box.getBoundingClientRect(); if(!r.width) return;
+    onPlaceSceneTap((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+  });
+  box.addEventListener('pointercancel', () => { placeZoomDrag = null; });
+  box.addEventListener('click', e => {
+    if(placeZoomDragMoved){ placeZoomDragMoved = false; e.stopPropagation(); e.preventDefault(); }
+  }, true);
 }
 function renderWorld(){
   const starBox = document.getElementById('worldStars');
@@ -15891,6 +15979,7 @@ initLock(); // 必须放在初始化区：锁屏状态是后段才声明的 cons
 applyHomeLight(); refreshHomeLightBtn(); setInterval(applyHomeLight, 60000); // 首页时光：开局上一次，之后每分钟跟着钟走
 initDust(); refreshDustBtn(); // 星尘粒子：背景细尘缓漂（外观可关）
 chatWrap.addEventListener('scroll', onChatScroll, { passive:true }); // 消息窗口化：滚到接近顶部时向前补旧消息
+bindPlaceZoom(); // 客厅 2.5D 试点：点景推镜手势绑定（内部判定只对家·客厅生效）
 document.addEventListener('touchstart', function(){}, { passive:true }); // iOS 上要先有这句，按钮的 :active 按压回弹才肯触发
 refreshWeatherSnapshot(); // 天气快照超过半小时就后台悄悄刷新，让 Zephyr 知道糯糯那边的天气
 // PWA：注册 Service Worker（网络优先，改版刷新即新版；不支持的环境静默跳过）
