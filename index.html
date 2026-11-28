@@ -2203,6 +2203,13 @@
   </div>
   <iframe id="workFrame" sandbox="allow-scripts" style="flex:1;width:100%;border:none;background:#fff;"></iframe>
 </div>
+<div id="callDetail" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:198;flex-direction:column;">
+  <div class="settings-topbar">
+    <button class="back-btn" onclick="closeCallDetail()">←</button>
+    <div class="settings-topbar-title">通话详情</div>
+  </div>
+  <div id="callDetailBody" style="flex:1;overflow-y:auto;padding:14px 12px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;"></div>
+</div>
 <div class="settings-page" id="interestsPage">
   <div class="settings-topbar">
     <button class="back-btn" onclick="goBack()">←</button>
@@ -14044,6 +14051,7 @@ async function fetchTtsUrl(sentence, ttsUrl){
   });
   const data = await resp.json();
   if(!data || !data.audio) return null;
+  if(callAudioSink){ try { callAudioSink.push(data.audio); } catch(e) {} } // 通话存档旁听：只收集，不动播放
   const bytes = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
   return URL.createObjectURL(new Blob([bytes], { type: 'audio/wav' }));
 }
@@ -14120,6 +14128,7 @@ async function speakText(text){
       });
       const data = await resp.json();
       if(data.audio) {
+        if(callAudioSink){ try { callAudioSink.push(data.audio); } catch(e) {} } // 通话存档旁听：只收集，不动播放
         const audioBytes = Uint8Array.from(atob(data.audio), c => c.charCodeAt(0));
         const blob = new Blob([audioBytes], {type: 'audio/wav'});
         const url = URL.createObjectURL(blob);
@@ -14693,7 +14702,17 @@ function startCallSTT() {
     const reply = await callAPI(text);
     hideTyping(); headerSub.textContent = '通话中';
     callBusy = false; callLastActivity = Date.now();
-    if (reply) { await speakText(reply); }
+    // 通话存档：打标 + 存他的声音（浏览器识别没有她的 PCM，她的声音存不了，跳过）；失败静默，不影响通话
+    const turnMsgs = tagCallTurnMessages(sttMid, reply);
+    if (reply) {
+      callAudioSink = [];
+      try { await speakText(reply); } catch(e) {}
+      const segs = callAudioSink; callAudioSink = null;
+      if (turnMsgs && turnMsgs.asst && segs && segs.length) {
+        const merged = mergeCallAudio16k(segs);
+        if (merged) attachCallAsstVoice(turnMsgs.asst, merged);
+      }
+    }
     // 他说完（speakText 内部也会接一次）再继续监听
     if (isCalling && callMicActive) scheduleCallSTT(500);
   };
@@ -14847,10 +14866,12 @@ async function callRecSend(R, chunks, rate) {
     let total = 0; for (const c of chunks) total += c.length;
     const all = new Float32Array(total); let off = 0;
     for (const c of chunks) { all.set(c, off); off += c.length; }
-    const wav = encodeWav16k(resampleTo16k(all, rate));
+    const pcm16 = resampleTo16k(all, rate);
+    const wav = encodeWav16k(pcm16);
+    const wavB64 = bytesToB64(wav);
     const url = (cfg.ttsUrl || '').replace(/\/+$/, '');
     if (!url) throw new Error('no tts url');
-    const res = await fetch(url + '/asr', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: bytesToB64(wav), language: 'zh' }) });
+    const res = await fetch(url + '/asr', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ audio: wavB64, language: 'zh' }) });
     const data = await res.json().catch(() => null);
     if (!res.ok) throw new Error((data && data.error) || ('HTTP ' + res.status));
     const text = data && data.text ? String(data.text).trim() : '';
@@ -14858,6 +14879,7 @@ async function callRecSend(R, chunks, rate) {
       // 与浏览器识别版 onresult 完全同款：callAPI 自己负责把这句存进对话，
       // 这里只管显示气泡（pendingUserMid 让 callAPI 用同一个 mid 存档）
       const sttMid = genMsgId(); pendingUserMid = sttMid;
+      try { callUserAudio[sttMid] = { data: wavB64, dur: pcm16.length / 16000 }; } catch(e) {} // 通话存档：她的这段录音先暂存，等她的消息落库再挂上去
       addTextMsg(text, true, false, sttMid);
       headerSub.textContent = '正在回复…';
       showTyping();
@@ -14865,7 +14887,18 @@ async function callRecSend(R, chunks, rate) {
       let reply = null;
       try { reply = await callAPI(text); } catch(e2) {}
       hideTyping(); headerSub.textContent = '通话中';
-      if (reply && (isCalling || isVideo)) await speakText(reply);
+      // 通话存档：打标 + 她的声音落档 + 收集他的声音落档；全程失败静默，不影响通话
+      const turnMsgs = tagCallTurnMessages(sttMid, reply);
+      attachCallUserAudio(sttMid);
+      if (reply && (isCalling || isVideo)) {
+        callAudioSink = [];
+        try { await speakText(reply); } catch(e3) {}
+        const segs = callAudioSink; callAudioSink = null;
+        if (turnMsgs && turnMsgs.asst && segs && segs.length) {
+          const merged = mergeCallAudio16k(segs);
+          if (merged) attachCallAsstVoice(turnMsgs.asst, merged);
+        }
+      }
     }
   } catch(e) {
     const now = Date.now();
@@ -14891,6 +14924,7 @@ document.getElementById('callBtn').addEventListener('click',async()=>{
   // 录音识别就绪就用它，没就绪才回退浏览器识别
   callMicActive = true;
   callConnected = true;
+  currentCallId = genMsgId(); // 通话存档：接通即立编号，这一通的消息都打这个标
   const okAsr = await listenReadyP;
   if (!okAsr && isCalling) startCallSTT();
 });
@@ -14924,17 +14958,158 @@ function appendCallRecRow(m) {
   b.className = 'msg call-rec-bubble';
   b.innerHTML = (m.callrec.kind === 'video' ? CALLREC_VIDEO_SVG : CALLREC_PHONE_SVG) + '<span></span>';
   b.querySelector('span').textContent = callRecLabel(m);
+  if (m.callrec && m.callrec.id) {
+    b.style.cursor = 'pointer';
+    b.addEventListener('click', (e) => { e.stopPropagation(); openCallDetail(m); });
+  }
   col.appendChild(b);
   if(!rowSink) chatWrap.scrollTop = chatWrap.scrollHeight;
 }
 function addCallRecord(kind, seconds, cancelled) {
   const label = cancelled ? '已取消' : '通话时长 ' + fmtCallDur(seconds);
-  const m = { role: 'user', mid: genMsgId(), ts: Date.now(), callrec: { kind, dur: seconds, cancelled: !!cancelled },
+  const rec = { kind, dur: seconds, cancelled: !!cancelled };
+  if (currentCallId) rec.id = currentCallId; // 通话存档：接通过的才有编号；没接通的取消通话保持现状、没编号
+  currentCallId = null;
+  const m = { role: 'user', mid: genMsgId(), ts: Date.now(), callrec: rec,
     content: '（' + (kind === 'video' ? '视频通话' : '语音通话') + (cancelled ? '，已取消' : '，' + label) + '）' };
   messages.push(m);
   saveChatHistory();
   appendCallRecRow(m);
 }
+
+// ══ 通话存档：整通电话单独成册，双方的声音都留下来 ══
+// 收集只旁听不干预：speakText / fetchTtsUrl 照常播放，存档任何一步失败都静默吞掉，绝不影响打电话本身。
+let currentCallId = null;  // 接通时立编号（语音/视频两个接通点），addCallRecord 写进记录后清空
+let callAudioSink = null;  // 他这一轮回复的 TTS 分段收集器：轮次处理器在 speakText 前置 []、后取走置 null
+const callUserAudio = {};  // 她这一轮的录音暂存：sttMid -> { data, dur }（已是 16k wav 的 base64）
+
+// 把收集到的多段 TTS wav（多为 32k）拼成一条完整 PCM 并降采样到 16k 单声道再入库（省备份空间）。
+// 任一段解析不了 / 不是 16bit PCM 就整体放弃（返回 null），不许半成品入库。
+function mergeCallAudio16k(b64List) {
+  try {
+    if (!b64List || !b64List.length) return null;
+    let merged = null;
+    for (const b64 of b64List) {
+      const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+      const p = parseWavParts(bytes);
+      if (!p || !p.fmt || p.fmt.bits !== 16) return null;
+      const chans = p.fmt.chans || 1;
+      const frames = Math.floor(p.dataLen / (2 * chans));
+      if (!frames) return null;
+      const dv = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+      const mono = new Float32Array(frames);
+      for (let i = 0; i < frames; i++) {
+        let s = 0;
+        for (let ch = 0; ch < chans; ch++) s += dv.getInt16(p.dataOff + (i * chans + ch) * 2, true);
+        mono[i] = (s / chans) / 32768;
+      }
+      const r = resampleTo16k(mono, p.fmt.rate);
+      if (!merged) merged = r;
+      else { const t = new Float32Array(merged.length + r.length); t.set(merged, 0); t.set(r, merged.length); merged = t; }
+    }
+    if (!merged || !merged.length) return null;
+    return { data: bytesToB64(encodeWav16k(merged)), type: 'audio/wav', dur: merged.length / 16000 };
+  } catch (e) { return null; }
+}
+
+// 给这一轮的两条消息打上通话编号。定位法：她的消息用 mid 精确命中（callAPI 就是用这个 mid 存的）；
+// 他的回复是 callAPI 在她这条之后 push 的那条 assistant（13771 行，全轮唯一一条落库的 assistant），
+// 先按 content 与 reply 原文精确匹配，匹配不上再退回「她之后最后一条 assistant」兜底（跳过心跳插入的消息）。
+function tagCallTurnMessages(userMid, replyText) {
+  try {
+    if (!currentCallId || !userMid) return null;
+    let ui = -1;
+    for (let i = messages.length - 1; i >= 0; i--) { if (messages[i] && messages[i].mid === userMid) { ui = i; break; } }
+    if (ui < 0) return null;
+    const um = messages[ui];
+    if (!um.call) um.call = currentCallId;
+    let am = null, fallback = null;
+    for (let i = ui + 1; i < messages.length; i++) {
+      const m = messages[i];
+      if (!m || m.role !== 'assistant' || m.fromHeartbeat) continue;
+      fallback = m;
+      if (replyText && m.content === replyText) am = m;
+    }
+    if (!am) am = fallback;
+    if (am && !am.call) am.call = currentCallId;
+    return { user: um, asst: am };
+  } catch (e) { return null; }
+}
+
+// 她的声音落档：按 sttMid 把暂存录音挂到她那条消息上；消息不在（发送失败被回滚等）就丢弃暂存，不报错。
+function attachCallUserAudio(sttMid) {
+  try {
+    const stash = callUserAudio[sttMid];
+    if (!stash) return;
+    delete callUserAudio[sttMid];
+    const m = messages.find(x => x && x.mid === sttMid);
+    if (m && !m.voice) { m.voice = { data: stash.data, type: 'audio/wav', dur: stash.dur }; saveChatHistory(); }
+  } catch (e) {}
+}
+
+// 他的声音落档：带 voiceText 的消息归 [[语音：]] 语音条流程管（那条流程会自己写 m.voice），不抢；已有 voice 的也不覆盖。
+function attachCallAsstVoice(msg, voiceObj) {
+  try {
+    if (!msg || !voiceObj) return;
+    if (msg.voice || msg.voiceText) return;
+    msg.voice = voiceObj;
+    saveChatHistory();
+  } catch (e) {}
+}
+
+function buildCallDetailRow(m) {
+  const isUser = m.role === 'user';
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + (isUser ? 'user' : 'ai');
+  const col = document.createElement('div');
+  col.className = 'msg-col';
+  let text = '';
+  if (typeof m.content === 'string') text = m.content;
+  else if (Array.isArray(m.content)) text = m.content.filter(b => b && b.type === 'text').map(b => b.text || '').join('\n');
+  if (!isUser) text = stripEmotionForDisplay(text);
+  if (text) {
+    const b = document.createElement('div');
+    b.className = 'msg';
+    b.textContent = text;
+    col.appendChild(b);
+  }
+  if (m.voice && m.voice.data) col.appendChild(buildVoiceWrap('data:' + (m.voice.type || 'audio/wav') + ';base64,' + m.voice.data, m.voice.dur || 0));
+  row.appendChild(col);
+  return row;
+}
+
+function openCallDetail(recMsg) {
+  try {
+    const rec = recMsg && recMsg.callrec;
+    if (!rec || !rec.id) return;
+    const body = document.getElementById('callDetailBody');
+    const ov = document.getElementById('callDetail');
+    if (!body || !ov) return;
+    body.innerHTML = '';
+    const meta = document.createElement('div');
+    meta.style.cssText = 'text-align:center;color:var(--text-pale);font-size:12px;margin:2px 0 8px;';
+    const d = new Date(recMsg.ts || Date.now());
+    const p2 = n => String(n).padStart(2, '0');
+    meta.textContent = d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + p2(d.getHours()) + ':' + p2(d.getMinutes())
+      + ' · ' + (rec.kind === 'video' ? '视频通话' : '语音通话') + (rec.cancelled ? ' · 已取消' : ' · 通话时长 ' + fmtCallDur(rec.dur || 0));
+    body.appendChild(meta);
+    const list = messages.filter(m => m && m.call === rec.id).slice().sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    for (const m of list) body.appendChild(buildCallDetailRow(m));
+    ov.style.display = 'flex';
+    body.scrollTop = 0;
+  } catch (e) {}
+}
+
+function closeCallDetail() {
+  const body = document.getElementById('callDetailBody');
+  if (body) {
+    body.querySelectorAll('.voice-bubble').forEach(w => { try { if (w._audio) w._audio.pause(); } catch (e) {} });
+    body.innerHTML = '';
+  }
+  const ov = document.getElementById('callDetail');
+  if (ov) ov.style.display = 'none';
+}
+
 function minimizeCall(kind) {
   if (kind === 'video') {
     if (!isVideo) return;
@@ -15018,6 +15193,7 @@ document.getElementById('videoBtn').addEventListener('click',async()=>{
   if(reply){ await speakText(reply); }
   // 问候说完才算接通；聆听就绪后他就能听见你说话（借摄像头那路麦克风做录音识别）
   videoConnected = true;
+  currentCallId = genMsgId(); // 通话存档：接通即立编号，这一通的消息都打这个标
   const okAsr = await listenReadyP;
   if (!okAsr && isVideo) showToast('没能打开麦克风识别，视频里先听不见你说话');
 });
