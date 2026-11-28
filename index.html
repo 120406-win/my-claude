@@ -2192,6 +2192,10 @@
     </div>
   </div>
 </div>
+<div id="placeFull" style="display:none;position:fixed;inset:0;background:#000;z-index:195;">
+  <div id="placeFullView" style="position:absolute;inset:0;overflow:hidden;"></div>
+  <button id="placeFullClose" onclick="exitPlaceFull()" aria-label="退出全屏" style="position:absolute;top:calc(10px + env(safe-area-inset-top));left:12px;z-index:5;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(20,16,28,.45);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.92)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+</div>
 <div id="workPlayer" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:200;flex-direction:column;">
   <div class="settings-topbar">
     <button class="back-btn" onclick="closeWorkPlayer()">←</button>
@@ -2460,6 +2464,7 @@
           <img id="placeZephyrImg" alt="Zephyr" onclick="placeZephyrTap()" style="position:absolute;display:none;cursor:pointer;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));">
         </div>
         <div id="placeZephyrBubble"></div>
+        <button id="placeFullBtn" onclick="enterPlaceFull()" aria-label="全屏看场景" style="position:absolute;top:8px;right:8px;z-index:4;width:34px;height:34px;border-radius:50%;border:1px solid rgba(255,255,255,.35);background:rgba(20,16,28,.42);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.92)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/><path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
       </div>
       <div id="placeRoomTabs" style="display:none;gap:6px;margin-top:8px;flex-wrap:wrap;"></div>
     </div>
@@ -7833,6 +7838,7 @@ function wardrobeCardHtml(){
   return h + '</div></div>';
 }
 function renderPlaceScene(p, here){
+  if(placeFullOn) exitPlaceFull(); // 全屏中重渲（切房间/喊他过来等）：先把 stage/bubble 搬回卡片再渲染
   resetPlaceZoom(); // 客厅 2.5D 试点：切房间/切地点先把推镜归零
   const wrap = document.getElementById('placeSceneWrap'); if(!wrap) return;
   const img = document.getElementById('placeSceneImg');
@@ -7872,17 +7878,30 @@ let placeZoom = { s:1, tx:0, ty:0 };
 let placeZoomDrag = null;      // 进行中的手势 { id, x0, y0, tx, ty, moved, onZephyr }
 let placeZoomDragMoved = false; // 刚结束一次拖动 → 紧接着的那记 click 要拦下，免得误戳到他
 let placeZoomBound = false;
+let placeFullOn = false;       // 全屏沉浸模式中（stage/bubble 已搬进 #placeFullView）
+let placeFullGazeBound = false;
 const PLACE_ZOOM_HOTSPOTS = [
   { x0:0.36, y0:0.02, x1:0.60, y1:0.55, cx:0.48, cy:0.30, s:1.75 }, // 落地窗
   { x0:0.00, y0:0.00, x1:0.28, y1:0.52, cx:0.14, cy:0.26, s:1.75 }, // 星空屏
   { x0:0.55, y0:0.68, x1:1.00, y1:1.00, cx:0.78, cy:0.85, s:1.60 }, // 沙发
 ];
 function placeZoomEnabled(){ return currentWorldPlace === 'home' && currentHomeRoom === 'living'; }
+// 视图参数：卡片模式 stage 填满盒子（sw=vw、sh=vh，与原公式等价）；
+// 全屏模式场景按高撑满、宽溢出（sh=vh、sw=vh*16/9），视口 vw/vh 为 overlay 尺寸。
+function placeViewDims(){
+  if(placeFullOn){
+    const v = document.getElementById('placeFullView');
+    const r = v ? v.getBoundingClientRect() : { width:0, height:0 };
+    return { vw:r.width, vh:r.height, sw:r.height * 16 / 9, sh:r.height };
+  }
+  const box = document.getElementById('placeSceneBox');
+  const r = box ? box.getBoundingClientRect() : { width:0, height:0 };
+  return { vw:r.width, vh:r.height, sw:r.width, sh:r.height };
+}
 function clampPlaceZoom(){
-  const box = document.getElementById('placeSceneBox'); if(!box) return;
-  const r = box.getBoundingClientRect(); if(!r.width) return;
-  placeZoom.tx = Math.min(0, Math.max(r.width * (1 - placeZoom.s), placeZoom.tx));
-  placeZoom.ty = Math.min(0, Math.max(r.height * (1 - placeZoom.s), placeZoom.ty));
+  const d = placeViewDims(); if(!d.vw || !d.vh) return;
+  placeZoom.tx = Math.min(0, Math.max(d.vw - d.sw * placeZoom.s, placeZoom.tx));
+  placeZoom.ty = Math.min(0, Math.max(d.vh - d.sh * placeZoom.s, placeZoom.ty));
 }
 function applyPlaceZoom(animate){
   const stage = document.getElementById('placeStage'); if(!stage) return;
@@ -7892,28 +7911,33 @@ function applyPlaceZoom(animate){
   stage.style.transition = animate ? 'transform .55s cubic-bezier(.34,1.3,.5,1)' : 'none';
   stage.style.transform = 'translate(' + placeZoom.tx + 'px,' + placeZoom.ty + 'px) scale(' + placeZoom.s + ')';
   if(scene) scene.style.transform = placeZoom.s > 1 ? 'translate(' + (-placeZoom.tx * 0.10).toFixed(1) + 'px,' + (-placeZoom.ty * 0.10).toFixed(1) + 'px) scale(1.06)' : '';
+  stage.style.touchAction = (placeFullOn || placeZoom.s > 1) ? 'none' : '';
   if(box) box.style.touchAction = placeZoom.s > 1 ? 'none' : '';
 }
 function resetPlaceZoom(){
   placeZoom = { s:1, tx:0, ty:0 };
   placeZoomDrag = null;
   const stage = document.getElementById('placeStage');
-  if(stage){ stage.style.transition = 'none'; stage.style.transform = ''; }
+  if(stage){ stage.style.transition = 'none'; stage.style.transform = ''; stage.style.touchAction = placeFullOn ? 'none' : ''; }
   const scene = document.getElementById('placeSceneImg');
   if(scene) scene.style.transform = '';
   const box = document.getElementById('placeSceneBox');
   if(box) box.style.touchAction = '';
 }
 function zoomPlaceTo(fx, fy, s){
-  const box = document.getElementById('placeSceneBox'); if(!box) return;
-  const r = box.getBoundingClientRect(); if(!r.width) return;
+  const d = placeViewDims(); if(!d.vw) return;
   placeZoom.s = s;
-  placeZoom.tx = r.width / 2 - s * fx * r.width;   // 点 p 映射为 t + s·p：让目标点落到画面中心
-  placeZoom.ty = r.height / 2 - s * fy * r.height;
+  placeZoom.tx = d.vw / 2 - s * fx * d.sw;   // 点 p 映射为 t + s·p：让目标点落到视口中心（fx/fy 为 stage 分数坐标）
+  placeZoom.ty = d.vh / 2 - s * fy * d.sh;
   applyPlaceZoom(true);
 }
 function onPlaceSceneTap(fx, fy){
-  if(placeZoom.s > 1){ placeZoom.s = 1; placeZoom.tx = 0; placeZoom.ty = 0; applyPlaceZoom(true); return; }
+  if(placeZoom.s > 1){ // 缩回：回本模式的初始机位（卡片原点 / 全屏居中）
+    placeZoom.s = 1; placeZoom.ty = 0;
+    const d = placeViewDims();
+    placeZoom.tx = placeFullOn ? (d.vw - d.sw) / 2 : 0;
+    applyPlaceZoom(true); return;
+  }
   for(const h of PLACE_ZOOM_HOTSPOTS){
     if(fx >= h.x0 && fx <= h.x1 && fy >= h.y0 && fy <= h.y1){ zoomPlaceTo(h.cx, h.cy, h.s); return; }
   }
@@ -7921,34 +7945,102 @@ function onPlaceSceneTap(fx, fy){
 }
 function bindPlaceZoom(){
   if(placeZoomBound) return;
-  const box = document.getElementById('placeSceneBox'); if(!box) return;
+  const stage = document.getElementById('placeStage'); if(!stage) return;
   placeZoomBound = true;
-  box.addEventListener('pointerdown', e => {
+  // 监听绑在 stage 本身：全屏时 stage/bubble 搬进 overlay，盒子不再是祖先、冒泡会断；绑 stage 则两种模式都通。
+  stage.addEventListener('pointerdown', e => {
     placeZoomDragMoved = false;
-    if(!placeZoomEnabled()){ placeZoomDrag = null; return; }
+    if(!placeZoomEnabled() && !placeFullOn){ placeZoomDrag = null; return; } // 卡片模式非客厅不接手势；全屏里任何房间都可平移
     placeZoomDrag = { id:e.pointerId, x0:e.clientX, y0:e.clientY, tx:placeZoom.tx, ty:placeZoom.ty, moved:false, onZephyr:e.target === document.getElementById('placeZephyrImg') };
-    try{ box.setPointerCapture(e.pointerId); }catch(err){}
+    try{ stage.setPointerCapture(e.pointerId); }catch(err){}
   });
-  box.addEventListener('pointermove', e => {
+  stage.addEventListener('pointermove', e => {
     const d = placeZoomDrag; if(!d || e.pointerId !== d.id) return;
     if(Math.abs(e.clientX - d.x0) > 8 || Math.abs(e.clientY - d.y0) > 8) d.moved = true;
-    if(!d.moved || placeZoom.s <= 1) return; // 未放大时拖动不做任何事，页面滚动照旧
+    if(!d.moved) return;
+    if(placeZoom.s <= 1 && !placeFullOn) return; // 卡片模式未放大时拖动不做任何事，页面滚动照旧；全屏 s=1 即可转头看房
     placeZoom.tx = d.tx + (e.clientX - d.x0);
     placeZoom.ty = d.ty + (e.clientY - d.y0);
     applyPlaceZoom(false);
   });
-  box.addEventListener('pointerup', e => {
+  stage.addEventListener('pointerup', e => {
     const d = placeZoomDrag; if(!d || e.pointerId !== d.id) return;
     placeZoomDrag = null;
     if(d.moved){ placeZoomDragMoved = true; return; }
     if(d.onZephyr) return; // 点他走他自己的 onclick（戳他），绝不触发缩放
-    const r = box.getBoundingClientRect(); if(!r.width) return;
-    onPlaceSceneTap((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);
+    if(!placeZoomEnabled()) return; // 推镜只对家·客厅：全屏里的其他房间轻点不推镜（只有平移）
+    const view = placeFullOn ? document.getElementById('placeFullView') : document.getElementById('placeSceneBox');
+    if(!view) return;
+    const r = view.getBoundingClientRect(); if(!r.width) return;
+    const d2 = placeViewDims(); if(!d2.sw) return;
+    // 视口坐标 → stage 分数坐标：stage 点 p = (tap − t) / s，再除以 stage 尺寸
+    const px = (e.clientX - r.left - placeZoom.tx) / placeZoom.s;
+    const py = (e.clientY - r.top - placeZoom.ty) / placeZoom.s;
+    onPlaceSceneTap(px / d2.sw, py / d2.sh);
   });
-  box.addEventListener('pointercancel', () => { placeZoomDrag = null; });
-  box.addEventListener('click', e => {
+  stage.addEventListener('pointercancel', () => { placeZoomDrag = null; });
+  stage.addEventListener('click', e => {
     if(placeZoomDragMoved){ placeZoomDragMoved = false; e.stopPropagation(); e.preventDefault(); }
   }, true);
+}
+// ══ 全屏沉浸模式：场景按高撑满、宽溢出，拖动转头看整间房 ══
+// 进出都是把 #placeStage 与 #placeZephyrBubble 两个节点 appendChild 搬家（不克隆），
+// 所以立绘的眨眼/戳他/气泡等一切按 id 找节点的机制都不受影响。
+function enterPlaceFull(){
+  if(placeFullOn) return;
+  const ov = document.getElementById('placeFull');
+  const view = document.getElementById('placeFullView');
+  const stage = document.getElementById('placeStage');
+  const bub = document.getElementById('placeZephyrBubble');
+  if(!ov || !view || !stage) return;
+  resetPlaceZoom();
+  view.appendChild(stage);
+  if(bub) view.appendChild(bub);
+  stage.style.left = '0px'; stage.style.top = '0px'; stage.style.right = 'auto'; stage.style.bottom = 'auto';
+  stage.style.width = 'auto'; stage.style.height = '100%'; stage.style.aspectRatio = '16 / 9';
+  ov.style.display = 'block';
+  placeFullOn = true;
+  document.body.style.overflow = 'hidden';
+  view.style.touchAction = 'none';
+  bindPlaceFullGaze();
+  const d = placeViewDims(); // 初始机位：s=1、房间居中
+  placeZoom.s = 1; placeZoom.ty = 0; placeZoom.tx = (d.vw - d.sw) / 2;
+  applyPlaceZoom(false);
+}
+function exitPlaceFull(){
+  if(!placeFullOn) return;
+  const ov = document.getElementById('placeFull');
+  const box = document.getElementById('placeSceneBox');
+  const stage = document.getElementById('placeStage');
+  const bub = document.getElementById('placeZephyrBubble');
+  resetPlaceZoom();
+  if(box){ if(stage) box.appendChild(stage); if(bub) box.appendChild(bub); } // 按原顺序搬回（stage 第一、bubble 第二）
+  if(stage) stage.style.cssText = 'position:absolute;inset:0;transform-origin:0 0;'; // 全屏几何（height/aspect-ratio 等内联）一次清掉
+  placeFullOn = false;
+  if(ov) ov.style.display = 'none';
+  document.body.style.overflow = '';
+}
+// bindGaze 本体绑在 #placeSceneBox 上并按盒子 rect 算视线——全屏搬家后盒子不在冒泡路径上、rect 也不对，
+// 故这里给 overlay 补一个同公式的视线跟随（以 view rect 为参照，写的仍是立绘的 translate/rotate），bindGaze 一字未动。
+function bindPlaceFullGaze(){
+  if(placeFullGazeBound) return;
+  const view = document.getElementById('placeFullView'); if(!view) return;
+  placeFullGazeBound = true;
+  view.addEventListener('pointermove', e => {
+    if(!placeFullOn) return;
+    const z = document.getElementById('placeZephyrImg');
+    if(!z || z.style.display === 'none' || z.className === 'z-live-sleep') return;
+    const r = view.getBoundingClientRect();
+    if(!r.width) return;
+    const dx = Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / (r.width / 2)));
+    const dy = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / (r.height / 2)));
+    z.style.translate = (dx * 7).toFixed(1) + 'px ' + (dy * 4).toFixed(1) + 'px';
+    z.style.rotate = (dx * 0.9).toFixed(2) + 'deg';
+  });
+  view.addEventListener('pointerleave', () => {
+    const z = document.getElementById('placeZephyrImg');
+    if(z){ z.style.translate = '0px 0px'; z.style.rotate = '0deg'; }
+  });
 }
 function renderWorld(){
   const starBox = document.getElementById('worldStars');
